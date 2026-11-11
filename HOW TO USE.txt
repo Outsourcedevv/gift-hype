@@ -1,0 +1,46 @@
+﻿GIFT HYPE
+=========
+TikTok LIVE gifts play sounds, pop up on your stream, and make things happen in your games.
+
+OPEN IT
+  Double-click "Gift Hype" on your desktop. It opens in its own window.
+  Closing the window closes Gift Hype.
+  (First time on a new PC: run Setup.bat once. It installs what's needed and adds the desktop icon.)
+
+GO LIVE
+  1. Type your TikTok name at the top and press Connect.
+     It keeps trying until your live starts, and connects by itself next time.
+  2. Pick the game on the left that you're playing (it says ON).
+  3. Every gift you set up now plays its sound and does its actions.
+
+GAMES
+  "+ New game" makes a game with its own gift list. Pick how gifts reach it:
+    Minecraft     - runs Minecraft commands on your server. Pick your server from the list:
+                    Gift Hype finds it on your PC and connects by itself, no password to type.
+                    If it says gift commands are off, press the pink button and restart that server once.
+    My own game   - your game connects to ws://127.0.0.1:8765 and gets a message per gift
+                    (the app shows code you can paste into your game)
+    Key presses   - presses keys in whatever window is in front (click into your game first)
+    Sounds only   - just sounds and stream popups
+
+GIFTS
+  + Add gift / Browse all gifts   - every TikTok gift with its picture and price
+  + Any other gift                - plays for any gift you didn't set up
+  Each gift has: a sound (and volume), "Pop up on stream", what it does, and actions.
+  "Once per gift in a streak" = a streak of 5 Roses does the actions 5 times.
+  Test tries it right away without going live.
+
+SOUNDS
+  20 starter sounds are built in (fahh, bruh, vine boom, airhorn, sad trombone, sheesh, let's go...).
+  Add your own: drop .mp3 / .wav files on "Add your own sounds", or press "upload..." next to a gift.
+  They're saved in the sounds\custom folder.
+
+ON STREAM (OBS / TikTok LIVE Studio)
+  Add a Browser source: http://localhost:4747/overlay  size 1920 x 1080.
+  If your streaming app doesn't hear the Gift Hype window, set "Play sounds in" to the OBS overlay.
+
+MAKING CHANGES
+  Change anything in the app itself (games, gifts, sounds, settings): it saves by itself.
+  Change how the app works: ask Claude in the Parkour TT project. The files are in this folder.
+  After a change, close the Gift Hype window and open it again from the desktop.
+

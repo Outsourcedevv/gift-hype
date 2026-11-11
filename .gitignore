@@ -1,0 +1,10 @@
+# Downloaded by Setup.bat
+node_modules/
+
+# Your own stuff, made when you use the app (TikTok name, keys, games, server paths, window profile)
+data/*
+!data/gift-catalog.json
+sounds/custom/*
+!sounds/custom/.gitkeep
+
+*.log

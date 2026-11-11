@@ -1,0 +1,811 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gift Hype</title>
+<link rel="icon" href="/icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0e1013;
+  --panel: #171a1f;
+  --panel-2: #1f232a;
+  --line: #2b3039;
+  --text: #e9ecf1;
+  --muted: #8b93a1;
+  --accent: #25f4ee;
+  --pink: #fe2c55;
+  --green: #4ade80;
+  --amber: #fbbf24;
+  --red: #f87171;
+  --radius: 10px;
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font-size: 15px; }
+button, input, select, textarea { font: inherit; color: inherit; }
+header {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  padding: 12px 20px; border-bottom: 1px solid var(--line); background: #0b0d10;
+  position: sticky; top: 0; z-index: 5;
+}
+.brand { font-weight: 700; letter-spacing: .02em; font-size: 18px; display: flex; align-items: center; gap: 10px; }
+.brand img { width: 28px; height: 28px; border-radius: 7px; }
+.brand span { color: var(--accent); }
+.brand em { font-style: normal; color: var(--pink); }
+.connect { display: flex; gap: 8px; align-items: center; margin-left: 12px; }
+.at { position: relative; }
+.at input[type=text] { padding-left: 26px; width: 210px; }
+.at::before { content: '@'; position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--muted); }
+.chips { display: flex; gap: 8px; margin-left: auto; flex-wrap: wrap; }
+.chip {
+  display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px;
+  background: var(--panel); border: 1px solid var(--line); font-size: 13px; color: var(--muted);
+}
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--red); flex: none; }
+.dot.on { background: var(--green); box-shadow: 0 0 8px var(--green); }
+.dot.wait { background: var(--amber); }
+.dot.idle { background: var(--muted); }
+.tterr { width: 100%; color: var(--amber); font-size: 13px; margin: -4px 0 0; }
+.tterr:empty { display: none; }
+
+main { display: grid; grid-template-columns: 230px minmax(0, 1fr) 340px; gap: 20px; padding: 20px; max-width: 1700px; margin: 0 auto; }
+@media (max-width: 1250px) { main { grid-template-columns: 210px minmax(0, 1fr); } .side-right { grid-column: 1 / -1; } }
+@media (max-width: 760px) { main { grid-template-columns: 1fr; padding: 12px; } .at input[type=text] { width: 150px; } }
+.col { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+section { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; }
+h2 { margin: 0 0 14px; font-size: 13px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); font-weight: 500; display: flex; align-items: center; gap: 10px; }
+h2 .right { margin-left: auto; text-transform: none; letter-spacing: 0; }
+label.field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--muted); }
+input[type=text], input[type=number], input[type=password], select, textarea {
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; min-width: 0;
+}
+textarea { resize: vertical; font-family: 'JetBrains Mono', monospace; font-size: 13px; }
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+input[type=range] { accent-color: var(--accent); }
+input[type=checkbox] { accent-color: var(--accent); width: 16px; height: 16px; }
+button {
+  border: 1px solid var(--line); background: var(--panel-2); border-radius: 8px; padding: 9px 14px; cursor: pointer; white-space: nowrap;
+}
+button:hover { border-color: var(--muted); }
+button.primary { background: var(--accent); color: #031a1a; border-color: var(--accent); font-weight: 700; }
+button.primary:hover { filter: brightness(1.1); }
+button.pink { background: var(--pink); color: #fff; border-color: var(--pink); font-weight: 700; }
+button.danger { color: var(--red); }
+button.ghost { background: transparent; }
+button.small { padding: 6px 10px; font-size: 13px; }
+button.icon { padding: 6px 9px; }
+.hint { color: var(--muted); font-size: 13px; margin: 10px 0 0; line-height: 1.45; }
+.hint code, code { overflow-wrap: anywhere; }
+.hint code, code { font-family: 'JetBrains Mono', monospace; font-size: 12px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px; color: var(--text); }
+.check { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); cursor: pointer; }
+
+/* Games sidebar */
+.games { display: flex; flex-direction: column; gap: 6px; }
+.game-btn {
+  display: flex; align-items: center; gap: 10px; text-align: left; width: 100%; padding: 10px 12px;
+  background: transparent; border: 1px solid transparent; border-radius: 9px;
+}
+.game-btn:hover { background: var(--panel-2); border-color: var(--line); }
+.game-btn.on { background: var(--panel-2); border-color: var(--accent); }
+.game-btn .gi { font-size: 22px; width: 28px; text-align: center; }
+.game-btn .gn { font-weight: 700; overflow: hidden; text-overflow: ellipsis; }
+.game-btn .gs { font-size: 12px; color: var(--muted); }
+.game-btn .live { margin-left: auto; font-size: 10px; font-weight: 700; color: var(--pink); letter-spacing: .08em; }
+.new-game { margin-top: 10px; width: 100%; }
+
+/* Game header */
+.ghead { display: grid; grid-template-columns: 64px 1fr auto; gap: 12px; align-items: center; }
+.ghead .emoji { font-size: 28px; text-align: center; padding: 6px; }
+.ghead .gtitle { font-size: 20px; font-weight: 700; }
+.ghead .btns { display: flex; gap: 6px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; flex-wrap: wrap; }
+.seg button { border: 0; border-radius: 0; background: var(--panel-2); padding: 9px 14px; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-checked=true] { background: var(--accent); color: #031a1a; font-weight: 700; }
+.conn-box { margin-top: 14px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; align-items: end; }
+@media (max-width: 900px) { .conn-box { grid-template-columns: 1fr 1fr; } }
+.conn-box .wide { grid-column: 1 / -1; }
+.snippet { position: relative; }
+.snippet pre { margin: 0; background: #0b0d10; border: 1px solid var(--line); border-radius: 8px; padding: 12px; font-family: 'JetBrains Mono', monospace; font-size: 12px; overflow-x: auto; color: #c9d1d9; }
+.snippet button { position: absolute; top: 8px; right: 8px; }
+.pill { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+
+/* Gift rules */
+.rules { display: flex; flex-direction: column; gap: 12px; }
+.rule { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.rule-top { display: grid; grid-template-columns: 52px minmax(130px, 1fr) minmax(150px, 1.3fr) auto; gap: 10px; align-items: center; }
+@media (max-width: 760px) { .rule-top { grid-template-columns: 52px 1fr; } .rule-top > :nth-child(n+3) { grid-column: 1 / -1; } }
+.gimg { width: 52px; height: 52px; border-radius: 9px; background: #2a2f38; display: grid; place-items: center; font-size: 24px; overflow: hidden; }
+.gimg img { width: 100%; height: 100%; object-fit: contain; }
+.gname { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.gname input { width: 100%; font-weight: 700; }
+.coins { font-size: 12px; color: var(--amber); font-family: 'JetBrains Mono', monospace; padding-left: 2px; }
+.rule-top > input { width: 100%; }
+.rule-actions { display: flex; gap: 6px; justify-content: flex-end; }
+.rule-sound { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding-left: 62px; }
+@media (max-width: 760px) { .rule-sound { padding-left: 0; } }
+.rule-sound select { min-width: 170px; }
+.vol { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.vol input { width: 90px; }
+.acts { display: flex; flex-direction: column; gap: 8px; padding-left: 62px; }
+@media (max-width: 760px) { .acts { padding-left: 0; } }
+.act { display: grid; grid-template-columns: 120px minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.act .tag { font-size: 12px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: .06em; }
+.act .fields { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; min-width: 0; }
+.act .fields input[type=text] { flex: 1; min-width: 140px; }
+.act .fields input[type=number] { width: 80px; }
+.act .fields span { font-size: 12px; color: var(--muted); }
+.add-act { display: flex; gap: 8px; align-items: center; }
+.add-act select { font-size: 13px; padding: 6px 10px; }
+.toolbar { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; align-items: center; }
+.saved { color: var(--green); font-size: 13px; opacity: 0; transition: opacity .3s; margin-left: auto; }
+.saved.show { opacity: 1; }
+.empty { color: var(--muted); font-size: 14px; padding: 6px 0; }
+
+/* Feed */
+.feed { display: flex; flex-direction: column; gap: 8px; max-height: 340px; overflow-y: auto; }
+.feed .item { display: flex; gap: 10px; align-items: center; padding: 8px; border-radius: 8px; background: var(--panel-2); animation: pop .35s ease; }
+.feed .item .gimg { width: 36px; height: 36px; font-size: 18px; }
+.feed .who { font-weight: 700; }
+.feed .what { color: var(--muted); font-size: 13px; }
+.feed .eff { color: var(--accent); font-size: 13px; }
+.feed .eff.none { color: var(--muted); font-style: italic; }
+@keyframes pop { from { transform: translateY(-6px); opacity: 0; } }
+
+/* Sounds */
+.sounds { display: flex; flex-direction: column; gap: 4px; max-height: 330px; overflow-y: auto; }
+.snd { display: flex; align-items: center; gap: 8px; padding: 5px 6px; border-radius: 7px; }
+.snd:hover { background: var(--panel-2); }
+.snd .sn { flex: 1; text-transform: capitalize; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.snd .mine { font-size: 10px; color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: 0 4px; text-transform: uppercase; }
+.snd button { padding: 3px 8px; font-size: 12px; }
+.drop { margin-top: 10px; border: 2px dashed var(--line); border-radius: 9px; padding: 14px; text-align: center; color: var(--muted); font-size: 13px; cursor: pointer; }
+.drop.over { border-color: var(--accent); color: var(--accent); }
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.row + .row { margin-top: 10px; }
+.log { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--muted); max-height: 160px; overflow-y: auto; white-space: pre-wrap; margin: 0; }
+details summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+
+/* Dialogs */
+dialog { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 12px; padding: 0; width: min(920px, 94vw); max-height: 86vh; }
+dialog::backdrop { background: rgba(0,0,0,.6); }
+.dlg-head { display: flex; gap: 10px; align-items: center; padding: 16px 18px; border-bottom: 1px solid var(--line); }
+.dlg-head h3 { margin: 0; font-size: 17px; }
+.dlg-head input { flex: 1; }
+.dlg-body { padding: 16px 18px; overflow-y: auto; max-height: calc(86vh - 70px); }
+.gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 10px; }
+.gcard { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 6px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 9px; cursor: pointer; text-align: center; }
+.gcard:hover { border-color: var(--accent); }
+.gcard img { width: 52px; height: 52px; object-fit: contain; }
+.gcard .n { font-size: 13px; font-weight: 700; line-height: 1.2; }
+.new-grid { display: grid; grid-template-columns: 90px 1fr; gap: 12px; }
+.types { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+.type { text-align: left; padding: 14px; white-space: normal; }
+.type b { display: block; margin-bottom: 4px; }
+.type span { font-size: 13px; color: var(--muted); }
+.type[aria-checked=true] { border-color: var(--accent); background: #13292b; }
+.toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--panel); border: 1px solid var(--line); padding: 10px 16px; border-radius: 9px; font-size: 14px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 20; }
+.toast.show { opacity: 1; }
+.toast.err { border-color: var(--red); color: var(--red); }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><img src="/icon.png" alt=""><div><span>GIFT</span> HYPE · <em>LIVE</em></div></div>
+  <div class="connect">
+    <div class="at"><input type="text" id="ttUser" placeholder="your TikTok name" aria-label="TikTok username" autocomplete="off"></div>
+    <button class="primary" id="ttBtn">Connect</button>
+  </div>
+  <div class="chips">
+    <div class="chip"><span class="dot" id="ttDot"></span><span id="ttText">TikTok offline</span></div>
+    <div class="chip"><span class="dot idle" id="gmDot"></span><span id="gmText">No game link</span></div>
+  </div>
+  <p class="tterr" id="ttErr"></p>
+</header>
+
+<main>
+  <div class="col">
+    <section>
+      <h2>Games</h2>
+      <div class="games" id="games"></div>
+      <button class="new-game" id="newGame">+ New game</button>
+      <p class="hint">Each game has its own gifts. The highlighted one is the one your gifts go to.</p>
+    </section>
+  </div>
+
+  <div class="col">
+    <section id="gameCard">
+      <div class="ghead">
+        <input type="text" class="emoji" id="gIcon" maxlength="8" aria-label="Game icon (emoji)">
+        <input type="text" class="gtitle" id="gName" maxlength="60" aria-label="Game name">
+        <div class="btns">
+          <button class="small" id="gDup" title="Make a copy of this game">Copy</button>
+          <button class="small danger" id="gDel">Delete</button>
+        </div>
+      </div>
+      <h2 style="margin-top:18px">Connects to</h2>
+      <div class="seg" role="radiogroup" aria-label="How gifts reach the game">
+        <button data-conn="minecraft" role="radio">⛏️ Minecraft</button>
+        <button data-conn="websocket" role="radio">🕹️ My own game</button>
+        <button data-conn="keys" role="radio">⌨️ Key presses</button>
+        <button data-conn="none" role="radio">🔊 Sounds only</button>
+      </div>
+      <div id="connBox"></div>
+    </section>
+
+    <section>
+      <h2>Gifts &amp; what they do <span class="right"><span class="saved" id="saved">Saved</span></span></h2>
+      <div class="rules" id="rules"></div>
+      <div class="toolbar">
+        <button class="primary" id="addGift">+ Add gift</button>
+        <button id="browse">Browse all gifts</button>
+        <button id="addAny" title="Plays for any gift you haven't set up">+ Any other gift</button>
+      </div>
+    </section>
+  </div>
+
+  <div class="col side-right">
+    <section>
+      <h2>Live gifts <span class="right"><button class="small ghost" id="clearFeed">Clear</button></span></h2>
+      <div class="feed" id="feed"><div class="empty">Gifts will show up here.</div></div>
+    </section>
+
+    <section>
+      <h2>Sounds <span class="right"><button class="small" id="stopAll">■ Stop</button></span></h2>
+      <div class="row">
+        <label class="vol" style="flex:1">Volume <input type="range" id="master" min="0" max="1" step="0.05" style="flex:1"></label>
+      </div>
+      <div class="sounds" id="sounds" style="margin-top:10px"></div>
+      <label class="drop" id="drop">
+        <input type="file" id="upload" accept=".mp3,.wav,.ogg,.m4a,audio/*" multiple hidden>
+        <b>+ Add your own sounds</b><br>Drop .mp3 / .wav files here, or click
+      </label>
+    </section>
+
+    <section>
+      <h2>Settings</h2>
+      <label class="field">Play sounds in
+        <select id="soundsIn">
+          <option value="app">This app (you and your stream hear them)</option>
+          <option value="overlay">The OBS overlay only</option>
+        </select>
+      </label>
+      <div class="row" style="margin-top:14px"><label class="check"><input type="checkbox" id="autoConnect"> Connect to TikTok by itself when the app opens</label></div>
+      <h2 style="margin-top:18px">Stream overlay</h2>
+      <div class="row">
+        <code id="ovUrl"></code>
+        <button class="small" id="ovCopy">Copy</button>
+      </div>
+      <div class="row">
+        <label class="field" style="flex:1">Popups at
+          <select id="ovPos"><option value="top">Top</option><option value="middle">Middle</option><option value="bottom">Bottom</option></select>
+        </label>
+        <label class="field" style="flex:1">Size
+          <input type="range" id="ovScale" min="0.5" max="2.5" step="0.1">
+        </label>
+      </div>
+      <p class="hint">In OBS or TikTok LIVE Studio add a <b>Browser</b> source with that address, size 1920 × 1080. Gift popups show on your stream.</p>
+      <details style="margin-top:14px">
+        <summary>Euler Stream key (only if TikTok says "too many connects")</summary>
+        <div class="row" style="margin-top:10px"><input type="password" id="euler" placeholder="paste your free key from eulerstream.com" style="flex:1"><button class="small" id="eulerSave">Save</button></div>
+      </details>
+      <details style="margin-top:10px">
+        <summary>Activity log</summary>
+        <pre class="log" id="log" style="margin-top:10px"></pre>
+      </details>
+    </section>
+  </div>
+</main>
+
+<dialog id="gallery">
+  <div class="dlg-head"><h3>All gifts</h3><input type="text" id="gSearch" placeholder="Search gifts..."><button class="ghost" id="gClose">✕</button></div>
+  <div class="dlg-body"><div class="gallery" id="gGrid"></div></div>
+</dialog>
+
+<dialog id="newDlg" style="width:min(640px,94vw)">
+  <div class="dlg-head"><h3>New game</h3><button class="ghost" style="margin-left:auto" id="nClose">✕</button></div>
+  <div class="dlg-body">
+    <div class="new-grid">
+      <label class="field">Icon <input type="text" id="nIcon" value="🎮" maxlength="8" style="font-size:24px;text-align:center"></label>
+      <label class="field">Name <input type="text" id="nName" placeholder="e.g. My Zombie Game" maxlength="60"></label>
+    </div>
+    <div class="types" role="radiogroup" aria-label="Game type">
+      <button class="type" data-ntype="minecraft" role="radio"><b>⛏️ Minecraft</b><span>Runs Minecraft commands on your server (RCON).</span></button>
+      <button class="type" data-ntype="websocket" role="radio"><b>🕹️ My own game</b><span>Your game connects to Gift Hype and gets a message for each gift.</span></button>
+      <button class="type" data-ntype="keys" role="radio"><b>⌨️ Key presses</b><span>Presses keys in whatever game is open. Works with lots of PC games.</span></button>
+      <button class="type" data-ntype="none" role="radio"><b>🔊 Sounds only</b><span>Just sounds and stream popups for gifts.</span></button>
+    </div>
+    <div class="toolbar"><button class="primary" id="nCreate" style="margin-left:auto">Create game</button></div>
+  </div>
+</dialog>
+
+<datalist id="giftNames"></datalist>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const pic = url => url ? '/gift-img?u=' + encodeURIComponent(url) : '';
+const coinText = c => c == null ? '' : `🪙 ${Number(c).toLocaleString()}`;
+
+async function api(path, body) {
+  const r = await fetch(path, { method: body === undefined ? 'GET' : 'POST', headers: { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || 'Something went wrong');
+  return j;
+}
+let toastTimer;
+function toast(msg, err) {
+  const t = $('toast');
+  t.textContent = msg; t.className = 'toast show' + (err ? ' err' : '');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.className = 'toast', 2600);
+}
+
+let settings = {}, gamesList = [], game = null, sounds = [], status = {}, catalog = [];
+
+// ----- Sounds -----
+const playing = new Set();
+function playSound(file, volume = 1) {
+  if (!file) return;
+  if (playing.size >= 6) { const oldest = playing.values().next().value; oldest.pause(); playing.delete(oldest); }
+  const a = new Audio('/sounds/' + file.split('/').map(encodeURIComponent).join('/'));
+  a.volume = Math.max(0, Math.min(1, volume));
+  playing.add(a);
+  a.onended = a.onerror = () => playing.delete(a);
+  a.play().catch(() => playing.delete(a));
+}
+function stopAll() { playing.forEach(a => a.pause()); playing.clear(); }
+$('stopAll').onclick = stopAll;
+const soundName = file => sounds.find(s => s.file === file)?.name || (file ? file.split('/').pop() : 'None');
+
+function renderSounds() {
+  const box = $('sounds');
+  box.innerHTML = sounds.map(s => `<div class="snd">
+    <button data-play="${esc(s.file)}" aria-label="Play ${esc(s.name)}">▶</button>
+    <span class="sn">${esc(s.name)}</span>
+    ${s.custom ? `<span class="mine">yours</span><button class="ghost danger" data-delsnd="${esc(s.file)}" aria-label="Delete ${esc(s.name)}">✕</button>` : ''}
+  </div>`).join('') || '<div class="empty">No sounds yet.</div>';
+  box.querySelectorAll('[data-play]').forEach(b => b.onclick = () => playSound(b.dataset.play, settings.masterVolume));
+  box.querySelectorAll('[data-delsnd]').forEach(b => b.onclick = async () => {
+    if (!confirm(`Delete the sound "${soundName(b.dataset.delsnd)}"?`)) return;
+    try { await api('/api/sounds/delete', { file: b.dataset.delsnd }); } catch (e) { toast(e.message, true); }
+  });
+}
+
+async function uploadFiles(files) {
+  let last = null;
+  for (const f of files) {
+    try {
+      const r = await fetch('/api/sounds/upload?name=' + encodeURIComponent(f.name), { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: f });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error);
+      last = j.file;
+      toast(`Added ${f.name}`);
+    } catch (e) { toast(`${f.name}: ${e.message}`, true); }
+  }
+  return last;
+}
+$('upload').onchange = async e => { await uploadFiles([...e.target.files]); e.target.value = ''; };
+const drop = $('drop');
+drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); };
+drop.ondragleave = () => drop.classList.remove('over');
+drop.ondrop = async e => { e.preventDefault(); drop.classList.remove('over'); await uploadFiles([...e.dataTransfer.files]); };
+
+$('master').oninput = () => saveSettingsSoon({ masterVolume: +$('master').value });
+$('soundsIn').onchange = () => api('/api/settings', { soundsIn: $('soundsIn').value });
+$('autoConnect').onchange = () => api('/api/settings', { autoConnect: $('autoConnect').checked });
+$('ovPos').onchange = () => api('/api/settings', { overlay: { position: $('ovPos').value } });
+$('ovScale').oninput = () => saveSettingsSoon({ overlay: { scale: +$('ovScale').value } });
+$('eulerSave').onclick = async () => { await api('/api/settings', { eulerStreamApiKey: $('euler').value }); toast('Key saved. Connect again to use it.'); };
+$('ovCopy').onclick = () => { navigator.clipboard.writeText(location.origin + '/overlay'); toast('Overlay address copied'); };
+let settingsTimer;
+function saveSettingsSoon(patch) {
+  clearTimeout(settingsTimer);
+  settingsTimer = setTimeout(() => api('/api/settings', patch), 250);
+}
+function fillSettings() {
+  $('master').value = settings.masterVolume;
+  $('soundsIn').value = settings.soundsIn;
+  $('autoConnect').checked = settings.autoConnect;
+  $('ovPos').value = settings.overlay.position;
+  $('ovScale').value = settings.overlay.scale;
+  $('ovUrl').textContent = location.origin + '/overlay';
+  $('euler').value = settings.eulerStreamApiKey || '';
+  if (!$('ttUser').value) $('ttUser').value = settings.tiktokUsername || '';
+}
+
+// ----- TikTok -----
+$('ttBtn').onclick = async () => {
+  if (status.tiktok && status.tiktok !== 'offline') return api('/api/disconnect', {});
+  const u = $('ttUser').value.trim().replace(/^@/, '');
+  if (!u) { $('ttUser').focus(); return toast('Type your TikTok name first', true); }
+  api('/api/connect', { username: u });
+};
+$('ttUser').onkeydown = e => { if (e.key === 'Enter') $('ttBtn').click(); };
+
+function renderStatus() {
+  const t = status.tiktok;
+  $('ttDot').className = 'dot' + (t === 'connected' ? ' on' : t === 'connecting' || t === 'waiting' ? ' wait' : '');
+  $('ttText').textContent = t === 'connected' ? `Live: @${settings.tiktokUsername}` : t === 'connecting' ? 'Connecting…' : t === 'waiting' ? 'Waiting for your live…' : 'TikTok offline';
+  $('ttBtn').textContent = t && t !== 'offline' ? 'Disconnect' : 'Connect';
+  $('ttBtn').className = t && t !== 'offline' ? '' : 'primary';
+  $('ttErr').textContent = status.tiktokError || '';
+
+  const c = game?.connector;
+  let dot = 'idle', text = 'Sounds only';
+  if (c === 'minecraft') {
+    const m = status.minecraft;
+    dot = m === 'connected' ? 'on' : m === 'connecting' || m === 'offline' ? 'wait' : '';
+    text = {
+      connected: 'Minecraft connected',
+      connecting: 'Connecting to Minecraft…',
+      offline: 'Waiting for your Minecraft server to start',
+      'no server picked': 'Minecraft: pick your server',
+      'gift commands are off': 'Minecraft: turn on gift commands',
+      'server folder not found': 'Minecraft: server folder is gone',
+      'wrong password': 'Minecraft: wrong password',
+      'no password': 'Minecraft: type the RCON password',
+    }[m] || 'Minecraft not running';
+  } else if (c === 'websocket') {
+    dot = status.gameClients ? 'on' : 'wait';
+    text = status.gameClients ? `Game connected${status.gameClients > 1 ? ` (${status.gameClients})` : ''}` : 'Waiting for your game';
+  } else if (c === 'keys') { dot = 'on'; text = 'Key presses ready'; }
+  $('gmDot').className = 'dot ' + dot;
+  $('gmText').textContent = text;
+  const mcs = $('mcState');
+  if (mcs) mcs.textContent = text;
+  const wsc = $('wsCount');
+  if (wsc) wsc.textContent = status.gameClients ? `${status.gameClients} connected` : 'not connected yet';
+}
+
+// ----- Games sidebar -----
+const CONN_NAMES = { minecraft: 'Minecraft', websocket: 'My own game', keys: 'Key presses', none: 'Sounds only' };
+function renderGames() {
+  $('games').innerHTML = gamesList.map(g => `<button class="game-btn ${g.id === settings.activeGame ? 'on' : ''}" data-game="${g.id}">
+      <span class="gi">${esc(g.icon)}</span>
+      <span style="min-width:0"><div class="gn">${esc(g.name)}</div><div class="gs">${CONN_NAMES[g.connector]} · ${g.gifts} gift${g.gifts === 1 ? '' : 's'}</div></span>
+      ${g.id === settings.activeGame ? '<span class="live">ON</span>' : ''}
+    </button>`).join('') || '<div class="empty">No games yet.</div>';
+  $('games').querySelectorAll('[data-game]').forEach(b => b.onclick = async () => {
+    if (b.dataset.game === settings.activeGame) return;
+    await flushSave();
+    await api('/api/games/active', { id: b.dataset.game });
+  });
+}
+
+// ----- New game -----
+let nType = 'websocket';
+function pickType(t) { nType = t; document.querySelectorAll('[data-ntype]').forEach(b => b.setAttribute('aria-checked', String(b.dataset.ntype === t))); }
+document.querySelectorAll('[data-ntype]').forEach(b => b.onclick = () => pickType(b.dataset.ntype));
+$('newGame').onclick = () => { $('nName').value = ''; $('nIcon').value = '🎮'; pickType('websocket'); $('newDlg').showModal(); $('nName').focus(); };
+$('nClose').onclick = () => $('newDlg').close();
+$('nCreate').onclick = async () => {
+  await flushSave();
+  try {
+    await api('/api/games/new', { name: $('nName').value.trim() || 'New game', icon: $('nIcon').value.trim() || '🎮', connector: nType });
+    $('newDlg').close();
+  } catch (e) { toast(e.message, true); }
+};
+
+// ----- Game editor -----
+$('gName').oninput = () => { game.name = $('gName').value; queueSave(); };
+$('gIcon').oninput = () => { game.icon = $('gIcon').value; queueSave(); };
+$('gDup').onclick = async () => { await flushSave(); await api('/api/games/duplicate', { id: game.id }); toast('Copied'); };
+$('gDel').onclick = async () => {
+  if (!confirm(`Delete "${game.name}" and all its gifts? This can't be undone.`)) return;
+  clearTimeout(saveTimer); saveTimer = null;
+  await api('/api/games/delete', { id: game.id });
+};
+document.querySelectorAll('[data-conn]').forEach(b => b.onclick = () => {
+  game.connector = b.dataset.conn;
+  renderConnector(); renderRules(); renderStatus();
+  queueSave();
+});
+
+const WS_SNIPPET = port => `// Put this in your game's JavaScript
+function connectGiftHype() {
+  const ws = new WebSocket('ws://127.0.0.1:${port}');
+  ws.onmessage = e => {
+    const msg = JSON.parse(e.data);
+    if (msg.type !== 'gift') return;
+    // msg.action  - the name you typed, e.g. "spawnEnemy"
+    // msg.amount  - how many (already multiplied for streaks)
+    // msg.gift, msg.from, msg.count
+    if (msg.action === 'spawnEnemy') spawnEnemy(msg.amount);
+    if (msg.action === 'heal') heal(msg.amount);
+  };
+  ws.onclose = () => setTimeout(connectGiftHype, 2000); // keeps trying
+}
+connectGiftHype();`;
+
+function renderConnector() {
+  document.querySelectorAll('[data-conn]').forEach(b => b.setAttribute('aria-checked', String(b.dataset.conn === game.connector)));
+  const box = $('connBox');
+  const m = game.minecraft;
+  if (game.connector === 'minecraft') {
+    renderMinecraftBox();
+  } else if (game.connector === 'websocket') {
+    const port = settings.wsPort;
+    box.innerHTML = `<p class="hint">Your game connects to <code>ws://127.0.0.1:${port}</code> and gets a message like <code>{"type":"gift","action":"spawnEnemy","amount":3,"gift":"Rose","from":"name"}</code> for every gift action. Status: <b id="wsCount"></b></p>
+    <details style="margin-top:12px"><summary>Code to paste into your game</summary>
+      <div class="snippet" style="margin-top:10px"><pre id="wsCode">${esc(WS_SNIPPET(port))}</pre><button class="small" id="wsCopy">Copy</button></div>
+      <p class="hint">Unity, Godot, Python and most engines have a WebSocket client too: connect to the same address and read the same JSON.</p>
+    </details>`;
+    $('wsCopy').onclick = () => { navigator.clipboard.writeText(WS_SNIPPET(port)); toast('Code copied'); };
+  } else if (game.connector === 'keys') {
+    box.innerHTML = `<p class="hint">Gift Hype presses keys in <b>whatever window is in front</b>, so click into your game before going live. Type keys like <code>w</code>, <code>{SPACE}</code>, <code>{ENTER}</code>, <code>{UP}</code>, <code>{F1}</code>. <code>^</code> = Ctrl, <code>+</code> = Shift, <code>%</code> = Alt (e.g. <code>^s</code>). It works in lots of PC games; a few (mostly anti-cheat ones) ignore pretend key presses.</p>`;
+  } else {
+    box.innerHTML = `<p class="hint">Gifts play their sound and pop up on your stream overlay. Nothing is sent to a game.</p>`;
+  }
+  renderStatus();
+}
+
+// Minecraft: pick a server Gift Hype found on this PC. Its password is read from the server itself.
+let mcServers = null;
+async function loadServers() {
+  try { mcServers = await api('/api/minecraft/servers'); } catch { mcServers = []; }
+}
+async function renderMinecraftBox() {
+  const box = $('connBox');
+  const m = game.minecraft;
+  if (!mcServers) { box.innerHTML = '<p class="hint">Looking for Minecraft servers on this PC…</p>'; await loadServers(); if (game.connector !== 'minecraft') return; }
+  const picked = mcServers.find(s => s.folder === m.serverFolder);
+  const manual = !!m.manual;
+  const opts = mcServers.map(s => `<option value="${esc(s.folder)}" ${s.folder === m.serverFolder ? 'selected' : ''}>${esc(s.name)}${s.rcon ? '' : ' (gift commands off)'}</option>`).join('');
+  box.innerHTML = `<div class="conn-box">
+      <label class="field wide" style="grid-column: span 3">Your Minecraft server
+        <select id="mcPick">
+          ${mcServers.length ? '' : '<option value="">No servers found on this PC</option>'}
+          ${!m.serverFolder && !manual && mcServers.length ? '<option value="" selected>Pick your server…</option>' : ''}
+          ${opts}
+          <option value="__manual" ${manual ? 'selected' : ''}>Another PC / set up by hand…</option>
+        </select>
+      </label>
+      <label class="field">Your Minecraft name <input type="text" data-mc="player" value="${esc(m.player)}" placeholder="found by itself"></label>
+      ${picked && !picked.rcon ? `<div class="wide row"><button class="pink small" id="mcEnable">Turn on gift commands for this server</button><span class="pill">then restart that Minecraft server once</span></div>` : ''}
+      ${manual ? `
+        <label class="field">Address <input type="text" data-mc="host" value="${esc(m.host)}"></label>
+        <label class="field">RCON port <input type="number" data-mc="port" value="${esc(m.port)}"></label>
+        <label class="field" style="grid-column: span 2">RCON password <input type="password" data-mc="password" value="${esc(m.password)}" autocomplete="off"></label>` : ''}
+      <div class="wide row"><button class="small" id="mcTest">Test connection</button><button class="small ghost" id="mcRescan">Look for servers again</button><span class="pill" id="mcState"></span></div>
+    </div>
+    <p class="hint">${picked ? `Using <code>${esc(picked.folder)}</code>. ` : ''}Start that server like normal and Gift Hype connects by itself. No password to type: it reads it from the server's own settings. Leave the name empty and it uses whoever is playing. Commands can use <code>{player}</code>, <code>{from}</code> (the sender), <code>{gift}</code> and <code>{count}</code>.</p>`;
+  $('mcPick').onchange = () => {
+    const v = $('mcPick').value;
+    m.manual = v === '__manual';
+    m.serverFolder = m.manual ? '' : v;
+    queueSave(); renderMinecraftBox();
+  };
+  box.querySelectorAll('[data-mc]').forEach(i => i.oninput = () => { m[i.dataset.mc] = i.type === 'number' ? +i.value : i.value.trim(); queueSave(); });
+  $('mcTest').onclick = async () => {
+    await flushSave();
+    try { const r = await api('/api/minecraft/test', {}); toast('Connected! ' + (r.reply || '').slice(0, 80)); } catch (e) { toast(e.message, true); }
+  };
+  $('mcRescan').onclick = async () => { mcServers = null; await renderMinecraftBox(); toast(`Found ${mcServers.length} server${mcServers.length === 1 ? '' : 's'}`); };
+  const en = $('mcEnable');
+  if (en) en.onclick = async () => {
+    try {
+      await api('/api/minecraft/enable-rcon', { folder: m.serverFolder });
+      mcServers = null; await renderMinecraftBox();
+      toast('Done! Restart that Minecraft server and Gift Hype connects by itself.');
+    } catch (e) { toast(e.message, true); }
+  };
+  renderStatus();
+}
+
+// What each action type needs, per connector.
+const ACTION_TYPES = {
+  command: { label: 'Minecraft command', conn: 'minecraft' },
+  message: { label: 'Send to my game', conn: 'websocket' },
+  keys: { label: 'Press keys', conn: 'keys' },
+  wait: { label: 'Wait', conn: '*' },
+};
+const newAction = type => type === 'command' ? { type, command: '' } : type === 'message' ? { type, name: '', amount: 1 } : type === 'keys' ? { type, keys: '', times: 1 } : { type: 'wait', seconds: 1 };
+
+function actionFields(a) {
+  if (a.type === 'command') return `<input type="text" data-a="command" value="${esc(a.command)}" placeholder="e.g. summon creeper ~ ~ ~ or give {player} diamond 5" spellcheck="false">`;
+  if (a.type === 'message') return `<input type="text" data-a="name" value="${esc(a.name)}" placeholder="action name, e.g. spawnEnemy" spellcheck="false"><span>amount</span><input type="number" min="1" data-a="amount" value="${esc(a.amount ?? 1)}">`;
+  if (a.type === 'keys') return `<input type="text" data-a="keys" value="${esc(a.keys)}" placeholder="e.g. {SPACE} or w" spellcheck="false"><span>times</span><input type="number" min="1" data-a="times" value="${esc(a.times ?? 1)}">`;
+  return `<input type="number" min="0" step="0.5" data-a="seconds" value="${esc(a.seconds ?? 1)}"><span>seconds</span>`;
+}
+
+const known = name => catalog.find(g => g.name.toLowerCase() === String(name).toLowerCase());
+function giftImgHtml(r) {
+  if (r.gift === '*') return '<div class="gimg">🎁</div>';
+  const k = known(r.gift);
+  const img = k?.image || r.image;
+  return `<div class="gimg">${img ? `<img src="${pic(img)}" alt="" onerror="this.replaceWith('🎁')">` : '🎁'}</div>`;
+}
+
+function renderRules() {
+  const box = $('rules');
+  if (!game.rules.length) { box.innerHTML = '<div class="empty">No gifts yet. Press <b>+ Add gift</b> or <b>Browse all gifts</b>.</div>'; return; }
+  const soundOpts = sel => `<option value="">No sound</option>` + sounds.map(s => `<option value="${esc(s.file)}" ${s.file === sel ? 'selected' : ''}>${esc(s.name)}${s.custom ? ' (yours)' : ''}</option>`).join('');
+  const addOpts = Object.entries(ACTION_TYPES).filter(([, t]) => t.conn === '*' || t.conn === game.connector).map(([k, t]) => `<option value="${k}">${t.label}</option>`).join('');
+  box.innerHTML = game.rules.map((r, i) => {
+    const k = known(r.gift);
+    const usable = r.actions.map((a, j) => [a, j]).filter(([a]) => ACTION_TYPES[a.type] && (ACTION_TYPES[a.type].conn === '*' || ACTION_TYPES[a.type].conn === game.connector));
+    const hidden = r.actions.length - usable.length;
+    return `<div class="rule" data-i="${i}">
+      <div class="rule-top">
+        ${giftImgHtml(r)}
+        <div class="gname">
+          ${r.gift === '*' ? '<input type="text" value="Any other gift" disabled>' : `<input type="text" list="giftNames" value="${esc(r.gift)}" placeholder="Gift name" data-f="gift">`}
+          <span class="coins">${r.gift === '*' ? 'gifts not on this list' : coinText(k?.coins ?? r.coins) || '&nbsp;'}</span>
+        </div>
+        <input type="text" data-f="label" value="${esc(r.label)}" placeholder="What it does (shows on stream)">
+        <div class="rule-actions">
+          <button class="small" data-test>Test</button>
+          <button class="small ghost danger" data-del aria-label="Remove gift">✕</button>
+        </div>
+      </div>
+      <div class="rule-sound">
+        <select data-f="sound" aria-label="Sound">${soundOpts(r.sound)}</select>
+        <button class="small" data-prev ${r.sound ? '' : 'disabled'}>▶</button>
+        <label class="small ghost" style="cursor:pointer"><input type="file" accept=".mp3,.wav,.ogg,.m4a,audio/*" data-upsound hidden><span class="pill" style="text-decoration:underline">upload…</span></label>
+        <label class="vol">vol <input type="range" min="0" max="1" step="0.05" value="${r.volume}" data-f="volume"></label>
+        <label class="check"><input type="checkbox" data-f="alert" ${r.alert ? 'checked' : ''}> Pop up on stream</label>
+        <label class="check" title="A streak of 5 does the actions 5 times"><input type="checkbox" data-f="perCount" ${r.perCount ? 'checked' : ''}> Once per gift in a streak</label>
+      </div>
+      <div class="acts">
+        ${usable.map(([a, j]) => `<div class="act" data-j="${j}"><span class="tag">${ACTION_TYPES[a.type].label}</span><div class="fields">${actionFields(a)}</div><button class="small ghost danger" data-delact aria-label="Remove action">✕</button></div>`).join('')}
+        ${hidden ? `<div class="hint" style="margin:0">${hidden} action${hidden > 1 ? 's' : ''} for another game type ${hidden > 1 ? 'are' : 'is'} kept but not used.</div>` : ''}
+        ${addOpts ? `<div class="add-act"><select data-addact aria-label="Add an action"><option value="">+ Add an action…</option>${addOpts}</select></div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  box.querySelectorAll('.rule').forEach(el => {
+    const r = game.rules[+el.dataset.i];
+    el.querySelectorAll('[data-f]').forEach(inp => {
+      const f = inp.dataset.f;
+      const ev = inp.type === 'checkbox' || inp.tagName === 'SELECT' ? 'change' : 'input';
+      inp.addEventListener(ev, () => {
+        r[f] = inp.type === 'checkbox' ? inp.checked : inp.type === 'range' ? +inp.value : inp.value;
+        if (f === 'gift') {
+          const k = known(inp.value);
+          if (k) { r.image = k.image; r.coins = k.coins; el.querySelector('.gimg').outerHTML = giftImgHtml(r); el.querySelector('.coins').textContent = coinText(k.coins); }
+        }
+        if (f === 'sound') { el.querySelector('[data-prev]').disabled = !r.sound; if (r.sound) playSound(r.sound, r.volume * settings.masterVolume); }
+        queueSave();
+      });
+    });
+    el.querySelector('[data-prev]').onclick = () => playSound(r.sound, r.volume * settings.masterVolume);
+    el.querySelector('[data-upsound]').onchange = async e => {
+      const file = await uploadFiles([...e.target.files]);
+      if (file) { r.sound = file; renderRules(); queueSave(); }
+    };
+    el.querySelector('[data-del]').onclick = () => { game.rules.splice(+el.dataset.i, 1); renderRules(); queueSave(); };
+    el.querySelector('[data-test]').onclick = async () => {
+      await flushSave();
+      try { await api('/api/test', { ruleId: r.id }); } catch (e) { toast(e.message, true); }
+    };
+    el.querySelectorAll('.act').forEach(row => {
+      const a = r.actions[+row.dataset.j];
+      row.querySelectorAll('[data-a]').forEach(inp => inp.oninput = () => { a[inp.dataset.a] = inp.type === 'number' ? +inp.value : inp.value; queueSave(); });
+      row.querySelector('[data-delact]').onclick = () => { r.actions.splice(+row.dataset.j, 1); renderRules(); queueSave(); };
+    });
+    const add = el.querySelector('[data-addact]');
+    if (add) add.onchange = () => {
+      if (!add.value) return;
+      r.actions.push(newAction(add.value));
+      renderRules(); queueSave();
+      const rows = $('rules').querySelectorAll(`.rule[data-i="${el.dataset.i}"] .act input`);
+      rows[rows.length - (add.value === 'wait' ? 1 : add.value === 'command' ? 1 : 2)]?.focus();
+    };
+  });
+}
+
+function defaultActions() {
+  if (game.connector === 'minecraft') return [newAction('command')];
+  if (game.connector === 'websocket') return [newAction('message')];
+  if (game.connector === 'keys') return [newAction('keys')];
+  return [];
+}
+const randomSound = () => { const b = sounds.filter(s => !s.custom); return b.length ? b[Math.floor(Math.random() * b.length)].file : null; };
+function addRule(name = '', image = null, coins = null) {
+  game.rules.push({ id: Math.random().toString(16).slice(2, 12), gift: name, image, coins, sound: randomSound(), volume: 1, alert: true, label: '', perCount: true, actions: defaultActions() });
+  renderRules(); queueSave();
+  const inputs = $('rules').querySelectorAll('.rule');
+  const last = inputs[inputs.length - 1];
+  last?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  last?.querySelector(name ? '[data-f="label"]' : '[data-f="gift"]')?.focus();
+}
+$('addGift').onclick = () => addRule();
+$('addAny').onclick = () => {
+  if (game.rules.some(r => r.gift === '*')) return toast('This game already has "Any other gift"');
+  addRule('*');
+};
+
+// ----- Saving -----
+let saveTimer = null;
+function queueSave() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(doSave, 500);
+}
+async function doSave() {
+  saveTimer = null;
+  try {
+    await api('/api/games/save', game);
+    const s = $('saved'); s.classList.add('show'); setTimeout(() => s.classList.remove('show'), 1200);
+  } catch (e) { toast('Not saved: ' + e.message, true); }
+}
+async function flushSave() { if (saveTimer) { clearTimeout(saveTimer); await doSave(); } }
+window.addEventListener('beforeunload', () => { if (saveTimer) navigator.sendBeacon && fetch('/api/games/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(game), keepalive: true }); });
+
+// ----- Gift catalog -----
+async function loadCatalog() {
+  catalog = await api('/api/catalog');
+  $('giftNames').innerHTML = catalog.map(g => `<option value="${esc(g.name)}">`).join('');
+  if (game) renderRules();
+}
+function renderGallery() {
+  const q = $('gSearch').value.trim().toLowerCase();
+  const list = catalog.filter(g => !q || g.name.toLowerCase().includes(q)).slice(0, 400);
+  $('gGrid').innerHTML = list.map((g, i) => `<div class="gcard" data-gi="${catalog.indexOf(g)}" tabindex="0" role="button">
+    <img src="${pic(g.image)}" alt="" loading="lazy"><span class="n">${esc(g.name)}</span><span class="coins">${coinText(g.coins)}</span></div>`).join('')
+    || '<div class="empty">No gifts match.</div>';
+  $('gGrid').querySelectorAll('[data-gi]').forEach(c => {
+    const pick = () => { const g = catalog[+c.dataset.gi]; $('gallery').close(); addRule(g.name, g.image, g.coins); };
+    c.onclick = pick; c.onkeydown = e => { if (e.key === 'Enter') pick(); };
+  });
+}
+$('browse').onclick = () => { $('gSearch').value = ''; renderGallery(); $('gallery').showModal(); $('gSearch').focus(); };
+$('gSearch').oninput = renderGallery;
+$('gClose').onclick = () => $('gallery').close();
+
+// ----- Feed -----
+function addFeed(e, animate = true) {
+  const box = $('feed');
+  box.querySelector('.empty')?.remove();
+  const el = document.createElement('div');
+  el.className = 'item';
+  if (!animate) el.style.animation = 'none';
+  el.innerHTML = `<div class="gimg">${e.image ? `<img src="${pic(e.image)}" alt="">` : '🎁'}</div>
+    <div><div><span class="who">${esc(e.from)}</span> <span class="what">sent ${e.count > 1 ? e.count + ' × ' : ''}${esc(e.gift)}</span></div>
+    <div class="eff ${e.did ? '' : 'none'}">${e.did ? '→ ' + esc(e.did) : 'not set up in this game'}</div></div>`;
+  box.prepend(el);
+  while (box.children.length > 60) box.lastChild.remove();
+}
+$('clearFeed').onclick = () => { $('feed').innerHTML = '<div class="empty">Gifts will show up here.</div>'; };
+
+// ----- Loading and live updates -----
+function applyState(s) {
+  settings = s.settings; gamesList = s.games; game = s.game; sounds = s.sounds; status = s.status;
+  fillSettings(); renderGames(); renderSounds();
+  $('gameCard').parentElement.style.display = game ? '' : 'none';
+  if (game) {
+    $('gName').value = game.name; $('gIcon').value = game.icon;
+    renderConnector(); renderRules();
+  }
+  renderStatus();
+}
+
+async function init() {
+  const s = await api('/api/state');
+  applyState(s);
+  $('feed').innerHTML = s.feed.length ? '' : '<div class="empty">Gifts will show up here.</div>';
+  s.feed.slice().reverse().forEach(e => addFeed(e, false));
+  $('log').textContent = s.log.join('\n');
+  loadCatalog();
+
+  const es = new EventSource('/api/events');
+  es.addEventListener('state', e => { saveTimer = null; applyState(JSON.parse(e.data)); });
+  es.addEventListener('status', e => { status = JSON.parse(e.data); renderStatus(); });
+  es.addEventListener('settings', e => { settings = JSON.parse(e.data); });
+  es.addEventListener('games', e => { gamesList = JSON.parse(e.data); renderGames(); });
+  es.addEventListener('sounds', e => { sounds = JSON.parse(e.data); renderSounds(); if (game) renderRules(); });
+  es.addEventListener('gift', e => addFeed(JSON.parse(e.data)));
+  es.addEventListener('play', e => { if (settings.soundsIn !== 'overlay') { const p = JSON.parse(e.data); playSound(p.file, p.volume); } });
+  es.addEventListener('log', e => { const l = $('log'); l.textContent += (l.textContent ? '\n' : '') + JSON.parse(e.data); l.scrollTop = l.scrollHeight; });
+  es.onerror = () => { $('ttText').textContent = 'App closed'; $('ttDot').className = 'dot'; };
+  es.onopen = () => { if (game) api('/api/state').then(s => { status = s.status; renderStatus(); }); };
+}
+init();
+</script>
+</body>
+</html>
