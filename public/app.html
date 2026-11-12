@@ -4,38 +4,65 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Gift Hype</title>
+<script>try { const t = localStorage.getItem('gh-theme'); if (t && t !== 'sky') document.documentElement.dataset.theme = t; } catch {}</script>
 <link rel="icon" href="/icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <style>
+/* Colour themes. Each one is: main colour, second colour (backgrounds), and one eye-catcher
+   colour for the things to look at first (Connect, LIVE, alerts). */
 :root {
-  --bg: #0e1013;
-  --panel: #171a1f;
-  --panel-2: #1f232a;
-  --line: #2b3039;
-  --text: #e9ecf1;
-  --muted: #8b93a1;
-  --accent: #25f4ee;
-  --pink: #fe2c55;
-  --green: #4ade80;
-  --amber: #fbbf24;
-  --red: #f87171;
   --radius: 10px;
   font-family: 'Space Grotesk', system-ui, sans-serif;
+  /* 1. Sky: sky blue, cloudy white, amber red */
+  --main: #4db3ee; --on-main: #05263d; --main-text: #1474b4;
+  --hot: #e8542a; --on-hot: #ffffff; --hot-text: #c8441c;
+  --bg: #edf2f7; --header: #ffffff; --panel: #ffffff; --panel-2: #f3f7fb; --line: #d5e0ea;
+  --text: #13304a; --muted: #5b7287; --well: #e2ebf3; --code-bg: #f3f7fb; --code-text: #13304a;
+  --green: #16a34a; --amber: #b7791f; --red: #dc2626; --shadow: rgba(20, 60, 100, .18);
+  color-scheme: light;
+}
+/* 2. Blaze: red orange, snowy white, yellow */
+:root[data-theme=blaze] {
+  --main: #ff4500; --on-main: #ffffff; --main-text: #d23a00;
+  --hot: #ffd000; --on-hot: #3a2b00; --hot-text: #9c7700;
+  --bg: #fff8f6; --header: #ffffff; --panel: #ffffff; --panel-2: #fff2ee; --line: #f2ddd5;
+  --text: #33160b; --muted: #86655a; --well: #fbe9e3; --code-bg: #fff2ee; --code-text: #33160b;
+  --green: #16a34a; --amber: #b45309; --red: #dc2626; --shadow: rgba(120, 40, 10, .16);
+  color-scheme: light;
+}
+/* 3. Punk: sapphire blue, ocean blue, neon jade */
+:root[data-theme=punk] {
+  --main: #1e5fd0; --on-main: #ffffff; --main-text: #7faeff;
+  --hot: #00f0a8; --on-hot: #00281c; --hot-text: #00f0a8;
+  --bg: #061a2e; --header: #04131f; --panel: #0a2742; --panel-2: #0e3254; --line: #1a4670;
+  --text: #e5f1ff; --muted: #8cb0cf; --well: #0c2d4b; --code-bg: #04131f; --code-text: #cfe3f7;
+  --green: #4ade80; --amber: #fbbf24; --red: #f87171; --shadow: rgba(0, 0, 0, .5);
   color-scheme: dark;
 }
+/* 4. Egyptian: Egyptian blue, stone blue, scarlet red */
+:root[data-theme=egyptian] {
+  --main: #1034a6; --on-main: #ffffff; --main-text: #9fb3ff;
+  --hot: #ff2400; --on-hot: #ffffff; --hot-text: #ff6a4d;
+  --bg: #26333f; --header: #1d2833; --panel: #2f3e4c; --panel-2: #384959; --line: #4a5e70;
+  --text: #eef2f6; --muted: #a9b8c6; --well: #33444f; --code-bg: #1d2833; --code-text: #dce4ec;
+  --green: #4ade80; --amber: #fbbf24; --red: #ff8a7a; --shadow: rgba(0, 0, 0, .45);
+  color-scheme: dark;
+}
+:root { --accent: var(--main); --pink: var(--hot); }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 body { margin: 0; background: var(--bg); color: var(--text); font-size: 15px; }
 button, input, select, textarea { font: inherit; color: inherit; }
 header {
   display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
-  padding: 12px 20px; border-bottom: 1px solid var(--line); background: #0b0d10;
+  padding: 12px 20px; border-bottom: 1px solid var(--line); background: var(--header);
   position: sticky; top: 0; z-index: 5;
 }
 .brand { font-weight: 700; letter-spacing: .02em; font-size: 18px; display: flex; align-items: center; gap: 10px; }
 .brand img { width: 28px; height: 28px; border-radius: 7px; }
-.brand span { color: var(--accent); }
-.brand em { font-style: normal; color: var(--pink); }
+.brand span { color: var(--main-text); }
+.brand em { font-style: normal; color: var(--hot-text); }
 .connect { display: flex; gap: 8px; align-items: center; margin-left: 12px; }
 .at { position: relative; }
 .at input[type=text] { padding-left: 26px; width: 210px; }
@@ -52,8 +79,8 @@ header {
 .tterr { width: 100%; color: var(--amber); font-size: 13px; margin: -4px 0 0; }
 .tterr:empty { display: none; }
 
-main { display: grid; grid-template-columns: 230px minmax(0, 1fr) 340px; gap: 20px; padding: 20px; max-width: 1700px; margin: 0 auto; }
-@media (max-width: 1250px) { main { grid-template-columns: 210px minmax(0, 1fr); } .side-right { grid-column: 1 / -1; } }
+main { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 20px; padding: 20px; max-width: 1700px; margin: 0 auto; }
+@media (max-width: 1100px) { main { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 760px) { main { grid-template-columns: 1fr; padding: 12px; } .at input[type=text] { width: 150px; } }
 .col { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
 section { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; }
@@ -71,9 +98,12 @@ button {
   border: 1px solid var(--line); background: var(--panel-2); border-radius: 8px; padding: 9px 14px; cursor: pointer; white-space: nowrap;
 }
 button:hover { border-color: var(--muted); }
-button.primary { background: var(--accent); color: #031a1a; border-color: var(--accent); font-weight: 700; }
+button.primary { background: var(--main); color: var(--on-main); border-color: var(--main); font-weight: 700; }
 button.primary:hover { filter: brightness(1.1); }
-button.pink { background: var(--pink); color: #fff; border-color: var(--pink); font-weight: 700; }
+button.pink, button.hot { background: var(--hot); color: var(--on-hot); border-color: var(--hot); font-weight: 700; }
+button.hot:hover { filter: brightness(1.08); }
+.play-btn { font-size: 18px; padding: 12px 28px; margin-top: 12px; border-radius: 10px; }
+.play-btn:disabled { opacity: .7; cursor: wait; }
 button.danger { color: var(--red); }
 button.ghost { background: transparent; }
 button.small { padding: 6px 10px; font-size: 13px; }
@@ -83,34 +113,54 @@ button.icon { padding: 6px 9px; }
 .hint code, code { font-family: 'JetBrains Mono', monospace; font-size: 12px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px; color: var(--text); }
 .check { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); cursor: pointer; }
 
-/* Games sidebar */
-.games { display: flex; flex-direction: column; gap: 6px; }
-.game-btn {
-  display: flex; align-items: center; gap: 10px; text-align: left; width: 100%; padding: 10px 12px;
-  background: transparent; border: 1px solid transparent; border-radius: 9px;
-}
-.game-btn:hover { background: var(--panel-2); border-color: var(--line); }
-.game-btn.on { background: var(--panel-2); border-color: var(--accent); }
-.game-btn .gi { font-size: 22px; width: 28px; text-align: center; }
-.game-btn .gn { font-weight: 700; overflow: hidden; text-overflow: ellipsis; }
-.game-btn .gs { font-size: 12px; color: var(--muted); }
-.game-btn .live { margin-left: auto; font-size: 10px; font-weight: 700; color: var(--pink); letter-spacing: .08em; }
-.new-game { margin-top: 10px; width: 100%; }
+/* Games screen: one cover per game */
+.lib-head { display: flex; align-items: baseline; gap: 12px; margin: 4px 0 18px; }
+.lib-head h1 { margin: 0; font-size: 26px; letter-spacing: -.01em; }
+.lib-head p { margin: 0; color: var(--muted); font-size: 14px; }
+.covers { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 24px; }
+@media (max-width: 600px) { .covers { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 16px; } .lib-head { flex-wrap: wrap; } }
+.cover-card { display: flex; flex-direction: column; gap: 10px; padding: 0; border: 0; background: none; text-align: left; white-space: normal; border-radius: 12px; }
+.cover-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+.art { position: relative; aspect-ratio: 2 / 3; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); background: var(--well); transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+.art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.art .blank { position: absolute; inset: 0; display: grid; place-items: center; padding: 18px; text-align: center; font-size: 24px; font-weight: 700; line-height: 1.15;
+  background: radial-gradient(120% 80% at 0% 0%, color-mix(in srgb, var(--main) 40%, transparent), transparent 65%), radial-gradient(120% 80% at 100% 100%, color-mix(in srgb, var(--hot) 35%, transparent), transparent 65%), var(--well); }
+.cover-card:hover .art { transform: translateY(-4px); border-color: var(--accent); box-shadow: 0 16px 34px var(--shadow); }
+.cover-card.on .art { border-color: var(--pink); box-shadow: 0 0 0 1px var(--pink); }
+.badge { position: absolute; top: 10px; left: 10px; background: var(--hot); color: var(--on-hot); font-size: 11px; font-weight: 700; letter-spacing: .1em; padding: 4px 8px; border-radius: 6px; }
+.cover-card .meta b { display: block; font-size: 16px; }
+.cover-card .meta span { font-size: 13px; color: var(--muted); }
+.add-card .art { border: 2px dashed var(--line); background: transparent; display: grid; place-items: center; color: var(--muted); }
+.add-card .art div { display: flex; flex-direction: column; align-items: center; gap: 10px; font-weight: 700; }
+.add-card:hover .art { color: var(--main-text); }
+.upd { display: flex; align-items: center; justify-content: center; gap: 14px; padding: 9px 16px; background: var(--hot); color: var(--on-hot); font-weight: 700; font-size: 14px; }
+.upd .hot { background: var(--on-hot); color: var(--hot); }
+.back { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 14px; }
+.steps { margin: 6px 0 12px; padding-left: 22px; display: grid; gap: 10px; line-height: 1.45; }
+.steps code { display: inline-block; margin-top: 4px; word-break: break-all; }
+.hero { display: grid; grid-template-columns: 132px minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 600px) { .hero { grid-template-columns: 90px minmax(0, 1fr); } }
+.hero .art { border-radius: 10px; }
+.hero .art .blank { font-size: 15px; padding: 10px; }
+.hero-main { min-width: 0; }
+.cover-btns { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+svg.i { width: 14px; height: 14px; flex: none; vertical-align: -2px; }
+.gimg svg { width: 22px; height: 22px; color: var(--muted); }
 
 /* Game header */
-.ghead { display: grid; grid-template-columns: 64px 1fr auto; gap: 12px; align-items: center; }
-.ghead .emoji { font-size: 28px; text-align: center; padding: 6px; }
+.ghead { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; }
 .ghead .gtitle { font-size: 20px; font-weight: 700; }
+@media (max-width: 600px) { .ghead { grid-template-columns: minmax(0, 1fr); } .hero { grid-template-columns: 80px minmax(0, 1fr); gap: 14px; } }
 .ghead .btns { display: flex; gap: 6px; }
 .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; flex-wrap: wrap; }
-.seg button { border: 0; border-radius: 0; background: var(--panel-2); padding: 9px 14px; }
+.seg button { border: 0; border-radius: 0; background: var(--panel-2); padding: 9px 14px; white-space: normal; text-align: left; }
 .seg button + button { border-left: 1px solid var(--line); }
-.seg button[aria-checked=true] { background: var(--accent); color: #031a1a; font-weight: 700; }
+.seg button[aria-checked=true] { background: var(--main); color: var(--on-main); font-weight: 700; }
 .conn-box { margin-top: 14px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; align-items: end; }
 @media (max-width: 900px) { .conn-box { grid-template-columns: 1fr 1fr; } }
 .conn-box .wide { grid-column: 1 / -1; }
 .snippet { position: relative; }
-.snippet pre { margin: 0; background: #0b0d10; border: 1px solid var(--line); border-radius: 8px; padding: 12px; font-family: 'JetBrains Mono', monospace; font-size: 12px; overflow-x: auto; color: #c9d1d9; }
+.snippet pre { margin: 0; background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px; padding: 12px; font-family: 'JetBrains Mono', monospace; font-size: 12px; overflow-x: auto; color: var(--code-text); }
 .snippet button { position: absolute; top: 8px; right: 8px; }
 .pill { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
 
@@ -119,7 +169,7 @@ button.icon { padding: 6px 9px; }
 .rule { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
 .rule-top { display: grid; grid-template-columns: 52px minmax(130px, 1fr) minmax(150px, 1.3fr) auto; gap: 10px; align-items: center; }
 @media (max-width: 760px) { .rule-top { grid-template-columns: 52px 1fr; } .rule-top > :nth-child(n+3) { grid-column: 1 / -1; } }
-.gimg { width: 52px; height: 52px; border-radius: 9px; background: #2a2f38; display: grid; place-items: center; font-size: 24px; overflow: hidden; }
+.gimg { width: 52px; height: 52px; border-radius: 9px; background: var(--well); display: grid; place-items: center; font-size: 24px; overflow: hidden; }
 .gimg img { width: 100%; height: 100%; object-fit: contain; }
 .gname { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .gname input { width: 100%; font-weight: 700; }
@@ -133,12 +183,14 @@ button.icon { padding: 6px 9px; }
 .vol input { width: 90px; }
 .acts { display: flex; flex-direction: column; gap: 8px; padding-left: 62px; }
 @media (max-width: 760px) { .acts { padding-left: 0; } }
-.act { display: grid; grid-template-columns: 120px minmax(0, 1fr) auto; gap: 8px; align-items: center; }
-.act .tag { font-size: 12px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: .06em; }
+.act { display: grid; grid-template-columns: 140px minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.act .tag { font-size: 12px; font-weight: 700; color: var(--main-text); text-transform: uppercase; letter-spacing: .06em; }
 .act .fields { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; min-width: 0; }
 .act .fields input[type=text] { flex: 1; min-width: 140px; }
 .act .fields input[type=number] { width: 80px; }
 .act .fields span { font-size: 12px; color: var(--muted); }
+.act .fields .desc { flex-basis: 100%; }
+.act .fields select { max-width: 220px; }
 .add-act { display: flex; gap: 8px; align-items: center; }
 .add-act select { font-size: 13px; padding: 6px 10px; }
 .toolbar { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; align-items: center; }
@@ -152,7 +204,7 @@ button.icon { padding: 6px 9px; }
 .feed .item .gimg { width: 36px; height: 36px; font-size: 18px; }
 .feed .who { font-weight: 700; }
 .feed .what { color: var(--muted); font-size: 13px; }
-.feed .eff { color: var(--accent); font-size: 13px; }
+.feed .eff { color: var(--main-text); font-size: 13px; }
 .feed .eff.none { color: var(--muted); font-style: italic; }
 @keyframes pop { from { transform: translateY(-6px); opacity: 0; } }
 
@@ -161,10 +213,12 @@ button.icon { padding: 6px 9px; }
 .snd { display: flex; align-items: center; gap: 8px; padding: 5px 6px; border-radius: 7px; }
 .snd:hover { background: var(--panel-2); }
 .snd .sn { flex: 1; text-transform: capitalize; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.snd .mine { font-size: 10px; color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: 0 4px; text-transform: uppercase; }
+.snd .mine { font-size: 10px; color: var(--main-text); border: 1px solid var(--main-text); border-radius: 4px; padding: 0 4px; text-transform: uppercase; }
 .snd button { padding: 3px 8px; font-size: 12px; }
+.found .snd .sn { text-transform: none; }
+.sounds.found { max-height: 260px; border: 1px solid var(--line); border-radius: 9px; padding: 4px; }
 .drop { margin-top: 10px; border: 2px dashed var(--line); border-radius: 9px; padding: 14px; text-align: center; color: var(--muted); font-size: 13px; cursor: pointer; }
-.drop.over { border-color: var(--accent); color: var(--accent); }
+.drop.over { border-color: var(--main); color: var(--main-text); }
 .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .row + .row { margin-top: 10px; }
 .log { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--muted); max-height: 160px; overflow-y: auto; white-space: pre-wrap; margin: 0; }
@@ -172,7 +226,7 @@ details summary { cursor: pointer; color: var(--muted); font-size: 13px; }
 
 /* Dialogs */
 dialog { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 12px; padding: 0; width: min(920px, 94vw); max-height: 86vh; }
-dialog::backdrop { background: rgba(0,0,0,.6); }
+dialog::backdrop { background: rgba(0,0,0,.5); }
 .dlg-head { display: flex; gap: 10px; align-items: center; padding: 16px 18px; border-bottom: 1px solid var(--line); }
 .dlg-head h3 { margin: 0; font-size: 17px; }
 .dlg-head input { flex: 1; }
@@ -182,23 +236,31 @@ dialog::backdrop { background: rgba(0,0,0,.6); }
 .gcard:hover { border-color: var(--accent); }
 .gcard img { width: 52px; height: 52px; object-fit: contain; }
 .gcard .n { font-size: 13px; font-weight: 700; line-height: 1.2; }
-.new-grid { display: grid; grid-template-columns: 90px 1fr; gap: 12px; }
 .types { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
 .type { text-align: left; padding: 14px; white-space: normal; }
 .type b { display: block; margin-bottom: 4px; }
 .type span { font-size: 13px; color: var(--muted); }
-.type[aria-checked=true] { border-color: var(--accent); background: #13292b; }
+.type[aria-checked=true] { border-color: var(--main); background: color-mix(in srgb, var(--main) 14%, var(--panel)); }
 .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--panel); border: 1px solid var(--line); padding: 10px 16px; border-radius: 9px; font-size: 14px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 20; }
 .toast.show { opacity: 1; }
+/* Theme picker */
+.themes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.theme { display: flex; align-items: center; gap: 10px; padding: 9px 10px; text-align: left; }
+.theme[aria-checked=true] { border-color: var(--main); box-shadow: 0 0 0 1px var(--main); font-weight: 700; }
+.sw { display: flex; flex: none; }
+.sw i { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--panel); margin-left: -6px; box-shadow: 0 0 0 1px var(--line); }
+.sw i:first-child { margin-left: 0; }
+.sw i:last-child { width: 12px; height: 12px; align-self: center; }
 .toast.err { border-color: var(--red); color: var(--red); }
 </style>
 </head>
 <body>
+<div id="updBar" class="upd" hidden><span id="updText"></span><button class="small hot" id="updNow">Update now</button></div>
 <header>
   <div class="brand"><img src="/icon.png" alt=""><div><span>GIFT</span> HYPE · <em>LIVE</em></div></div>
   <div class="connect">
     <div class="at"><input type="text" id="ttUser" placeholder="your TikTok name" aria-label="TikTok username" autocomplete="off"></div>
-    <button class="primary" id="ttBtn">Connect</button>
+    <button class="hot" id="ttBtn">Connect</button>
   </div>
   <div class="chips">
     <div class="chip"><span class="dot" id="ttDot"></span><span id="ttText">TikTok offline</span></div>
@@ -209,43 +271,57 @@ dialog::backdrop { background: rgba(0,0,0,.6); }
 
 <main>
   <div class="col">
-    <section>
-      <h2>Games</h2>
-      <div class="games" id="games"></div>
-      <button class="new-game" id="newGame">+ New game</button>
-      <p class="hint">Each game has its own gifts. The highlighted one is the one your gifts go to.</p>
-    </section>
-  </div>
+    <div id="home">
+      <div class="lib-head"><h1>Games</h1><p>Click a game to set up its gifts. The one marked LIVE is where your gifts go.</p></div>
+      <div class="covers" id="covers"></div>
+    </div>
 
-  <div class="col">
-    <section id="gameCard">
-      <div class="ghead">
-        <input type="text" class="emoji" id="gIcon" maxlength="8" aria-label="Game icon (emoji)">
-        <input type="text" class="gtitle" id="gName" maxlength="60" aria-label="Game name">
-        <div class="btns">
-          <button class="small" id="gDup" title="Make a copy of this game">Copy</button>
-          <button class="small danger" id="gDel">Delete</button>
+    <div id="typesView" hidden>
+      <button class="small ghost back" id="typesBack"><svg class="i" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3L5 8l5 5"/></svg>All games</button>
+      <div class="lib-head"><h1 id="typesTitle">Minecraft</h1><p>Pick what you're playing. Each one has its own gifts.</p></div>
+      <div class="covers" id="typeCovers"></div>
+    </div>
+
+    <div id="gameView" class="col" hidden>
+      <section id="gameCard">
+        <button class="small ghost back" id="back"><svg class="i" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3L5 8l5 5"/></svg><span id="backText">All games</span></button>
+        <div class="hero">
+          <div class="art" id="gArt"></div>
+          <div class="hero-main">
+            <div class="ghead">
+              <input type="text" class="gtitle" id="gName" maxlength="60" aria-label="Game name">
+              <div class="btns">
+                <button class="small" id="gDup" title="Make a copy of this game">Copy</button>
+                <button class="small danger" id="gDel">Delete</button>
+              </div>
+            </div>
+            <div id="playBox"></div>
+            <div class="cover-btns">
+              <input type="file" id="coverUp" accept="image/png,image/jpeg,image/webp,image/gif" hidden><button class="small" id="coverPick">Change cover</button>
+              <button class="small ghost" id="coverDel">Remove cover</button>
+            </div>
+            <div id="typeBox"></div>
+          </div>
         </div>
-      </div>
-      <h2 style="margin-top:18px">Connects to</h2>
-      <div class="seg" role="radiogroup" aria-label="How gifts reach the game">
-        <button data-conn="minecraft" role="radio">⛏️ Minecraft</button>
-        <button data-conn="websocket" role="radio">🕹️ My own game</button>
-        <button data-conn="keys" role="radio">⌨️ Key presses</button>
-        <button data-conn="none" role="radio">🔊 Sounds only</button>
-      </div>
-      <div id="connBox"></div>
-    </section>
+        <h2 style="margin-top:22px">Connects to</h2>
+        <div class="seg" role="radiogroup" aria-label="How gifts reach the game">
+          <button data-conn="minecraft" role="radio">Minecraft</button>
+          <button data-conn="keys" role="radio">Key presses</button>
+          <button data-conn="none" role="radio">Sounds only</button>
+        </div>
+        <div id="connBox"></div>
+      </section>
 
-    <section>
-      <h2>Gifts &amp; what they do <span class="right"><span class="saved" id="saved">Saved</span></span></h2>
-      <div class="rules" id="rules"></div>
-      <div class="toolbar">
-        <button class="primary" id="addGift">+ Add gift</button>
-        <button id="browse">Browse all gifts</button>
-        <button id="addAny" title="Plays for any gift you haven't set up">+ Any other gift</button>
-      </div>
-    </section>
+      <section>
+        <h2>Gifts &amp; what they do <span class="right"><span class="saved" id="saved">Saved</span></span></h2>
+        <div class="rules" id="rules"></div>
+        <div class="toolbar">
+          <button class="primary" id="addGift">+ Add gift</button>
+          <button id="browse">Browse all gifts</button>
+          <button id="addAny" title="Plays for any gift you haven't set up">+ Any other gift</button>
+        </div>
+      </section>
+    </div>
   </div>
 
   <div class="col side-right">
@@ -255,11 +331,20 @@ dialog::backdrop { background: rgba(0,0,0,.6); }
     </section>
 
     <section>
-      <h2>Sounds <span class="right"><button class="small" id="stopAll">■ Stop</button></span></h2>
+      <h2>Sounds <span class="right"><button class="small" id="stopAll"><svg class="i" viewBox="0 0 16 16"><rect x="3" y="3" width="10" height="10" rx="1.5" fill="currentColor"/></svg> Stop</button></span></h2>
       <div class="row">
         <label class="vol" style="flex:1">Volume <input type="range" id="master" min="0" max="1" step="0.05" style="flex:1"></label>
       </div>
-      <div class="sounds" id="sounds" style="margin-top:10px"></div>
+      <form class="row" id="findForm" style="margin-top:12px">
+        <input type="text" id="findQ" placeholder="Find any sound, e.g. fahh, metal pipe" style="flex:1" autocomplete="off" aria-label="Find a sound online">
+        <button class="small primary" id="findBtn">Search</button>
+      </form>
+      <div id="foundBox" hidden>
+        <div class="sounds found" id="found" style="margin-top:8px"></div>
+        <p class="hint" style="margin-top:6px">Sounds from myinstants.com. <b>Add</b> puts one in your list. <button class="small ghost" type="button" id="findClose">Close</button></p>
+      </div>
+      <h2 style="margin:16px 0 6px">Your sounds</h2>
+      <div class="sounds" id="sounds"></div>
       <label class="drop" id="drop">
         <input type="file" id="upload" accept=".mp3,.wav,.ogg,.m4a,audio/*" multiple hidden>
         <b>+ Add your own sounds</b><br>Drop .mp3 / .wav files here, or click
@@ -267,18 +352,26 @@ dialog::backdrop { background: rgba(0,0,0,.6); }
     </section>
 
     <section>
+      <h2>Colours</h2>
+      <div class="themes" id="themes" role="radiogroup" aria-label="Colour theme"></div>
+    </section>
+
+    <section>
       <h2>Settings</h2>
       <label class="field">Play sounds in
         <select id="soundsIn">
           <option value="app">This app (you and your stream hear them)</option>
-          <option value="overlay">The OBS overlay only</option>
+          <option value="overlay">The stream overlay only</option>
         </select>
       </label>
       <div class="row" style="margin-top:14px"><label class="check"><input type="checkbox" id="autoConnect"> Connect to TikTok by itself when the app opens</label></div>
+      <h2 style="margin-top:18px">Updates</h2>
+      <div class="row"><span class="pill" id="verText">Version</span><button class="small" id="updCheck">Check for updates</button></div>
       <h2 style="margin-top:18px">Stream overlay</h2>
       <div class="row">
         <code id="ovUrl"></code>
         <button class="small" id="ovCopy">Copy</button>
+        <button class="small hot" id="ovLive">Set up in TikTok LIVE Studio</button>
       </div>
       <div class="row">
         <label class="field" style="flex:1">Popups at
@@ -302,24 +395,36 @@ dialog::backdrop { background: rgba(0,0,0,.6); }
 </main>
 
 <dialog id="gallery">
-  <div class="dlg-head"><h3>All gifts</h3><input type="text" id="gSearch" placeholder="Search gifts..."><button class="ghost" id="gClose">✕</button></div>
+  <div class="dlg-head"><h3>All gifts</h3><input type="text" id="gSearch" placeholder="Search gifts..."><button class="ghost" id="gClose" aria-label="Close"><svg class="i" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button></div>
   <div class="dlg-body"><div class="gallery" id="gGrid"></div></div>
 </dialog>
 
 <dialog id="newDlg" style="width:min(640px,94vw)">
-  <div class="dlg-head"><h3>New game</h3><button class="ghost" style="margin-left:auto" id="nClose">✕</button></div>
+  <div class="dlg-head"><h3>New game</h3><button class="ghost" style="margin-left:auto" id="nClose" aria-label="Close"><svg class="i" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button></div>
   <div class="dlg-body">
-    <div class="new-grid">
-      <label class="field">Icon <input type="text" id="nIcon" value="🎮" maxlength="8" style="font-size:24px;text-align:center"></label>
-      <label class="field">Name <input type="text" id="nName" placeholder="e.g. My Zombie Game" maxlength="60"></label>
-    </div>
+    <label class="field">Name <input type="text" id="nName" placeholder="e.g. Fortnite" maxlength="60"></label>
     <div class="types" role="radiogroup" aria-label="Game type">
-      <button class="type" data-ntype="minecraft" role="radio"><b>⛏️ Minecraft</b><span>Runs Minecraft commands on your server (RCON).</span></button>
-      <button class="type" data-ntype="websocket" role="radio"><b>🕹️ My own game</b><span>Your game connects to Gift Hype and gets a message for each gift.</span></button>
-      <button class="type" data-ntype="keys" role="radio"><b>⌨️ Key presses</b><span>Presses keys in whatever game is open. Works with lots of PC games.</span></button>
-      <button class="type" data-ntype="none" role="radio"><b>🔊 Sounds only</b><span>Just sounds and stream popups for gifts.</span></button>
+      <button class="type" data-ntype="minecraft" role="radio"><b>Minecraft</b><span>Runs Minecraft commands on your server (RCON).</span></button>
+      <button class="type" data-ntype="keys" role="radio"><b>Key presses</b><span>Presses keys in whatever game is open. Works with lots of PC games.</span></button>
+      <button class="type" data-ntype="none" role="radio"><b>Sounds only</b><span>Just sounds and stream popups for gifts.</span></button>
     </div>
+    <p class="hint">You can give it a cover picture after it's made.</p>
     <div class="toolbar"><button class="primary" id="nCreate" style="margin-left:auto">Create game</button></div>
+  </div>
+</dialog>
+
+<dialog id="liveDlg" style="width:min(560px,94vw)">
+  <div class="dlg-head"><h3>Add the overlay in TikTok LIVE Studio</h3><button class="ghost" style="margin-left:auto" id="liveClose" aria-label="Close"><svg class="i" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button></div>
+  <div class="dlg-body">
+    <p id="liveState" class="hint"></p>
+    <ol class="steps">
+      <li>In LIVE Studio, under <b>Sources</b>, press <b>+</b> (Add source) and pick <b>Link</b>.</li>
+      <li>Click in the address box and press <b>Ctrl + V</b>: the overlay's address is already copied.<br><code id="liveUrl"></code></li>
+      <li>Set the size to <b>1920 × 1080</b> (or Fit to screen) and press <b>Add</b>.</li>
+      <li>Drag it to the top of your sources so the popups show over the game.</li>
+    </ol>
+    <p class="hint">The address points back to this PC, so Gift Hype must be open while you stream. If the overlay shows as a tiny box or stops updating, add <code>?refresh=1</code> to the end of the address.</p>
+    <div class="toolbar"><button id="liveCopy">Copy the address again</button><button class="primary" id="liveDone" style="margin-left:auto">Done</button></div>
   </div>
 </dialog>
 
@@ -330,7 +435,13 @@ dialog::backdrop { background: rgba(0,0,0,.6); }
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const pic = url => url ? '/gift-img?u=' + encodeURIComponent(url) : '';
-const coinText = c => c == null ? '' : `🪙 ${Number(c).toLocaleString()}`;
+const coinText = c => c == null ? '' : `${Number(c).toLocaleString()} coin${c == 1 ? '' : 's'}`;
+const IC = {
+  play: '<svg class="i" viewBox="0 0 16 16"><path d="M4.5 2.5v11l9-5.5z" fill="currentColor"/></svg>',
+  x: '<svg class="i" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>',
+  gift: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3.5" y="9" width="17" height="11.5" rx="1.5"/><path d="M2.5 9h19M12 9v11.5M12 9c-1.5-3.5-6-4.5-6-1.8C6 9 12 9 12 9zm0 0c1.5-3.5 6-4.5 6-1.8C18 9 12 9 12 9z"/></svg>',
+  plus: '<svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+};
 
 async function api(path, body) {
   const r = await fetch(path, { method: body === undefined ? 'GET' : 'POST', headers: { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
@@ -349,15 +460,23 @@ let settings = {}, gamesList = [], game = null, sounds = [], status = {}, catalo
 
 // ----- Sounds -----
 const playing = new Set();
-function playSound(file, volume = 1) {
+const looping = new Map();   // id -> sound that repeats until stopped (e.g. a reset's sound for its whole countdown)
+function playSound(file, volume = 1, opts = {}) {
   if (!file) return;
-  if (playing.size >= 6) { const oldest = playing.values().next().value; oldest.pause(); playing.delete(oldest); }
+  if (playing.size >= 6) { const oldest = [...playing].find(x => !x.loop) || playing.values().next().value; oldest.pause(); playing.delete(oldest); }
   const a = new Audio('/sounds/' + file.split('/').map(encodeURIComponent).join('/'));
   a.volume = Math.max(0, Math.min(1, volume));
   playing.add(a);
   a.onended = a.onerror = () => playing.delete(a);
+  if (opts.loopFor) {
+    stopSound(opts.id);
+    a.loop = true;
+    looping.set(opts.id, a);
+    a._stop = setTimeout(() => stopSound(opts.id), opts.loopFor * 1000);
+  }
   a.play().catch(() => playing.delete(a));
 }
+function stopSound(id) { const a = looping.get(id); if (!a) return; clearTimeout(a._stop); a.pause(); playing.delete(a); looping.delete(id); }
 function stopAll() { playing.forEach(a => a.pause()); playing.clear(); }
 $('stopAll').onclick = stopAll;
 const soundName = file => sounds.find(s => s.file === file)?.name || (file ? file.split('/').pop() : 'None');
@@ -365,9 +484,9 @@ const soundName = file => sounds.find(s => s.file === file)?.name || (file ? fil
 function renderSounds() {
   const box = $('sounds');
   box.innerHTML = sounds.map(s => `<div class="snd">
-    <button data-play="${esc(s.file)}" aria-label="Play ${esc(s.name)}">▶</button>
+    <button data-play="${esc(s.file)}" aria-label="Play ${esc(s.name)}">${IC.play}</button>
     <span class="sn">${esc(s.name)}</span>
-    ${s.custom ? `<span class="mine">yours</span><button class="ghost danger" data-delsnd="${esc(s.file)}" aria-label="Delete ${esc(s.name)}">✕</button>` : ''}
+    ${s.custom ? `<span class="mine">yours</span><button class="ghost danger" data-delsnd="${esc(s.file)}" aria-label="Delete ${esc(s.name)}">${IC.x}</button>` : ''}
   </div>`).join('') || '<div class="empty">No sounds yet.</div>';
   box.querySelectorAll('[data-play]').forEach(b => b.onclick = () => playSound(b.dataset.play, settings.masterVolume));
   box.querySelectorAll('[data-delsnd]').forEach(b => b.onclick = async () => {
@@ -389,6 +508,40 @@ async function uploadFiles(files) {
   }
   return last;
 }
+// Find real sound clips online (through Gift Hype, from myinstants.com) and add them to your sounds.
+let previewAudio = null;
+$('findForm').onsubmit = async e => {
+  e.preventDefault();
+  const q = $('findQ').value.trim();
+  if (!q) return $('findQ').focus();
+  const box = $('found');
+  $('foundBox').hidden = false;
+  box.innerHTML = '<div class="empty">Searching…</div>';
+  try {
+    const r = await fetch('/api/sounds/search?q=' + encodeURIComponent(q));
+    const list = await r.json();
+    if (!r.ok) throw new Error(list.error);
+    box.innerHTML = list.map((s, i) => `<div class="snd">
+        <button data-pv="${i}" aria-label="Listen to ${esc(s.name)}">${IC.play}</button>
+        <span class="sn" title="${esc(s.name)}">${esc(s.name)}</span>
+        <button class="primary" data-add="${i}">Add</button>
+      </div>`).join('') || '<div class="empty">Nothing found. Try other words.</div>';
+    box.querySelectorAll('[data-pv]').forEach(b => b.onclick = () => {
+      previewAudio?.pause();
+      previewAudio = new Audio('/sound-preview?p=' + encodeURIComponent(list[+b.dataset.pv].path));
+      previewAudio.volume = settings.masterVolume;
+      previewAudio.play().catch(() => toast("Couldn't play that one", true));
+    });
+    box.querySelectorAll('[data-add]').forEach(b => b.onclick = async () => {
+      const s = list[+b.dataset.add];
+      b.disabled = true; b.textContent = 'Adding…';
+      try { await api('/api/sounds/add', { path: s.path, name: s.name }); b.textContent = 'Added'; toast(`Added "${s.name}"`); }
+      catch (err) { b.disabled = false; b.textContent = 'Add'; toast(err.message, true); }
+    });
+  } catch (err) { box.innerHTML = `<div class="empty">${esc(err.message || "Couldn't search right now")}</div>`; }
+};
+$('findClose').onclick = () => { previewAudio?.pause(); $('foundBox').hidden = true; };
+
 $('upload').onchange = async e => { await uploadFiles([...e.target.files]); e.target.value = ''; };
 const drop = $('drop');
 drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); };
@@ -401,19 +554,54 @@ $('autoConnect').onchange = () => api('/api/settings', { autoConnect: $('autoCon
 $('ovPos').onchange = () => api('/api/settings', { overlay: { position: $('ovPos').value } });
 $('ovScale').oninput = () => saveSettingsSoon({ overlay: { scale: +$('ovScale').value } });
 $('eulerSave').onclick = async () => { await api('/api/settings', { eulerStreamApiKey: $('euler').value }); toast('Key saved. Connect again to use it.'); };
-$('ovCopy').onclick = () => { navigator.clipboard.writeText(location.origin + '/overlay'); toast('Overlay address copied'); };
+const overlayUrl = () => `http://gifthype.localtest.me:${location.port}/overlay`;   // works in TikTok LIVE Studio (it won't take "localhost"), still this PC
+$('ovCopy').onclick = () => { navigator.clipboard.writeText(overlayUrl()); toast('Overlay address copied'); };
+// Copies the overlay's address, opens LIVE Studio, and shows the clicks to add it
+$('ovLive').onclick = async () => {
+  try { await navigator.clipboard.writeText(overlayUrl()); } catch { }
+  $('liveUrl').textContent = overlayUrl();
+  $('liveState').textContent = 'Opening TikTok LIVE Studio…';
+  $('liveDlg').showModal();
+  try {
+    const r = await api('/api/live-studio/open', {});
+    $('liveState').textContent = r.opened ? 'TikTok LIVE Studio is opening. Then:' : "TikTok LIVE Studio isn't on this PC (or isn't where it usually is). Open it yourself, then:";
+  } catch { $('liveState').textContent = 'Open TikTok LIVE Studio, then:'; }
+};
+$('liveCopy').onclick = () => { navigator.clipboard.writeText(overlayUrl()); toast('Overlay address copied'); };
+$('liveClose').onclick = $('liveDone').onclick = () => $('liveDlg').close();
 let settingsTimer;
 function saveSettingsSoon(patch) {
   clearTimeout(settingsTimer);
   settingsTimer = setTimeout(() => api('/api/settings', patch), 250);
 }
+// Each theme: main colour, second colour, eye-catcher (the same order every time).
+const THEMES = [
+  { id: 'sky', name: 'Sky', colours: ['#4db3ee', '#f4f7fa', '#e8542a'] },
+  { id: 'blaze', name: 'Blaze', colours: ['#ff4500', '#fffafa', '#ffd000'] },
+  { id: 'punk', name: 'Punk', colours: ['#0f52ba', '#0e4c7a', '#00f0a8'] },
+  { id: 'egyptian', name: 'Egyptian', colours: ['#1034a6', '#6c8597', '#ff2400'] },
+];
+function applyTheme(id) {
+  if (!THEMES.some(t => t.id === id)) id = 'sky';
+  if (id === 'sky') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = id;
+  try { localStorage.setItem('gh-theme', id); } catch {}
+  $('themes').innerHTML = THEMES.map(t => `<button class="theme" role="radio" aria-checked="${t.id === id}" data-theme-id="${t.id}">
+      <span class="sw">${t.colours.map(c => `<i style="background:${c}"></i>`).join('')}</span>${t.name}</button>`).join('');
+  $('themes').querySelectorAll('[data-theme-id]').forEach(b => b.onclick = () => {
+    settings.theme = b.dataset.themeId;
+    applyTheme(settings.theme);
+    api('/api/settings', { theme: settings.theme });
+  });
+}
+
 function fillSettings() {
+  applyTheme(settings.theme);
   $('master').value = settings.masterVolume;
   $('soundsIn').value = settings.soundsIn;
   $('autoConnect').checked = settings.autoConnect;
   $('ovPos').value = settings.overlay.position;
   $('ovScale').value = settings.overlay.scale;
-  $('ovUrl').textContent = location.origin + '/overlay';
+  $('ovUrl').textContent = overlayUrl();
   $('euler').value = settings.eulerStreamApiKey || '';
   if (!$('ttUser').value) $('ttUser').value = settings.tiktokUsername || '';
 }
@@ -432,16 +620,16 @@ function renderStatus() {
   $('ttDot').className = 'dot' + (t === 'connected' ? ' on' : t === 'connecting' || t === 'waiting' ? ' wait' : '');
   $('ttText').textContent = t === 'connected' ? `Live: @${settings.tiktokUsername}` : t === 'connecting' ? 'Connecting…' : t === 'waiting' ? 'Waiting for your live…' : 'TikTok offline';
   $('ttBtn').textContent = t && t !== 'offline' ? 'Disconnect' : 'Connect';
-  $('ttBtn').className = t && t !== 'offline' ? '' : 'primary';
+  $('ttBtn').className = t && t !== 'offline' ? '' : 'hot';
   $('ttErr').textContent = status.tiktokError || '';
 
   const c = game?.connector;
   let dot = 'idle', text = 'Sounds only';
   if (c === 'minecraft') {
     const m = status.minecraft;
-    dot = m === 'connected' ? 'on' : m === 'connecting' || m === 'offline' ? 'wait' : '';
+    dot = m === 'connected' ? 'on' : ['connecting', 'offline', 'downloading', 'starting'].includes(m) ? 'wait' : '';
     text = {
-      connected: 'Minecraft connected',
+      connected: isDropperMode() ? (/building/.test(status.dropper || '') ? `Building the Dropper: ${status.dropper.replace('building ', '')} levels…` : 'The Dropper is ready') : game?.minecraft?.single ? `Your world is ready: ${game.minecraft.world}` : 'Minecraft connected',
       connecting: 'Connecting to Minecraft…',
       offline: 'Waiting for your Minecraft server to start',
       'no server picked': 'Minecraft: pick your server',
@@ -449,6 +637,16 @@ function renderStatus() {
       'server folder not found': 'Minecraft: server folder is gone',
       'wrong password': 'Minecraft: wrong password',
       'no password': 'Minecraft: type the RCON password',
+      'no world picked': 'Minecraft: pick your world',
+      'world not found': 'Minecraft: world not found',
+      'eula not accepted': 'Minecraft: tick the EULA box',
+      'java missing': 'Minecraft: Java not found',
+      downloading: 'Getting Minecraft ready (first time only)…',
+      starting: 'Opening your world…',
+      'world open in singleplayer': 'Close the world in singleplayer first',
+      'world closed': 'Your world is closed',
+      'world failed': "Your world couldn't open",
+      crashed: 'Your world stopped. Press Reopen',
     }[m] || 'Minecraft not running';
   } else if (c === 'websocket') {
     dot = status.gameClients ? 'on' : 'wait';
@@ -462,43 +660,147 @@ function renderStatus() {
   if (wsc) wsc.textContent = status.gameClients ? `${status.gameClients} connected` : 'not connected yet';
 }
 
-// ----- Games sidebar -----
-const CONN_NAMES = { minecraft: 'Minecraft', websocket: 'My own game', keys: 'Key presses', none: 'Sounds only' };
-function renderGames() {
-  $('games').innerHTML = gamesList.map(g => `<button class="game-btn ${g.id === settings.activeGame ? 'on' : ''}" data-game="${g.id}">
-      <span class="gi">${esc(g.icon)}</span>
-      <span style="min-width:0"><div class="gn">${esc(g.name)}</div><div class="gs">${CONN_NAMES[g.connector]} · ${g.gifts} gift${g.gifts === 1 ? '' : 's'}</div></span>
-      ${g.id === settings.activeGame ? '<span class="live">ON</span>' : ''}
-    </button>`).join('') || '<div class="empty">No games yet.</div>';
-  $('games').querySelectorAll('[data-game]').forEach(b => b.onclick = async () => {
-    if (b.dataset.game === settings.activeGame) return;
-    await flushSave();
-    await api('/api/games/active', { id: b.dataset.game });
+// ----- Games screen (covers) and the game page -----
+const CONN_NAMES = { minecraft: 'Minecraft', websocket: 'Game link', keys: 'Key presses', none: 'Sounds only' };
+let view = 'home';
+const coverHtml = g => g.cover
+  ? `<img src="/cover/${encodeURIComponent(g.id)}?v=${g.cover}" alt="" onerror="this.outerHTML='<div class=blank>'+this.dataset.name+'</div>'" data-name="${esc(esc(g.name))}">`
+  : `<div class="blank">${esc(g.name)}</div>`;
+// A type's cover: its own picture, or the built-in one for Dropper / Block Delete / Parkour
+const TYPE_ART = [[/dropper/i, '/img/type-dropper.svg'], [/block delete/i, '/img/type-blockdelete.svg'], [/parkour/i, '/img/type-parkour.svg']];
+const typeCoverHtml = m => {
+  if (m.cover) return `<img src="/cover/${encodeURIComponent(game.id)}?mode=${encodeURIComponent(m.id)}&v=${encodeURIComponent(m.cover)}" alt="">`;
+  const art = TYPE_ART.find(([re]) => re.test(m.name || ''));
+  return art ? `<img src="${art[1]}" alt="">` : `<div class="blank">${esc(m.name || 'Untitled')}</div>`;
+};
+const manyTypes = () => game && game.modes.length > 1;
+function renderTypeCovers() {
+  if (!game) return;
+  $('typesTitle').textContent = game.name;
+  const live = game.id === settings.activeGame;
+  $('typeCovers').innerHTML = game.modes.map(m => `<button class="cover-card ${live && m.id === game.mode ? 'on' : ''}" data-tmode="${esc(m.id)}">
+      <div class="art">${typeCoverHtml(m)}${live && m.id === game.mode ? '<span class="badge">LIVE</span>' : ''}</div>
+      <div class="meta"><b>${esc(m.name || 'Untitled')}</b><span>${m.rules.length} gift${m.rules.length === 1 ? '' : 's'}</span></div>
+    </button>`).join('');
+  $('typeCovers').querySelectorAll('[data-tmode]').forEach(b => b.onclick = async () => {
+    if (game.mode !== b.dataset.tmode) {
+      game.mode = b.dataset.tmode;
+      queueSave(); await flushSave();
+      renderTypes(); renderRules();
+      if (game.connector === 'minecraft') renderMinecraftBox();
+    }
+    showView('game');
   });
 }
+$('typesBack').onclick = () => showView('home');
+function renderGames() {
+  $('covers').innerHTML = gamesList.map(g => `<button class="cover-card ${g.id === settings.activeGame ? 'on' : ''}" data-game="${esc(g.id)}">
+      <div class="art">${coverHtml(g)}${g.id === settings.activeGame ? '<span class="badge">LIVE</span>' : ''}</div>
+      <div class="meta"><b>${esc(g.name)}</b><span>${g.mode ? esc(g.mode) : CONN_NAMES[g.connector]} · ${g.gifts} gift${g.gifts === 1 ? '' : 's'}</span></div>
+    </button>`).join('') + `<button class="cover-card add-card" id="newGame"><div class="art"><div>${IC.plus}Add a game</div></div><div class="meta"><b>&nbsp;</b></div></button>`;
+  $('covers').querySelectorAll('[data-game]').forEach(b => b.onclick = async () => {
+    await flushSave();
+    if (b.dataset.game !== settings.activeGame) await api('/api/games/active', { id: b.dataset.game });
+    showView(gamesList.find(g => g.id === b.dataset.game)?.mode ? 'types' : 'game');
+  });
+  $('newGame').onclick = openNewGame;
+  const cur = gamesList.find(g => g.id === game?.id);
+  if (cur) $('gArt').innerHTML = manyTypes() ? typeCoverHtml(curMode()) : coverHtml(cur);
+}
+function showView(v) {
+  view = game ? v : 'home';
+  if (view === 'types' && !manyTypes()) view = 'game';
+  $('home').hidden = view !== 'home';
+  $('typesView').hidden = view !== 'types';
+  $('gameView').hidden = view !== 'game';
+  if (view === 'types') renderTypeCovers();
+  $('backText').textContent = manyTypes() ? game.name : 'All games';
+  window.scrollTo(0, 0);
+}
+$('back').onclick = async () => { await flushSave(); showView(manyTypes() ? 'types' : 'home'); };
+$('coverPick').onclick = () => $('coverUp').click();
+$('coverUp').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = '';
+  if (!f) return;
+  await flushSave();
+  const r = await fetch('/api/games/cover?id=' + encodeURIComponent(game.id) + (manyTypes() ? '&mode=' + encodeURIComponent(game.mode) : ''), { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: f });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) toast(j.error || 'Could not use that picture', true); else toast('Cover changed');
+};
+$('coverDel').onclick = async () => {
+  await flushSave();
+  await fetch('/api/games/cover?id=' + encodeURIComponent(game.id) + (manyTypes() ? '&mode=' + encodeURIComponent(game.mode) : '') + '&remove=1', { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' } });
+};
 
 // ----- New game -----
-let nType = 'websocket';
+let nType = 'minecraft';
 function pickType(t) { nType = t; document.querySelectorAll('[data-ntype]').forEach(b => b.setAttribute('aria-checked', String(b.dataset.ntype === t))); }
 document.querySelectorAll('[data-ntype]').forEach(b => b.onclick = () => pickType(b.dataset.ntype));
-$('newGame').onclick = () => { $('nName').value = ''; $('nIcon').value = '🎮'; pickType('websocket'); $('newDlg').showModal(); $('nName').focus(); };
+function openNewGame() { $('nName').value = ''; pickType('minecraft'); $('newDlg').showModal(); $('nName').focus(); }
 $('nClose').onclick = () => $('newDlg').close();
 $('nCreate').onclick = async () => {
   await flushSave();
   try {
-    await api('/api/games/new', { name: $('nName').value.trim() || 'New game', icon: $('nIcon').value.trim() || '🎮', connector: nType });
+    await api('/api/games/new', { name: $('nName').value.trim() || 'New game', connector: nType });
     $('newDlg').close();
+    showView('game');
   } catch (e) { toast(e.message, true); }
 };
 
+// ----- Types (e.g. Minecraft: Parkour Paradise / Block Delete Survival), each with its own gifts -----
+const curMode = () => game.modes.find(m => m.id === game.mode) || game.modes[0];
+const R = () => curMode().rules;
+const isDropperMode = () => game?.connector === 'minecraft' && /dropper/i.test(curMode().name || '');
+function renderTypes() {
+  const box = $('typeBox'), many = game.modes.length > 1;
+  box.innerHTML = many ? `<h2 style="margin-top:18px">Type <span class="right" style="font-weight:400;text-transform:none">gifts do what the picked one says</span></h2>
+    <div class="row">
+      <div class="seg" role="radiogroup" aria-label="Which type you're playing">
+        ${game.modes.map(m => `<button data-mode="${esc(m.id)}" role="radio" aria-checked="${m.id === game.mode}">${esc(m.name || 'Untitled')}</button>`).join('')}
+      </div>
+      <button class="small ghost" id="mAdd">+ Type</button>
+      <button class="small ghost" id="mRen">Rename</button>
+      <button class="small ghost danger" id="mDel">Remove</button>
+    </div>` : `<div class="row" style="margin-top:12px"><button class="small ghost" id="mAdd" title="e.g. Parkour and Survival, each with its own gifts">+ Add a type</button></div>`;
+  box.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => {
+    if (b.dataset.mode === game.mode) return;
+    game.mode = b.dataset.mode;
+    renderTypes(); renderRules(); queueSave(); renderGames();
+    if (game.connector === 'minecraft') renderMinecraftBox();
+    toast(`Gifts now do: ${curMode().name}`);
+  });
+  $('mAdd').onclick = () => {
+    const name = (prompt('Name of the new type (e.g. Block Delete Survival)') || '').trim();
+    if (!name) return;
+    if (!many && !game.modes[0].name) game.modes[0].name = game.name;
+    const id = Math.random().toString(16).slice(2, 12);
+    game.modes.push({ id, name: name.slice(0, 40), icon: '', rules: [] });
+    game.mode = id;
+    renderTypes(); renderRules(); queueSave();
+  };
+  if (!many) return;
+  $('mRen').onclick = () => {
+    const m = curMode(), name = (prompt('New name for this type', m.name) || '').trim();
+    if (!name) return;
+    m.name = name.slice(0, 40); renderTypes(); queueSave();
+  };
+  $('mDel').onclick = () => {
+    const m = curMode();
+    if (!confirm(`Remove the type "${m.name}" and its ${m.rules.length} gift${m.rules.length === 1 ? '' : 's'}? This can't be undone.`)) return;
+    game.modes = game.modes.filter(x => x !== m);
+    game.mode = game.modes[0].id;
+    renderTypes(); renderRules(); queueSave();
+  };
+}
+
 // ----- Game editor -----
 $('gName').oninput = () => { game.name = $('gName').value; queueSave(); };
-$('gIcon').oninput = () => { game.icon = $('gIcon').value; queueSave(); };
 $('gDup').onclick = async () => { await flushSave(); await api('/api/games/duplicate', { id: game.id }); toast('Copied'); };
 $('gDel').onclick = async () => {
   if (!confirm(`Delete "${game.name}" and all its gifts? This can't be undone.`)) return;
   clearTimeout(saveTimer); saveTimer = null;
   await api('/api/games/delete', { id: game.id });
+  showView('home');
 };
 document.querySelectorAll('[data-conn]').forEach(b => b.onclick = () => {
   game.connector = b.dataset.conn;
@@ -523,6 +825,7 @@ function connectGiftHype() {
 connectGiftHype();`;
 
 function renderConnector() {
+  renderPlay();
   document.querySelectorAll('[data-conn]').forEach(b => b.setAttribute('aria-checked', String(b.dataset.conn === game.connector)));
   const box = $('connBox');
   const m = game.minecraft;
@@ -549,14 +852,78 @@ let mcServers = null;
 async function loadServers() {
   try { mcServers = await api('/api/minecraft/servers'); } catch { mcServers = []; }
 }
+let mcWorlds = null;
+// The Play button: opens your world, then Minecraft set to go straight into it.
+let playing_ = false;
+function renderPlay() {
+  const box = $('playBox');
+  if (!box) return;
+  if (!game || game.connector !== 'minecraft' || !(game.minecraft.single || isDropperMode())) { box.innerHTML = ''; return; }
+  box.innerHTML = `<button class="hot play-btn" id="playMc" ${playing_ ? 'disabled' : ''}>${playing_ ? 'Opening your world…' : 'Play Minecraft'}</button>`;
+  $('playMc').onclick = async () => {
+    playing_ = true; renderPlay();
+    try {
+      await flushSave();
+      await api('/api/minecraft/play', {});
+      toast('Minecraft is opening: press Play on "Gift Hype"');
+    } catch (e) { toast(e.message, true); }
+    playing_ = false; renderPlay();
+  };
+}
+
 async function renderMinecraftBox() {
+  renderPlay();
   const box = $('connBox');
   const m = game.minecraft;
+  if (isDropperMode()) {
+    box.innerHTML = `<div class="conn-box">
+        <p class="wide" style="margin:0"><b>The Dropper has its own world</b>, made by Gift Hype: 100 levels that get harder as you go. Fall through the gaps and land in the water to go to the next level. Hit anything else and you start that level again.</p>
+        <div class="wide"><label class="check"><input type="checkbox" id="mcEula" ${settings.mcEula ? 'checked' : ''}> I agree to the <a href="https://aka.ms/MinecraftEULA" target="_blank" rel="noopener" style="color:var(--main-text)">Minecraft EULA</a> (needed to open the world for gifts)</label></div>
+        <div class="wide row"><button class="small" id="mcRestart">Reopen world</button><span class="pill" id="mcState"></span></div>
+      </div>
+      <p class="hint"><b>How to play:</b> press <b>Play Minecraft</b>. The first time, Gift Hype makes the world and builds the levels (about a minute). Your level, punches on/off and any shield are shown at the bottom of your screen, and the reset countdown at the top.</p>`;
+    $('mcEula').onchange = () => { settings.mcEula = $('mcEula').checked; api('/api/settings', { mcEula: settings.mcEula }); };
+    $('mcRestart').onclick = async () => { try { await api('/api/minecraft/restart-world', {}); toast('Reopening the Dropper…'); } catch (e) { toast(e.message, true); } };
+    renderStatus();
+    return;
+  }
+  const where = `<div class="seg" role="radiogroup" aria-label="Where you play" style="margin-top:14px">
+      <button data-where="single" role="radio" aria-checked="${!!m.single}">Singleplayer world</button>
+      <button data-where="server" role="radio" aria-checked="${!m.single}">Server</button>
+    </div>`;
+  const hookWhere = () => box.querySelectorAll('[data-where]').forEach(b => b.onclick = () => {
+    m.single = b.dataset.where === 'single';
+    queueSave(); renderMinecraftBox();
+  });
+  if (m.single) {
+    if (!mcWorlds) { box.innerHTML = where + '<p class="hint">Looking for your worlds…</p>'; try { mcWorlds = await api('/api/minecraft/worlds'); } catch { mcWorlds = []; } if (!game.minecraft.single) return; }
+    const picked = mcWorlds.find(w => w.name === m.world);
+    box.innerHTML = `${where}
+      <div class="conn-box">
+        <label class="field wide" style="grid-column: span 3">Your world
+          <select id="mcWorld">
+            ${!picked ? '<option value="" selected>Pick your world…</option>' : ''}
+            ${mcWorlds.map(w => `<option value="${esc(w.name)}" ${w.name === m.world ? 'selected' : ''}>${esc(w.name)}</option>`).join('')}
+          </select>
+        </label>
+        <div class="wide"><label class="check"><input type="checkbox" id="mcEula" ${settings.mcEula ? 'checked' : ''}> I agree to the <a href="https://aka.ms/MinecraftEULA" target="_blank" rel="noopener" style="color:var(--main-text)">Minecraft EULA</a> (needed to open the world for gifts)</label></div>
+        <div class="wide row"><button class="small" id="mcRestart">Reopen world</button><button class="small ghost" id="mcWorlds">Look for worlds again</button><span class="pill" id="mcState"></span></div>
+      </div>
+      <p class="hint"><b>How to play:</b> keep Gift Hype open. In Minecraft go to <b>Multiplayer</b> and join <b>Gift Hype</b> (it's added to your list; if not, Direct Connection: <code>localhost:25566</code>). It's your own world, with your stuff. Gifts happen instantly, nothing is typed.<br>
+      Don't open the same world in Singleplayer at the same time. Closing Gift Hype saves and closes the world.</p>`;
+    hookWhere();
+    $('mcWorld').onchange = async () => { m.world = $('mcWorld').value; queueSave(); await flushSave(); renderStatus(); };
+    $('mcWorlds').onclick = async () => { mcWorlds = null; await renderMinecraftBox(); toast(`Found ${mcWorlds.length} world${mcWorlds.length === 1 ? '' : 's'}`); };
+    $('mcEula').onchange = () => { settings.mcEula = $('mcEula').checked; api('/api/settings', { mcEula: settings.mcEula }); };
+    $('mcRestart').onclick = async () => { try { await api('/api/minecraft/restart-world', {}); toast('Reopening your world…'); } catch (e) { toast(e.message, true); } };
+    renderStatus();
+    return;
+  }
   if (!mcServers) { box.innerHTML = '<p class="hint">Looking for Minecraft servers on this PC…</p>'; await loadServers(); if (game.connector !== 'minecraft') return; }
   const picked = mcServers.find(s => s.folder === m.serverFolder);
   const manual = !!m.manual;
   const opts = mcServers.map(s => `<option value="${esc(s.folder)}" ${s.folder === m.serverFolder ? 'selected' : ''}>${esc(s.name)}${s.rcon ? '' : ' (gift commands off)'}</option>`).join('');
-  box.innerHTML = `<div class="conn-box">
+  box.innerHTML = `${where}<div class="conn-box">
       <label class="field wide" style="grid-column: span 3">Your Minecraft server
         <select id="mcPick">
           ${mcServers.length ? '' : '<option value="">No servers found on this PC</option>'}
@@ -574,6 +941,7 @@ async function renderMinecraftBox() {
       <div class="wide row"><button class="small" id="mcTest">Test connection</button><button class="small ghost" id="mcRescan">Look for servers again</button><span class="pill" id="mcState"></span></div>
     </div>
     <p class="hint">${picked ? `Using <code>${esc(picked.folder)}</code>. ` : ''}Start that server like normal and Gift Hype connects by itself. No password to type: it reads it from the server's own settings. Leave the name empty and it uses whoever is playing. Commands can use <code>{player}</code>, <code>{from}</code> (the sender), <code>{gift}</code> and <code>{count}</code>.</p>`;
+  hookWhere();
   $('mcPick').onchange = () => {
     const v = $('mcPick').value;
     m.manual = v === '__manual';
@@ -597,36 +965,76 @@ async function renderMinecraftBox() {
   renderStatus();
 }
 
-// What each action type needs, per connector.
+// Every action you can pick. Minecraft ones are ready-made (no commands to type); "Custom command"
+// is still there for anything else. fields = the settings each one has, with their starting values.
 const ACTION_TYPES = {
-  command: { label: 'Minecraft command', conn: 'minecraft' },
-  message: { label: 'Send to my game', conn: 'websocket' },
-  keys: { label: 'Press keys', conn: 'keys' },
-  wait: { label: 'Wait', conn: '*' },
+  nuke: { label: 'Nuke', conn: 'minecraft', desc: 'A nuke falls on you and goes up in a mushroom cloud, leaving a huge crater down to y -20: a wide flat middle, then a steep wall you can just climb. Size = how far the flat middle goes out (40 makes a hole about 18 chunks across)', fields: { size: { label: 'crater size', def: 40, min: 16, max: 64 } } },
+  jail: { label: 'Jail', conn: 'minecraft', desc: 'Locks you in a jail (in the Dropper: a cell, then back to the start of your level)', fields: { seconds: { label: 'seconds', def: 30, min: 1, max: 3600 } } },
+  punch: { label: 'Punch arrow', conn: 'minecraft', desc: 'An arrow with Punch II knocks you from a random side. Only while punches are on', fields: { amount: { label: 'arrows', def: 1, min: 1, max: 10 } } },
+  punchToggle: { label: 'Punches on/off', conn: 'minecraft', desc: 'Turns punch arrows off if they are on, and back on if they are off' },
+  levelUp: { label: 'Level up', conn: 'minecraft', desc: 'Skips you ahead to the start of a later level', fields: { amount: { label: 'levels', def: 1, min: 1, max: 99 } } },
+  levelDown: { label: 'Level down', conn: 'minecraft', desc: 'Sends you back to the start of an earlier level', fields: { amount: { label: 'levels', def: 1, min: 1, max: 99 } } },
+  resetTimer: { label: 'Reset countdown', conn: 'minecraft', desc: 'A countdown starts on screen. At 0 you go back to level 1, unless someone sends the save gift', fields: { seconds: { label: 'seconds', def: 60, min: 5, max: 600 } } },
+  levelWheel: { label: 'Level slot machine', conn: 'minecraft', desc: 'A slot machine spins on the stream overlay and stops on one of these amounts: you go up (green) or down (red) that many levels', fields: { amounts: { text: 'amounts on the reel, e.g. -10, -5, -1, 1, 5, 10', def: '-10, -5, -3, -1, 1, 3, 5, 10' } } },
+  saveReset: { label: 'Save from the reset', conn: 'minecraft', desc: 'Stops the reset countdown. With no countdown running, you get a shield that blocks the next one' },
+  cobwebChunk: { label: 'Cobweb chunk', conn: 'minecraft', desc: 'Your whole chunk turns to cobwebs, down to the void' },
+  lavaChunk: { label: 'Lava chunk', conn: 'minecraft', desc: 'Your whole chunk turns to lava' },
+  airChunk: { label: 'Air chunk', conn: 'minecraft', desc: 'Your whole chunk disappears, down to the void' },
+  clearInventory: { label: 'Clear inventory', conn: 'minecraft', desc: 'Everything you carry is gone' },
+  endTp: { label: 'Teleport to the End', conn: 'minecraft', desc: 'Sends you to the End, onto a small platform' },
+  godKit: { label: 'God kit', conn: 'minecraft', desc: 'Full enchanted netherite, tools, 16 ender pearls, 32 eyes of ender, golden apples' },
+  diamondKit: { label: 'Diamond kit', conn: 'minecraft', desc: 'Diamond armour, sword and steak' },
+  spawnMob: { label: 'Spawn a mob', conn: 'minecraft', fields: { mob: { label: 'mob', def: 'zombie', mob: true }, amount: { label: 'how many', def: 1, min: 1, max: 50 } } },
+  lightning: { label: 'Lightning strike', conn: 'minecraft', fields: { amount: { label: 'strikes', def: 1, min: 1, max: 20 } } },
+  command: { label: 'Custom command', conn: 'minecraft', fields: { command: { text: 'e.g. give {player} diamond 5', def: '' } } },
+  message: { label: 'Send to my game', conn: 'websocket', fields: { name: { text: 'action name, e.g. spawnEnemy', def: '' }, amount: { label: 'amount', def: 1, min: 1 } } },
+  keys: { label: 'Press keys', conn: 'keys', fields: { keys: { text: 'e.g. {SPACE} or w', def: '' }, times: { label: 'times', def: 1, min: 1 } } },
+  wait: { label: 'Wait', conn: '*', fields: { seconds: { label: 'seconds', def: 1, min: 0, step: 0.5 } } },
 };
-const newAction = type => type === 'command' ? { type, command: '' } : type === 'message' ? { type, name: '', amount: 1 } : type === 'keys' ? { type, keys: '', times: 1 } : { type: 'wait', seconds: 1 };
+const newAction = type => ({ type, ...Object.fromEntries(Object.entries(ACTION_TYPES[type].fields || {}).map(([k, f]) => [k, f.def])) });
+
+let mobs = [];
+api('/api/minecraft/mobs').then(m => { mobs = m; if (game) renderRules(); }).catch(() => {});
 
 function actionFields(a) {
-  if (a.type === 'command') return `<input type="text" data-a="command" value="${esc(a.command)}" placeholder="e.g. summon creeper ~ ~ ~ or give {player} diamond 5" spellcheck="false">`;
-  if (a.type === 'message') return `<input type="text" data-a="name" value="${esc(a.name)}" placeholder="action name, e.g. spawnEnemy" spellcheck="false"><span>amount</span><input type="number" min="1" data-a="amount" value="${esc(a.amount ?? 1)}">`;
-  if (a.type === 'keys') return `<input type="text" data-a="keys" value="${esc(a.keys)}" placeholder="e.g. {SPACE} or w" spellcheck="false"><span>times</span><input type="number" min="1" data-a="times" value="${esc(a.times ?? 1)}">`;
-  return `<input type="number" min="0" step="0.5" data-a="seconds" value="${esc(a.seconds ?? 1)}"><span>seconds</span>`;
+  const t = ACTION_TYPES[a.type];
+  const parts = Object.entries(t.fields || {}).map(([k, f]) => {
+    const v = a[k] ?? f.def;
+    if (f.mob) return `<select data-a="${k}" aria-label="Mob">${(mobs.length ? mobs : [{ id: v, name: v }]).map(m => `<option value="${esc(m.id)}" ${m.id === v ? 'selected' : ''}>${esc(m.name)}</option>`).join('')}</select>`;
+    if (f.text) return `<input type="text" data-a="${k}" value="${esc(v)}" placeholder="${esc(f.text)}" spellcheck="false">`;
+    return `<span>${esc(f.label)}</span><input type="number" data-a="${k}" value="${esc(v)}" ${f.min != null ? `min="${f.min}"` : ''} ${f.max != null ? `max="${f.max}"` : ''} step="${f.step || 1}">`;
+  });
+  if (t.desc) parts.push(`<span class="desc">${esc(t.desc)}</span>`);
+  return parts.join('');
+}
+
+function addActionOptions() {
+  const usable = Object.entries(ACTION_TYPES).filter(([, t]) => t.conn === '*' || t.conn === game.connector);
+  if (!usable.length) return '';
+  if (game.connector !== 'minecraft') return usable.map(([k, t]) => `<option value="${k}">${t.label}</option>`).join('');
+  // the ready-made actions (nuke, jail, chunks, kits...) belong to Block Delete only
+  const blockDelete = /block delete/i.test(curMode().name || ''), dropper = isDropperMode();
+  const DROPPER = ['punch', 'punchToggle', 'levelUp', 'levelDown', 'levelWheel', 'jail', 'resetTimer', 'saveReset'];
+  const mcOpts = blockDelete ? usable.filter(([k, t]) => t.conn === 'minecraft' && k !== 'command' && (k === 'jail' || !DROPPER.includes(k)))
+    : dropper ? DROPPER.map(k => [k, ACTION_TYPES[k]]) : [];
+  return `${mcOpts.length ? `<optgroup label="${dropper ? 'Dropper' : 'Block Delete'}">${mcOpts.map(([k, t]) => `<option value="${k}">${t.label}</option>`).join('')}</optgroup>` : ''}
+    <optgroup label="Other"><option value="command">Custom command (type your own)</option><option value="wait">Wait</option></optgroup>`;
 }
 
 const known = name => catalog.find(g => g.name.toLowerCase() === String(name).toLowerCase());
 function giftImgHtml(r) {
-  if (r.gift === '*') return '<div class="gimg">🎁</div>';
+  if (r.gift === '*') return `<div class="gimg">${IC.gift}</div>`;
   const k = known(r.gift);
   const img = k?.image || r.image;
-  return `<div class="gimg">${img ? `<img src="${pic(img)}" alt="" onerror="this.replaceWith('🎁')">` : '🎁'}</div>`;
+  return `<div class="gimg">${img ? `<img src="${pic(img)}" alt="" onerror="this.outerHTML=IC.gift">` : IC.gift}</div>`;
 }
 
 function renderRules() {
   const box = $('rules');
-  if (!game.rules.length) { box.innerHTML = '<div class="empty">No gifts yet. Press <b>+ Add gift</b> or <b>Browse all gifts</b>.</div>'; return; }
+  if (!R().length) { box.innerHTML = '<div class="empty">No gifts yet. Press <b>+ Add gift</b> or <b>Browse all gifts</b>.</div>'; return; }
   const soundOpts = sel => `<option value="">No sound</option>` + sounds.map(s => `<option value="${esc(s.file)}" ${s.file === sel ? 'selected' : ''}>${esc(s.name)}${s.custom ? ' (yours)' : ''}</option>`).join('');
-  const addOpts = Object.entries(ACTION_TYPES).filter(([, t]) => t.conn === '*' || t.conn === game.connector).map(([k, t]) => `<option value="${k}">${t.label}</option>`).join('');
-  box.innerHTML = game.rules.map((r, i) => {
+  const addOpts = addActionOptions();
+  box.innerHTML = R().map((r, i) => {
     const k = known(r.gift);
     const usable = r.actions.map((a, j) => [a, j]).filter(([a]) => ACTION_TYPES[a.type] && (ACTION_TYPES[a.type].conn === '*' || ACTION_TYPES[a.type].conn === game.connector));
     const hidden = r.actions.length - usable.length;
@@ -640,19 +1048,19 @@ function renderRules() {
         <input type="text" data-f="label" value="${esc(r.label)}" placeholder="What it does (shows on stream)">
         <div class="rule-actions">
           <button class="small" data-test>Test</button>
-          <button class="small ghost danger" data-del aria-label="Remove gift">✕</button>
+          <button class="small ghost danger" data-del aria-label="Remove gift">${IC.x}</button>
         </div>
       </div>
       <div class="rule-sound">
         <select data-f="sound" aria-label="Sound">${soundOpts(r.sound)}</select>
-        <button class="small" data-prev ${r.sound ? '' : 'disabled'}>▶</button>
+        <button class="small" data-prev aria-label="Play sound" ${r.sound ? '' : 'disabled'}>${IC.play}</button>
         <label class="small ghost" style="cursor:pointer"><input type="file" accept=".mp3,.wav,.ogg,.m4a,audio/*" data-upsound hidden><span class="pill" style="text-decoration:underline">upload…</span></label>
         <label class="vol">vol <input type="range" min="0" max="1" step="0.05" value="${r.volume}" data-f="volume"></label>
         <label class="check"><input type="checkbox" data-f="alert" ${r.alert ? 'checked' : ''}> Pop up on stream</label>
         <label class="check" title="A streak of 5 does the actions 5 times"><input type="checkbox" data-f="perCount" ${r.perCount ? 'checked' : ''}> Once per gift in a streak</label>
       </div>
       <div class="acts">
-        ${usable.map(([a, j]) => `<div class="act" data-j="${j}"><span class="tag">${ACTION_TYPES[a.type].label}</span><div class="fields">${actionFields(a)}</div><button class="small ghost danger" data-delact aria-label="Remove action">✕</button></div>`).join('')}
+        ${usable.map(([a, j]) => `<div class="act" data-j="${j}"><span class="tag">${ACTION_TYPES[a.type].label}</span><div class="fields">${actionFields(a)}</div><button class="small ghost danger" data-delact aria-label="Remove action">${IC.x}</button></div>`).join('')}
         ${hidden ? `<div class="hint" style="margin:0">${hidden} action${hidden > 1 ? 's' : ''} for another game type ${hidden > 1 ? 'are' : 'is'} kept but not used.</div>` : ''}
         ${addOpts ? `<div class="add-act"><select data-addact aria-label="Add an action"><option value="">+ Add an action…</option>${addOpts}</select></div>` : ''}
       </div>
@@ -660,7 +1068,7 @@ function renderRules() {
   }).join('');
 
   box.querySelectorAll('.rule').forEach(el => {
-    const r = game.rules[+el.dataset.i];
+    const r = R()[+el.dataset.i];
     el.querySelectorAll('[data-f]').forEach(inp => {
       const f = inp.dataset.f;
       const ev = inp.type === 'checkbox' || inp.tagName === 'SELECT' ? 'change' : 'input';
@@ -679,36 +1087,38 @@ function renderRules() {
       const file = await uploadFiles([...e.target.files]);
       if (file) { r.sound = file; renderRules(); queueSave(); }
     };
-    el.querySelector('[data-del]').onclick = () => { game.rules.splice(+el.dataset.i, 1); renderRules(); queueSave(); };
+    el.querySelector('[data-del]').onclick = () => { R().splice(+el.dataset.i, 1); renderRules(); queueSave(); };
     el.querySelector('[data-test]').onclick = async () => {
       await flushSave();
       try { await api('/api/test', { ruleId: r.id }); } catch (e) { toast(e.message, true); }
     };
     el.querySelectorAll('.act').forEach(row => {
       const a = r.actions[+row.dataset.j];
-      row.querySelectorAll('[data-a]').forEach(inp => inp.oninput = () => { a[inp.dataset.a] = inp.type === 'number' ? +inp.value : inp.value; queueSave(); });
+      row.querySelectorAll('[data-a]').forEach(inp => inp.oninput = inp.onchange = () => { a[inp.dataset.a] = inp.type === 'number' ? +inp.value : inp.value; queueSave(); });
       row.querySelector('[data-delact]').onclick = () => { r.actions.splice(+row.dataset.j, 1); renderRules(); queueSave(); };
     });
     const add = el.querySelector('[data-addact]');
     if (add) add.onchange = () => {
       if (!add.value) return;
       r.actions.push(newAction(add.value));
+      // a gift with no description yet gets the action's name, e.g. "Nuke"
+      if (!r.label && add.value !== 'wait') r.label = ACTION_TYPES[add.value].label;
       renderRules(); queueSave();
-      const rows = $('rules').querySelectorAll(`.rule[data-i="${el.dataset.i}"] .act input`);
-      rows[rows.length - (add.value === 'wait' ? 1 : add.value === 'command' ? 1 : 2)]?.focus();
+      const acts = $('rules').querySelectorAll(`.rule[data-i="${el.dataset.i}"] .act`);
+      acts[acts.length - 1]?.querySelector('input, select')?.focus();
     };
   });
 }
 
 function defaultActions() {
-  if (game.connector === 'minecraft') return [newAction('command')];
+  if (game.connector === 'minecraft') return [];
   if (game.connector === 'websocket') return [newAction('message')];
   if (game.connector === 'keys') return [newAction('keys')];
   return [];
 }
 const randomSound = () => { const b = sounds.filter(s => !s.custom); return b.length ? b[Math.floor(Math.random() * b.length)].file : null; };
 function addRule(name = '', image = null, coins = null) {
-  game.rules.push({ id: Math.random().toString(16).slice(2, 12), gift: name, image, coins, sound: randomSound(), volume: 1, alert: true, label: '', perCount: true, actions: defaultActions() });
+  R().push({ id: Math.random().toString(16).slice(2, 12), gift: name, image, coins, sound: randomSound(), volume: 1, alert: true, label: '', perCount: true, actions: defaultActions() });
   renderRules(); queueSave();
   const inputs = $('rules').querySelectorAll('.rule');
   const last = inputs[inputs.length - 1];
@@ -717,7 +1127,7 @@ function addRule(name = '', image = null, coins = null) {
 }
 $('addGift').onclick = () => addRule();
 $('addAny').onclick = () => {
-  if (game.rules.some(r => r.gift === '*')) return toast('This game already has "Any other gift"');
+  if (R().some(r => r.gift === '*')) return toast('This game already has "Any other gift"');
   addRule('*');
 };
 
@@ -765,24 +1175,44 @@ function addFeed(e, animate = true) {
   const el = document.createElement('div');
   el.className = 'item';
   if (!animate) el.style.animation = 'none';
-  el.innerHTML = `<div class="gimg">${e.image ? `<img src="${pic(e.image)}" alt="">` : '🎁'}</div>
+  el.innerHTML = `<div class="gimg">${e.image ? `<img src="${pic(e.image)}" alt="">` : IC.gift}</div>
     <div><div><span class="who">${esc(e.from)}</span> <span class="what">sent ${e.count > 1 ? e.count + ' × ' : ''}${esc(e.gift)}</span></div>
-    <div class="eff ${e.did ? '' : 'none'}">${e.did ? '→ ' + esc(e.did) : 'not set up in this game'}</div></div>`;
+    <div class="eff ${e.did ? '' : 'none'}">${e.did ? esc(e.did) : 'not set up in this game'}</div></div>`;
   box.prepend(el);
   while (box.children.length > 60) box.lastChild.remove();
 }
 $('clearFeed').onclick = () => { $('feed').innerHTML = '<div class="empty">Gifts will show up here.</div>'; };
 
 // ----- Loading and live updates -----
+// ----- Updates -----
+function renderUpdate() {
+  const u = status.update;
+  $('verText').textContent = `Version ${appVersion}` + (u?.devCopy ? ' (this copy is where updates come from)' : '');
+  const show = u && (u.available || u.state === 'updating' || u.state === 'restarting' || u.state === 'failed');
+  $('updBar').hidden = !show;
+  if (!show) return;
+  $('updText').textContent = u.state === 'updating' ? 'Updating Gift Hype…' : u.state === 'restarting' ? 'Updated! Gift Hype is restarting…' : u.state === 'failed' ? `The update didn't work: ${u.error}` : `A new version of Gift Hype is ready: ${u.latest} (you have ${u.current})`;
+  $('updNow').hidden = u.state === 'updating' || u.state === 'restarting';
+  $('updNow').textContent = u.state === 'failed' ? 'Try again' : 'Update now';
+}
+let appVersion = '';
+$('updNow').onclick = async () => { try { await api('/api/update/apply', {}); } catch (e) { toast(e.message, true); } };
+$('updCheck').onclick = async () => {
+  try {
+    const u = await api('/api/update/check');
+    toast(u.devCopy ? `Newest on GitHub: ${u.latest}. This copy is where updates come from, so it doesn't update itself.` : u.available ? `Version ${u.latest} is ready: press Update now at the top` : `You have the newest version (${u.current})`);
+  } catch (e) { toast("Couldn't check for updates: " + e.message, true); }
+};
+
 function applyState(s) {
-  settings = s.settings; gamesList = s.games; game = s.game; sounds = s.sounds; status = s.status;
+  settings = s.settings; gamesList = s.games; game = s.game; sounds = s.sounds; status = s.status; appVersion = s.version || appVersion;
   fillSettings(); renderGames(); renderSounds();
-  $('gameCard').parentElement.style.display = game ? '' : 'none';
   if (game) {
-    $('gName').value = game.name; $('gIcon').value = game.icon;
-    renderConnector(); renderRules();
+    $('gName').value = game.name;
+    renderTypes(); renderConnector(); renderRules(); renderPlay();
   }
-  renderStatus();
+  renderStatus(); renderUpdate();
+  showView(view);
 }
 
 async function init() {
@@ -795,12 +1225,13 @@ async function init() {
 
   const es = new EventSource('/api/events');
   es.addEventListener('state', e => { saveTimer = null; applyState(JSON.parse(e.data)); });
-  es.addEventListener('status', e => { status = JSON.parse(e.data); renderStatus(); });
-  es.addEventListener('settings', e => { settings = JSON.parse(e.data); });
+  es.addEventListener('status', e => { status = JSON.parse(e.data); renderStatus(); renderUpdate(); });
+  es.addEventListener('settings', e => { settings = JSON.parse(e.data); applyTheme(settings.theme); });
   es.addEventListener('games', e => { gamesList = JSON.parse(e.data); renderGames(); });
   es.addEventListener('sounds', e => { sounds = JSON.parse(e.data); renderSounds(); if (game) renderRules(); });
   es.addEventListener('gift', e => addFeed(JSON.parse(e.data)));
-  es.addEventListener('play', e => { if (settings.soundsIn !== 'overlay') { const p = JSON.parse(e.data); playSound(p.file, p.volume); } });
+  es.addEventListener('play', e => { if (settings.soundsIn !== 'overlay') { const p = JSON.parse(e.data); playSound(p.file, p.volume, p); } });
+  es.addEventListener('stopSound', e => stopSound(JSON.parse(e.data).id));
   es.addEventListener('log', e => { const l = $('log'); l.textContent += (l.textContent ? '\n' : '') + JSON.parse(e.data); l.scrollTop = l.scrollHeight; });
   es.onerror = () => { $('ttText').textContent = 'App closed'; $('ttDot').className = 'dot'; };
   es.onopen = () => { if (game) api('/api/state').then(s => { status = s.status; renderStatus(); }); };

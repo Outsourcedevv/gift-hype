@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 600" width="400" height="600">
+  <defs><linearGradient id="fade" x1="0" y1="0" x2="0" y2="1"><stop offset=".55" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".75"/></linearGradient><linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3f8ff0"/><stop offset="1" stop-color="#bfe6ff"/></linearGradient></defs>
+  <rect width="400" height="600" fill="url(#sky)"/>
+  <circle cx="320" cy="80" r="34" fill="#fff6c2"/><circle cx="320" cy="80" r="56" fill="#fff6c2" opacity=".25"/>
+  <g fill="#fff" opacity=".9"><rect x="30" y="90" width="72" height="19.2"/><rect x="46.8" y="75.6" width="36" height="16.8"/></g><g fill="#fff" opacity=".9"><rect x="240" y="220" width="60" height="16"/><rect x="254" y="208" width="30" height="14"/></g><g fill="#fff" opacity=".9"><rect x="60" y="300" width="48" height="12.8"/><rect x="71.2" y="290.4" width="24" height="11.200000000000001"/></g>
+  <path d="M 80 422 Q 125 310 170 364.4" fill="none" stroke="#fff" stroke-width="3" stroke-dasharray="6 7" opacity=".85"/>
+  <path d="M 170 364.4 Q 220 260 270 315.6" fill="none" stroke="#fff" stroke-width="3" stroke-dasharray="6 7" opacity=".85"/>
+  <path d="M 270 315.6 Q 225 180 180 236.8" fill="none" stroke="#fff" stroke-width="3" stroke-dasharray="6 7" opacity=".85"/>
+  <path d="M 180 236.8 Q 235 120 290 178" fill="none" stroke="#fff" stroke-width="3" stroke-dasharray="6 7" opacity=".85"/>
+  <path d="M 290 178 Q 250 60 210 119.2" fill="none" stroke="#fff" stroke-width="3" stroke-dasharray="6 7" opacity=".85"/>
+  <g><polygon points="80,425 110,440 80,455 50,440" fill="#6cc04a"/>
+    <polygon points="50,440 80,455 80,488 50,473" fill="#7a5534"/>
+    <polygon points="110,440 80,455 80,488 110,473" fill="#5f4127"/></g>
+  <g><polygon points="170,367 196,380 170,393 144,380" fill="#9a9a9a"/>
+    <polygon points="144,380 170,393 170,421.6 144,408.6" fill="#7a7a7a"/>
+    <polygon points="196,380 170,393 170,421.6 196,408.6" fill="#626262"/></g>
+  <g><polygon points="270,318 294,330 270,342 246,330" fill="#f2d14a"/>
+    <polygon points="246,330 270,342 270,368.4 246,356.4" fill="#d1ae2b"/>
+    <polygon points="294,330 270,342 270,368.4 294,356.4" fill="#b08f1c"/></g>
+  <g><polygon points="180,239 202,250 180,261 158,250" fill="#55d6c9"/>
+    <polygon points="158,250 180,261 180,285.2 158,274.2" fill="#39b2a6"/>
+    <polygon points="202,250 180,261 180,285.2 202,274.2" fill="#2a8d84"/></g>
+  <g><polygon points="290,180 310,190 290,200 270,190" fill="#6cc04a"/>
+    <polygon points="270,190 290,200 290,222 270,212" fill="#7a5534"/>
+    <polygon points="310,190 290,200 290,222 310,212" fill="#5f4127"/></g>
+  <g><polygon points="210,121 228,130 210,139 192,130" fill="#f2f2f2"/>
+    <polygon points="192,130 210,139 210,158.8 192,149.8" fill="#d0d0d0"/>
+    <polygon points="228,130 210,139 210,158.8 228,149.8" fill="#b0b0b0"/></g>
+  <rect width="400" height="600" fill="url(#fade)"/>
+  
+  <g font-family="'Silkscreen','Press Start 2P','Courier New',monospace" font-weight="700" text-anchor="middle">
+    <text x="200" y="522" font-size="52" fill="#000" opacity=".55" transform="translate(4 4)">PARKOUR</text>
+    <text x="200" y="522" font-size="52" fill="#7af0ff" stroke="#2b1600" stroke-width="3" paint-order="stroke">PARKOUR</text>
+    <text x="200" y="560" font-size="20" fill="#fff" stroke="#000" stroke-width="3" paint-order="stroke" letter-spacing="2">PARADISE</text>
+  </g>
+</svg>

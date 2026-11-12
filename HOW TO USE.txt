@@ -10,33 +10,84 @@ OPEN IT
 GO LIVE
   1. Type your TikTok name at the top and press Connect.
      It keeps trying until your live starts, and connects by itself next time.
-  2. Pick the game on the left that you're playing (it says ON).
-  3. Every gift you set up now plays its sound and does its actions.
+  2. Click the cover of the game you're playing (it says LIVE).
+  3. Pick its type at the top, e.g. Minecraft: Parkour Paradise or Block Delete Survival.
+  4. Every gift you set up for that type now plays its sound and does its actions.
 
 GAMES
-  "+ New game" makes a game with its own gift list. Pick how gifts reach it:
-    Minecraft     - runs Minecraft commands on your server. Pick your server from the list:
-                    Gift Hype finds it on your PC and connects by itself, no password to type.
-                    If it says gift commands are off, press the pink button and restart that server once.
-    My own game   - your game connects to ws://127.0.0.1:8765 and gets a message per gift
-                    (the app shows code you can paste into your game)
-    Key presses   - presses keys in whatever window is in front (click into your game first)
-    Sounds only   - just sounds and stream popups
+  The games screen shows a cover for every game with a TikTok LIVE mod. Right now that's Minecraft.
+  Click a cover to open that game. "All games" takes you back. "Change cover" sets your own picture.
+  TYPES: Minecraft has Parkour Paradise and Block Delete Survival. Each type has its own gifts.
+    The type you pick is the one gifts use. "+ Type", Rename and Remove change the list.
+  YOUR OWN WORLD (the easy way): Minecraft -> "Singleplayer world" -> pick your world and tick the EULA box.
+    Gift Hype opens that world on a hidden server on your PC (first time it downloads Minecraft's
+    official server). In Minecraft go to Multiplayer and join "Gift Hype" (or localhost:25566).
+    It's your world with your stuff; gifts happen instantly. Don't open it in Singleplayer at the
+    same time. Closing Gift Hype saves and closes the world.
+  SERVER: Minecraft -> "Server" runs commands on your server. Pick your server from the list:
+    Gift Hype finds it on your PC and connects by itself, no password to type.
+    If it says gift commands are off, press the pink button and restart that server once.
+  "+ New game" adds another game: Minecraft, Key presses (presses keys in whatever window
+  is in front) or Sounds only (just sounds and stream popups).
+
+MINECRAFT'S TYPES
+  Click Minecraft on the Games screen and you pick a type: Dropper, Block Delete Survival or Parkour
+  Paradise, each with its own cover and its own gifts. The one marked LIVE is where gifts go. On a
+  type's page, "Change cover" changes that type's picture.
+
+THE DROPPER (Minecraft -> Dropper)
+  100 dropper levels in 10 chapters (Dawn Gardens, Sunstone Halls, Tidal Vaults, Cherry Grove,
+  Frostpeak, Ember Depths, Verdant Wilds, Clockwork Foundry, Shadow Realm, Golden Ascent), each level
+  with its own name and design, slowly getting harder. Gift Hype makes its own world for it
+  ("Gift Hype Dropper") and builds the levels the first time (a few minutes). Press Play Minecraft,
+  then Play in the launcher.
+  Each level starts in a garden on top: walk down the catwalk and drop in. Land in the water at the
+  bottom and you go straight to the next level; touch anything else and you start that level again.
+  "LEVEL 07 / 100" is at the top of your screen, fails and punches ON/OFF at the bottom, and the reset
+  countdown under the level bar. You start on a bridge on one side and drop off the end; you only
+  go up a level when all of you lands in the water.
+  On the stream overlay (see ON STREAM) each gift pops up with its picture on spinning sun rays, the
+  sender's name and what it did ("punched you x2", "+5 levels"). During a reset countdown a box shows
+  the seconds left and "Send Glowing Jellyfish to SAVE me!", and the reset's sound (I Need a Hero)
+  plays on for the whole countdown until someone saves you. Jail locks you in a cage on your level's
+  bridge.
+  Starting gifts: Finger Heart = punch arrow (only while punches are on), Doughnut = punches on/off,
+    Rosa = jail 5s, Paper Crane / Corgi = up 1 / 5 levels, Hat and Mustache / Boxing Gloves = down 1 / 5,
+    Galaxy = 60s reset countdown (back to level 1), Glowing Jellyfish = saves you (or a shield if no
+    countdown is running), Hand Hearts = level slot machine. Change any of them like other gifts.
+  Level slot machine: a slot machine spins on the stream overlay (about 4 seconds, ticking as the
+    numbers go past) and stops on one of the amounts you typed for that gift (e.g. -10, -5, -1, 1, 5, 10).
+    Green + sends you up that many levels, red - sends you down. Numbers are in Monocraft, a free
+    Minecraft-style font (publiconts, SIL Open Font License).
 
 GIFTS
   + Add gift / Browse all gifts   - every TikTok gift with its picture and price
   + Any other gift                - plays for any gift you didn't set up
   Each gift has: a sound (and volume), "Pop up on stream", what it does, and actions.
+  Actions: press "+ Add an action..." and pick one. For Minecraft there are ready-made ones:
+    Nuke (falls from the sky, goes up in a mushroom cloud and leaves a crater down to y -20 with a steep wall you can climb;
+      crater size 40 = a hole about 290 blocks across, 18 chunks), Jail (pick the seconds),
+    Cobweb / Lava / Air chunk, Clear inventory, Teleport to the End, God kit, Diamond kit,
+    Spawn a mob (any mob, pick how many), Lightning strike.
+    "Custom command" is still there to type your own Minecraft command.
+    A nuke removes around 200,000 blocks, so the server can freeze for a few seconds.
   "Once per gift in a streak" = a streak of 5 Roses does the actions 5 times.
   Test tries it right away without going live.
 
 SOUNDS
-  20 starter sounds are built in (fahh, bruh, vine boom, airhorn, sad trombone, sheesh, let's go...).
+  30 real meme sounds to start (fahh, bruh, vine boom, MLG airhorn, metal pipe, DaBaby "let's go", here comes the money, I need a hero...).
+  They download by themselves the first time Gift Hype opens (needs internet once).
+  Find more: type in "Find any sound" (e.g. "emotional damage"), press play to listen, Add to keep it.
   Add your own: drop .mp3 / .wav files on "Add your own sounds", or press "upload..." next to a gift.
   They're saved in the sounds\custom folder.
 
 ON STREAM (OBS / TikTok LIVE Studio)
-  Add a Browser source: http://localhost:4747/overlay  size 1920 x 1080.
+  Press "Set up in TikTok LIVE Studio" (Settings, Stream overlay): it copies the address, opens LIVE
+  Studio and shows the 4 clicks to add it. Or by hand: TikTok LIVE Studio: add a Link source, OBS: add
+  a Browser source, with
+    http://gifthype.localtest.me:4747/overlay   size 1920 x 1080.
+  (localtest.me always points back to your own PC, so it is still only on this PC. TikTok LIVE Studio
+  won't take a "localhost" address. In OBS http://localhost:4747/overlay works too.)
   If your streaming app doesn't hear the Gift Hype window, set "Play sounds in" to the OBS overlay.
 
 MAKING CHANGES

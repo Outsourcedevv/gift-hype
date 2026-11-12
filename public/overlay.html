@@ -4,9 +4,12 @@
 <meta charset="utf-8">
 <title>Gift Hype overlay</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@600&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
 <style>
 :root { --accent: #25f4ee; --pink: #fe2c55; --amber: #fbbf24; }
+/* Minecraft-style lettering: Monocraft (SIL Open Font License, github.com/IdreesInc/Monocraft) */
+@font-face { font-family: 'Monocraft'; src: url('/fonts/Monocraft.ttf') format('truetype'); font-weight: 400; }
+@font-face { font-family: 'Monocraft'; src: url('/fonts/Monocraft-Bold.ttf') format('truetype'); font-weight: 700; }
 html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; font-family: 'Space Grotesk', system-ui, sans-serif; color: #fff; }
 /* Popups stack in a column; position and size come from the app's settings. */
 #stack { position: absolute; left: 50%; display: flex; flex-direction: column; align-items: center; gap: 14px; transform-origin: top center; }
@@ -16,7 +19,7 @@ body.bottom #stack { bottom: 60px; flex-direction: column-reverse; transform-ori
 .pop {
   display: flex; align-items: center; gap: 18px; padding: 14px 26px 14px 14px; border-radius: 22px;
   background: rgba(14, 16, 19, .86); border: 2px solid var(--accent);
-  box-shadow: 0 0 0 4px rgba(37, 244, 238, .15), 0 12px 40px rgba(0, 0, 0, .5);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 20%, transparent), 0 12px 40px rgba(0, 0, 0, .5);
   animation: in .45s cubic-bezier(.2, 1.6, .4, 1) both;
   max-width: 900px;
 }
@@ -30,11 +33,79 @@ body.bottom #stack { bottom: 60px; flex-direction: column-reverse; transform-ori
 @keyframes in { from { transform: translateY(-30px) scale(.7); opacity: 0; } }
 @keyframes out { to { transform: translateY(-20px) scale(.9); opacity: 0; } }
 @keyframes wiggle { 0%, 100% { transform: rotate(-6deg) scale(1); } 50% { transform: rotate(6deg) scale(1.08); } }
+/* The Dropper's gift popup: the gift on spinning sun rays, the sender's name big, what they did under it */
+.burst { position: relative; display: flex; flex-direction: column; align-items: center; animation: pop .5s cubic-bezier(.2, 1.6, .4, 1) both; pointer-events: none; }
+.burst.out { animation: out .4s ease forwards; }
+.burst .sun { position: relative; width: 170px; height: 170px; display: grid; place-items: center; }
+.burst .rays { position: absolute; inset: -40px; border-radius: 50%;
+  background: repeating-conic-gradient(from 0deg, rgba(255, 214, 90, .95) 0deg 9deg, rgba(255, 214, 90, 0) 9deg 22.5deg);
+  -webkit-mask: radial-gradient(circle, #000 20%, transparent 70%); mask: radial-gradient(circle, #000 20%, transparent 70%);
+  animation: spin 6s linear infinite; }
+.burst .glow { position: absolute; width: 120px; height: 120px; border-radius: 50%; background: radial-gradient(circle, rgba(255, 236, 160, .95), rgba(255, 190, 60, 0) 70%); }
+.burst .sun img { position: relative; width: 120px; height: 120px; object-fit: contain; filter: drop-shadow(0 4px 12px rgba(0,0,0,.45)); animation: bob 1.2s ease-in-out infinite; }
+.burst .name { font-family: 'Monocraft', 'Silkscreen', monospace; font-weight: 700; font-size: 46px; color: #ffcf3a; letter-spacing: 1px; margin-top: -6px;
+  text-shadow: 3px 3px 0 #5a3a00, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 0 0 18px rgba(255, 190, 40, .55); }
+.burst .what { font-family: 'Monocraft', 'Silkscreen', monospace; font-size: 24px; margin-top: 2px; text-shadow: 2px 2px 0 #000; }
+.burst .what.red { color: #ff5a5a; } .burst .what.green { color: #6cff7a; } .burst .what.aqua { color: #6ff4ff; } .burst .what.yellow { color: #ffe066; } .burst .what.white { color: #fff; }
+@keyframes pop { from { transform: scale(.3); opacity: 0; } }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes bob { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-6px) scale(1.06); } }
+
+/* The level slot machine */
+#slots { position: absolute; left: 50%; top: 50%; transform-origin: center; display: none; }
+#slots.on { display: block; }
+.slot { width: 420px; padding: 16px 18px 18px; border-radius: 22px; text-align: center; font-family: 'Monocraft', monospace;
+  background: linear-gradient(#2a1608, #170b03); border: 6px solid #f5b81e; box-shadow: 0 0 0 4px #7a4a00, 0 0 40px rgba(255, 190, 40, .55), inset 0 0 30px rgba(0,0,0,.6);
+  animation: pop .45s cubic-bezier(.2, 1.6, .4, 1) both; position: relative; }
+.slot.out { animation: out .4s ease forwards; }
+.slot .bulbs { position: absolute; inset: 6px; border-radius: 14px; pointer-events: none;
+  background: radial-gradient(circle, #fff6c2 0 3px, transparent 4px) 0 0 / 22px 22px; -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; padding: 6px; animation: chase .5s steps(2) infinite; }
+.slot .head { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 10px; }
+.slot .head img { width: 54px; height: 54px; object-fit: contain; filter: drop-shadow(0 3px 6px rgba(0,0,0,.5)); }
+.slot .title { font-weight: 700; font-size: 26px; color: #ffd84a; text-shadow: 3px 3px 0 #3f2d00; letter-spacing: 1px; }
+.slot .by { font-size: 17px; color: #fff; text-shadow: 2px 2px 0 #3f3f3f; }
+.slot .window { position: relative; height: 270px; overflow: hidden; border-radius: 12px; background: linear-gradient(#0c0c0c, #262626 30%, #262626 70%, #0c0c0c); border: 4px solid #5b3a0a; }
+.slot .strip { position: absolute; left: 0; right: 0; top: 0; will-change: transform; }
+.slot .item { height: 90px; display: grid; place-items: center; font-weight: 700; font-size: 64px; }
+.slot .plus { color: #55ff55; text-shadow: 5px 5px 0 #153f15; }
+.slot .minus { color: #ff5555; text-shadow: 5px 5px 0 #3f1515; }
+.slot .band { position: absolute; left: 0; right: 0; top: 90px; height: 90px; border-top: 3px solid rgba(255, 216, 74, .85); border-bottom: 3px solid rgba(255, 216, 74, .85); box-shadow: 0 0 20px rgba(255, 216, 74, .35) inset; pointer-events: none; }
+.slot .band::before, .slot .band::after { content: ''; position: absolute; top: 50%; margin-top: -14px; border: 14px solid transparent; }
+.slot .band::before { left: 2px; border-left-color: #ffd84a; }
+.slot .band::after { right: 2px; border-right-color: #ffd84a; }
+.slot .shade { position: absolute; inset: 0; background: linear-gradient(rgba(0,0,0,.65), transparent 32%, transparent 68%, rgba(0,0,0,.65)); pointer-events: none; }
+.slot .result { height: 44px; margin-top: 12px; font-weight: 700; font-size: 34px; opacity: 0; }
+.slot.done .result { opacity: 1; animation: pop .4s cubic-bezier(.2, 1.6, .4, 1); }
+.slot.done .win { animation: flash .35s steps(2) 4; }
+@keyframes chase { to { background-position: 11px 0; } }
+@keyframes flash { 50% { opacity: .25; } }
+
+/* The reset countdown (as in Parkour Paradise): which gift saves you */
+#resetBox { position: absolute; left: 40px; top: 40px; width: 420px; transform-origin: top left; }
+#resetBox:empty { display: none; }
+.reset { border-radius: 16px; padding: 14px 18px 16px; background: rgba(20, 4, 10, .88); border: 3px solid var(--pink); box-shadow: 0 0 30px rgba(254,44,85,.45); animation: in .45s cubic-bezier(.2,1.4,.4,1); }
+.reset.urgent { animation: in .45s cubic-bezier(.2,1.4,.4,1), throb .5s ease-in-out infinite alternate; }
+.reset .top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.reset .label { font-weight: 700; font-size: 20px; letter-spacing: .06em; color: var(--pink); text-transform: uppercase; }
+.reset .num { font-weight: 700; font-size: 54px; line-height: 1; font-variant-numeric: tabular-nums; text-shadow: 0 2px 10px rgba(254,44,85,.6); }
+.reset .bar { height: 8px; border-radius: 4px; background: rgba(255,255,255,.12); margin: 10px 0 12px; overflow: hidden; }
+.reset .bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--pink), #ff8a3d); transition: width .3s linear; }
+.reset .save { display: flex; align-items: center; gap: 12px; font-size: 19px; font-weight: 700; }
+.reset .save .pic { width: 56px; height: 56px; flex: none; animation: wiggle 1.2s ease-in-out infinite; }
+.reset .save .pic img { width: 100%; height: 100%; object-fit: contain; }
+.reset .save b { color: var(--accent); }
+.reset.result { border-color: var(--accent); box-shadow: 0 0 30px rgba(37,244,238,.4); text-align: center; animation: in .45s cubic-bezier(.2,1.4,.4,1), out .4s ease 3.6s forwards; }
+.reset.result.bad { border-color: var(--pink); box-shadow: 0 0 30px rgba(254,44,85,.45); }
+.reset.result .num { font-size: 40px; }
+.reset.result .who { font-size: 17px; margin-top: 4px; }
+@keyframes throb { to { transform: scale(1.04); box-shadow: 0 0 46px rgba(254,44,85,.8); } }
 body.preview { background: repeating-conic-gradient(#20242b 0 25%, #171a1f 0 50%) 0 0 / 40px 40px; }
 </style>
 </head>
 <body class="top">
 <div id="stack"></div>
+<div id="resetBox"></div>
+<div id="slots"></div>
 <script>
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const pic = url => url ? '/gift-img?u=' + encodeURIComponent(url) : '';
@@ -42,18 +113,37 @@ let settings = { overlay: { position: 'top', scale: 1, showSender: true }, sound
 if (location.search.includes('preview')) document.body.classList.add('preview');
 
 function applySettings() {
+  // main colour for the border and sender, eye-catcher for what the gift does
+  const th = { sky: ['#4db3ee', '#ff6a3d'], blaze: ['#ff4500', '#ffd000'], punk: ['#3b82f6', '#00f0a8'], egyptian: ['#3a5ce0', '#ff2400'] }[settings.theme] || ['#4db3ee', '#ff6a3d'];
+  document.documentElement.style.setProperty('--accent', th[0]);
+  document.documentElement.style.setProperty('--pink', th[1]);
   const o = settings.overlay;
   document.body.className = o.position + (location.search.includes('preview') ? ' preview' : '');
   const s = document.getElementById('stack');
   s.style.transform = `translateX(-50%) ${o.position === 'middle' ? 'translateY(-50%)' : ''} scale(${o.scale})`;
+  document.getElementById('resetBox').style.transform = `scale(${o.scale})`;
+  document.getElementById('slots').style.transform = `translate(-50%, -50%) scale(${o.scale})`;
 }
 
 const MAX = 4;
+function burst(e) {
+  // the Dropper: one big popup at a time, like the gift effects in the game
+  const stack = document.getElementById('stack');
+  stack.querySelectorAll('.burst').forEach(b => b.remove());
+  const el = document.createElement('div');
+  el.className = 'burst';
+  el.innerHTML = `<div class="sun"><div class="rays"></div><div class="glow"></div>${e.image ? `<img src="${pic(e.image)}" alt="">` : ''}</div>
+    <div class="name">${esc(settings.overlay.showSender ? e.from : e.gift)}</div>
+    <div class="what ${esc(e.actionColor || 'white')}">${esc(e.action || e.label || '')}</div>`;
+  stack.prepend(el);
+  setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 400); }, 3600);
+}
 function popup(e) {
+  if (e.dropper) return burst(e);
   const stack = document.getElementById('stack');
   const el = document.createElement('div');
   el.className = 'pop';
-  el.innerHTML = `<div class="img">${e.image ? `<img src="${pic(e.image)}" alt="">` : '🎁'}</div>
+  el.innerHTML = `<div class="img">${e.image ? `<img src="${pic(e.image)}" alt="">` : ''}</div>
     <div><div class="who">${settings.overlay.showSender ? `<b>${esc(e.from)}</b> sent ` : ''}${e.count > 1 ? `<span class="n">${e.count}×</span> ` : ''}${esc(e.gift)}</div>
     ${e.label ? `<div class="did">${esc(e.label)}</div>` : ''}</div>`;
   stack.prepend(el);
@@ -61,22 +151,97 @@ function popup(e) {
   setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 400); }, 4500);
 }
 
-const playing = new Set();
-function playSound(file, volume) {
-  if (playing.size >= 6) { const a = playing.values().next().value; a.pause(); playing.delete(a); }
+const playing = new Set(), looping = new Map();
+function playSound(file, volume, opts = {}) {
+  if (playing.size >= 6) { const a = [...playing].find(x => !x.loop) || playing.values().next().value; a.pause(); playing.delete(a); }
   const a = new Audio('/sounds/' + file.split('/').map(encodeURIComponent).join('/'));
   a.volume = Math.max(0, Math.min(1, volume));
   playing.add(a);
   a.onended = a.onerror = () => playing.delete(a);
+  if (opts.loopFor) { stopSound(opts.id); a.loop = true; looping.set(opts.id, a); a._stop = setTimeout(() => stopSound(opts.id), opts.loopFor * 1000); }
   a.play().catch(() => playing.delete(a));
 }
+function stopSound(id) { const a = looping.get(id); if (!a) return; clearTimeout(a._stop); a.pause(); playing.delete(a); looping.delete(id); }
 
-fetch('/api/state').then(r => r.json()).then(s => { settings = s.settings; applySettings(); });
+// ----- the level slot machine (the Dropper) -----
+// The reel spins and slows down onto the result; ticks as each number goes past, a ding at the end.
+const slotQueue = [];
+let slotBusy = false, audio = null;
+function tick(freq = 1500, len = 0.03, vol = 0.12) {
+  try {
+    audio ||= new (window.AudioContext || window.webkitAudioContext)();
+    const o = audio.createOscillator(), g = audio.createGain();
+    o.type = 'square'; o.frequency.value = freq; g.gain.value = vol;
+    g.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + len);
+    o.connect(g).connect(audio.destination); o.start(); o.stop(audio.currentTime + len);
+  } catch { }
+}
+const fmt = n => (n > 0 ? '+' : '') + n;
+function spinSlots(w) {
+  if (slotBusy) return slotQueue.push(w);
+  slotBusy = true;
+  const box = document.getElementById('slots'), H = 90;
+  // a long strip of random amounts, ending with the result in the middle of the window
+  const items = Array.from({ length: 34 }, () => w.amounts[Math.floor(Math.random() * w.amounts.length)]);
+  items.push(w.result, w.amounts[Math.floor(Math.random() * w.amounts.length)]);
+  const end = (items.length - 3) * H;
+  box.innerHTML = `<div class="slot"><div class="bulbs"></div>
+      <div class="head">${w.image ? `<img src="${pic(w.image)}" alt="">` : ''}<div><div class="title">LEVEL SLOTS</div><div class="by">${esc(w.from)}</div></div></div>
+      <div class="window"><div class="strip">${items.map((n, i) => `<div class="item ${n > 0 ? 'plus' : 'minus'}${i === items.length - 2 ? ' win' : ''}">${fmt(n)}</div>`).join('')}</div><div class="shade"></div><div class="band"></div></div>
+      <div class="result ${w.result > 0 ? 'plus' : 'minus'}">${fmt(w.result)} LEVEL${Math.abs(w.result) === 1 ? '' : 'S'}!</div></div>`;
+  box.classList.add('on');
+  const strip = box.querySelector('.strip'), slot = box.querySelector('.slot'), t0 = performance.now(), dur = w.spinMs || 4500;
+  const ease = t => 1 - Math.pow(1 - t, 4);
+  let last = -1;
+  const frame = now => {
+    const t = Math.min(1, (now - t0) / dur), y = ease(t) * end, idx = Math.floor(y / H);
+    strip.style.transform = `translateY(${-y}px)`;
+    if (idx !== last) { last = idx; tick(1200 + (idx % 2) * 300); }
+    if (t < 1) return requestAnimationFrame(frame);
+    slot.classList.add('done');
+    tick(w.result > 0 ? 880 : 220, 0.25, 0.2); setTimeout(() => tick(w.result > 0 ? 1320 : 165, 0.35, 0.2), 140);
+    setTimeout(() => { slot.classList.add('out'); setTimeout(() => { box.classList.remove('on'); box.innerHTML = ''; slotBusy = false; if (slotQueue.length) spinSlots(slotQueue.shift()); }, 400); }, 3200);
+  };
+  requestAnimationFrame(frame);
+}
+
+// ----- the reset countdown (the Dropper) -----
+let resultTimer = null;
+function showReset(r) {
+  const box = document.getElementById('resetBox');
+  if (r.active) {
+    clearTimeout(resultTimer);
+    const save = r.saveGift;
+    let el = box.querySelector('.reset:not(.result)');
+    if (!el) {
+      box.innerHTML = `<div class="reset"><div class="top"><span class="label">Reset in</span><span class="num"></span></div>
+        <div class="bar"><i></i></div>
+        ${save ? `<div class="save"><div class="pic">${save.image ? `<img src="${pic(save.image)}" alt="">` : ''}</div><div>Send <b>${esc(save.name)}</b> to SAVE me!</div></div>` : ''}</div>`;
+      el = box.firstChild;
+    }
+    el.querySelector('.num').textContent = r.secondsLeft;
+    el.querySelector('.bar i').style.width = (r.total ? 100 * r.secondsLeft / r.total : 0) + '%';
+    el.classList.toggle('urgent', r.secondsLeft <= 10);
+  } else if (['saved', 'done', 'blocked'].includes(r.event)) {
+    const text = { saved: 'SAVED!', done: 'RESET!', blocked: 'BLOCKED!' }[r.event];
+    const who = r.event === 'saved' ? `by ${esc(r.by)}` : r.event === 'blocked' ? `${esc(r.by)}'s reset hit a shield` : r.by ? `thanks to ${esc(r.by)}` : '';
+    box.innerHTML = `<div class="reset result ${r.event === 'done' ? 'bad' : ''}"><div class="num">${text}</div>${who ? `<div class="who">${who}</div>` : ''}</div>`;
+    clearTimeout(resultTimer);
+    resultTimer = setTimeout(() => { box.innerHTML = ''; }, 4000);
+  } else if (!r.active && r.event !== 'shield') {
+    box.innerHTML = '';
+  }
+}
+
+fetch('/api/overlay-state').then(r => r.json()).then(s => { settings = s.settings; applySettings(); if (s.reset && s.reset.active) showReset(s.reset); });
 const es = new EventSource('/api/events');
 es.addEventListener('settings', e => { settings = JSON.parse(e.data); applySettings(); });
 es.addEventListener('state', e => { settings = JSON.parse(e.data).settings; applySettings(); });
 es.addEventListener('alert', e => popup(JSON.parse(e.data)));
-es.addEventListener('play', e => { if (settings.soundsIn === 'overlay') { const p = JSON.parse(e.data); playSound(p.file, p.volume); } });
+es.addEventListener('play', e => { if (settings.soundsIn === 'overlay') { const p = JSON.parse(e.data); playSound(p.file, p.volume, p); } });
+es.addEventListener('stopSound', e => stopSound(JSON.parse(e.data).id));
+es.addEventListener('reset', e => showReset(JSON.parse(e.data)));
+es.addEventListener('wheel', e => spinSlots(JSON.parse(e.data)));
 </script>
 </body>
 </html>

@@ -7,4 +7,8 @@ data/*
 sounds/custom/*
 !sounds/custom/.gitkeep
 
+# The starter sounds (real meme clips) are downloaded by each PC the first time Gift Hype opens
+sounds/builtin/*
+!sounds/builtin/.gitkeep
+
 *.log

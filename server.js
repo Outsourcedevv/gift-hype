@@ -20,10 +20,16 @@ import { fileURLToPath } from 'node:url';
 import { TikTokLiveConnection, WebcastEvent } from 'tiktok-live-connector';
 import { Rcon } from 'rcon-client';
 import { WebSocketServer } from 'ws';
+import { makePresets, MOBS } from './minecraft-presets.js';
+import { listWorlds, installPack, singleplayerCommands } from './singleplayer.js';
+import { makeLocalServer, setupLauncher, openLauncher, worldVersion } from './localserver.js';
+import { checkForUpdate, applyUpdate, localVersion } from './updater.js';
+import { DROPPER_WORLD, DROPPER_PROPS, DROPPER_ACTIONS, LEVELS as DROPPER_LEVELS, installDropperPack, wheelAmounts, installDropperBuildPack, removeDropperBuildPack, dropperCommands, dropperAlertText, buildDropper, dropperBuilt, markDropperBuilt } from './dropper.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const DATA = path.join(ROOT, 'data');
 const GAMES_DIR = path.join(DATA, 'games');
+const COVERS_DIR = path.join(DATA, 'covers');
 const SETTINGS_PATH = path.join(DATA, 'settings.json');
 const SOUNDS_DIR = path.join(ROOT, 'sounds');
 const CUSTOM_SOUNDS = path.join(SOUNDS_DIR, 'custom');
@@ -68,51 +74,196 @@ function normalizeGame(g) {
     return {
         id: g.id,
         name: String(g.name || 'My game').slice(0, 60),
-        icon: String(g.icon || '🎮').slice(0, 8),
+        // Cover picture on the games screen: '' (none), 'file:<name>' (uploaded, in data/covers)
+        // or a link to an official store picture (downloaded once, then kept in data/covers).
+        cover: typeof g.cover === 'string' && (/^file:[\w.-]+$/.test(g.cover) || isCoverUrl(g.cover)) ? g.cover : '',
         connector: ['minecraft', 'websocket', 'keys', 'none'].includes(g.connector) ? g.connector : 'none',
         // serverFolder: a server found on this PC; its RCON port and password are read from its
         // server.properties. Without one, host/port/password are used as typed.
-        minecraft: { serverFolder: '', host: '127.0.0.1', port: 25575, password: '', player: '', ...g.minecraft,
+        // single: a singleplayer world (world = its folder name in .minecraft/saves) instead of a server
+        minecraft: { serverFolder: '', host: '127.0.0.1', port: 25575, password: '', player: '', single: false, world: '', ...g.minecraft,
             manual: g.minecraft?.manual ?? (!!g.minecraft?.password && !g.minecraft?.serverFolder) },
-        rules: (Array.isArray(g.rules) ? g.rules : []).map(r => ({
-            id: r.id || newId(),
-            gift: String(r.gift || ''),
-            image: r.image || null,
-            coins: r.coins ?? null,
-            sound: r.sound || null,
-            volume: Number.isFinite(+r.volume) ? Math.max(0, Math.min(1, +r.volume)) : 1,
-            alert: r.alert !== false,
-            label: String(r.label || ''),
-            perCount: r.perCount !== false,
-            actions: (Array.isArray(r.actions) ? r.actions : []).map(a => ({ type: a.type, ...a })),
-        })),
+        // Types of the game (e.g. Minecraft: Parkour Paradise / Block Delete Survival), each with its
+        // own gift list. The picked one (mode) is the one gifts use. Old games had one list: `rules`.
+        ...normalizeModes(g),
     };
 }
+
+// The first versions came with made-up .wav sounds; the real clips have the same names as .mp3.
+const OLD_SOUND_NAMES = { 'pew-pew': 'bonk', fanfare: 'anime-wow' };
+function realSound(sound) {
+    const m = /^builtin\/([\w-]+)\.wav$/.exec(sound || '');
+    return m ? `builtin/${OLD_SOUND_NAMES[m[1]] || m[1]}.mp3` : sound || null;
+}
+
+function normalizeRules(rules) {
+    return (Array.isArray(rules) ? rules : []).map(r => ({
+        id: r.id || newId(),
+        gift: String(r.gift || ''),
+        image: r.image || null,
+        coins: r.coins ?? null,
+        sound: realSound(r.sound),
+        volume: Number.isFinite(+r.volume) ? Math.max(0, Math.min(1, +r.volume)) : 1,
+        alert: r.alert !== false,
+        label: String(r.label || ''),
+        perCount: r.perCount !== false,
+        actions: (Array.isArray(r.actions) ? r.actions : []).map(a => ({ type: a.type, ...a })),
+    }));
+}
+
+function normalizeModes(g) {
+    const src = Array.isArray(g.modes) && g.modes.length ? g.modes : [{ id: newId(), name: '', rules: g.rules }];
+    const modes = src.slice(0, 20).map(m => ({
+        id: String(m.id || newId()),
+        name: String(m.name || '').slice(0, 40),
+        cover: typeof m.cover === 'string' && /^file:[\w.-]+$/.test(m.cover) ? m.cover : '',
+        rules: normalizeRules(m.rules),
+    }));
+    return { modes, mode: modes.some(m => m.id === g.mode) ? g.mode : modes[0].id };
+}
+
+const currentMode = g => g.modes.find(m => m.id === g.mode) || g.modes[0];
+const rulesOf = g => currentMode(g).rules;
+
+// What the Minecraft starter types do. Commands only, so they work on any server.
+const AT = 'execute at @a[name={player},limit=1] run';
+const PARKOUR_RULES = [
+    { gift: 'Finger Heart', sound: 'builtin/bonk.mp3', label: 'Arrow rain', actions: [{ type: 'command', command: `${AT} summon arrow ~ ~6 ~ {Motion:[0.0d,-1.0d,0.0d],pickup:0b}` }] },
+    { gift: 'Rosa', sound: 'builtin/oh-no.mp3', label: 'Frozen for 5s', actions: [
+        { type: 'command', command: 'effect give {player} minecraft:slowness 5 255 true' },
+        { type: 'command', command: 'effect give {player} minecraft:jump_boost 5 250 true' }] },
+    { gift: 'Hat and Mustache', sound: 'builtin/fahh.mp3', label: 'Drunk for 15s', actions: [
+        { type: 'command', command: 'effect give {player} minecraft:nausea 15 0 true' },
+        { type: 'command', command: 'effect give {player} minecraft:slowness 15 1 true' }] },
+    { gift: 'Paper Crane', sound: 'builtin/level-up.mp3', label: 'Speed boost', actions: [{ type: 'command', command: 'effect give {player} minecraft:speed 10 2 true' }] },
+    { gift: 'Corgi', sound: 'builtin/boing.mp3', label: 'Super jump', actions: [{ type: 'command', command: 'effect give {player} minecraft:jump_boost 10 3 true' }] },
+    { gift: 'Boxing Gloves', sound: 'builtin/whoosh.mp3', label: 'Launched into the air', actions: [{ type: 'command', command: 'effect give {player} minecraft:levitation 2 4 true' }] },
+    { gift: 'Galaxy', sound: 'builtin/i-need-a-hero.mp3', label: 'Back to the start', perCount: false, actions: [{ type: 'command', command: 'kill {player}' }] },
+];
+const BLOCK_DELETE_RULES = [
+    { gift: 'Rose', sound: 'builtin/vine-boom.mp3', label: 'Spawns a zombie', actions: [{ type: 'spawnMob', mob: 'zombie', amount: 1 }] },
+    { gift: 'Finger Heart', sound: 'builtin/cha-ching.mp3', label: 'Diamond kit', perCount: false, actions: [{ type: 'diamondKit' }] },
+    { gift: 'Rosa', sound: 'builtin/wrong-buzzer.mp3', label: 'Jail for 30s', actions: [{ type: 'jail', seconds: 30 }] },
+    { gift: 'Perfume', sound: 'builtin/oh-no.mp3', label: 'Clears your inventory', perCount: false, actions: [{ type: 'clearInventory' }] },
+    { gift: 'Doughnut', sound: 'builtin/bruh.mp3', label: 'Cobweb chunk', perCount: false, actions: [{ type: 'cobwebChunk' }] },
+    { gift: 'Hat and Mustache', sound: 'builtin/fahh.mp3', label: 'Lava chunk', perCount: false, actions: [{ type: 'lavaChunk' }] },
+    { gift: 'Corgi', sound: 'builtin/whoosh.mp3', label: 'Teleport to the End', perCount: false, actions: [{ type: 'endTp' }] },
+    { gift: 'Money Gun', sound: 'builtin/anime-wow.mp3', label: 'God kit', perCount: false, actions: [{ type: 'godKit' }] },
+    { gift: 'Galaxy', sound: 'builtin/i-need-a-hero.mp3', label: 'NUKE', perCount: false, actions: [{ type: 'nuke', size: 40 }] },
+    { gift: 'Whale Diving', sound: 'builtin/nooo.mp3', label: 'Air chunk', perCount: false, actions: [{ type: 'airChunk' }] },
+];
+// Minecraft's official cover (Microsoft Store, Minecraft: Java & Bedrock Edition). Only the link is
+// kept here; each PC downloads the picture itself the first time.
+const MINECRAFT_COVER = 'https://store-images.s-microsoft.com/image/apps.808.14492077886571533.be42f4bd-887b-4430-8ed0-622341b4d2b0.c8274c53-105e-478b-9f4b-41b8088210a3';
+function isCoverUrl(u) {
+    try { const x = new URL(u); return x.protocol === 'https:' && x.hostname === 'store-images.s-microsoft.com'; } catch { return false; }
+}
+// The Dropper (dropper.js): 100 levels in its own world, with levels, jail, punches and the reset.
+const DROPPER_RULES = [
+    { gift: 'Finger Heart', sound: 'builtin/bonk.mp3', label: 'Punch arrow', actions: [{ type: 'punch', amount: 1 }] },
+    { gift: 'Rosa', sound: 'builtin/wrong-buzzer.mp3', label: 'Jail for 5s', actions: [{ type: 'jail', seconds: 5 }] },
+    { gift: 'Doughnut', sound: 'builtin/vine-boom.mp3', label: 'Punches on/off', perCount: false, actions: [{ type: 'punchToggle' }] },
+    { gift: 'Paper Crane', sound: 'builtin/level-up.mp3', label: 'Up 1 level', actions: [{ type: 'levelUp', amount: 1 }] },
+    { gift: 'Hat and Mustache', sound: 'builtin/fahh.mp3', label: 'Down 1 level', actions: [{ type: 'levelDown', amount: 1 }] },
+    { gift: 'Corgi', sound: 'builtin/anime-wow.mp3', label: 'Up 5 levels', actions: [{ type: 'levelUp', amount: 5 }] },
+    { gift: 'Boxing Gloves', sound: 'builtin/nooo.mp3', label: 'Down 5 levels', actions: [{ type: 'levelDown', amount: 5 }] },
+    { gift: 'Galaxy', sound: 'builtin/i-need-a-hero.mp3', label: 'Reset in 60s', perCount: false, actions: [{ type: 'resetTimer', seconds: 60 }] },
+    { gift: 'Glowing Jellyfish', sound: 'builtin/cha-ching.mp3', label: 'Saves the reset', perCount: false, actions: [{ type: 'saveReset' }] },
+    { gift: 'Hand Hearts', sound: 'builtin/here-comes-the-money.mp3', label: 'Level slots', perCount: false, actions: [{ type: 'levelWheel', amounts: '-10, -5, -3, -1, 1, 3, 5, 10' }] },
+];
+const minecraftModes = (parkourRules = PARKOUR_RULES) => [
+    { id: newId(), name: 'Block Delete Survival', rules: BLOCK_DELETE_RULES },
+    { id: newId(), name: 'Parkour Paradise', rules: parkourRules },
+    { id: newId(), name: 'Dropper', rules: DROPPER_RULES },
+];
+const isDropper = g => g?.connector === 'minecraft' && /dropper/i.test(currentMode(g)?.name || '');
+// the world gifts go to: the Dropper has its own, the other types use the world you picked
+const worldOf = g => isDropper(g) ? DROPPER_WORLD : g.minecraft.world;
+const isSingle = g => isDropper(g) || !!g.minecraft.single;
 
 let games = loadGames();
 const saveGame = g => writeJson(gamePath(g.id), g);
 
 // Starter games the first time the app opens.
 if (!Object.keys(games).length) {
-    const mc = normalizeGame({
-        id: newId(), name: 'Minecraft', icon: '⛏️', connector: 'minecraft',
-        rules: [
-            { gift: 'Rose', sound: 'builtin/vine-boom.wav', label: 'Spawns a zombie', actions: [{ type: 'command', command: 'execute at @a[name={player},limit=1] run summon zombie ^ ^ ^3' }] },
-            { gift: 'Finger Heart', sound: 'builtin/ding.wav', label: 'Gives a diamond', actions: [{ type: 'command', command: 'give {player} diamond 1' }] },
-            { gift: 'Hat and Mustache', sound: 'builtin/fahh.wav', label: 'Lightning strike!', actions: [{ type: 'command', command: 'execute at @a[name={player},limit=1] run summon lightning_bolt ^ ^ ^2' }] },
-        ],
-    });
-    const own = normalizeGame({
-        id: newId(), name: 'My own game', icon: '🕹️', connector: 'websocket',
-        rules: [
-            { gift: 'Rose', sound: 'builtin/airhorn.wav', label: 'Spawn an enemy', actions: [{ type: 'message', name: 'spawnEnemy', amount: 1 }] },
-            { gift: 'Finger Heart', sound: 'builtin/ding.wav', label: 'Heal', actions: [{ type: 'message', name: 'heal', amount: 10 }] },
-        ],
-    });
-    games = { [mc.id]: mc, [own.id]: own };
-    Object.values(games).forEach(saveGame);
+    const mc = normalizeGame({ id: newId(), name: 'Minecraft', cover: MINECRAFT_COVER, connector: 'minecraft', minecraft: { single: true, world: listWorlds()[0]?.name || '' }, modes: minecraftModes() });
+    games = { [mc.id]: mc };
+    saveGame(mc);
     settings.activeGame = mc.id;
     saveSettings();
+} else if (!settings.minecraftTypes) {
+    // Older versions started with "Minecraft" (one gift list) and "My own game". Now Minecraft has
+    // the Parkour / Block Delete types and "My own game" is gone. Runs once.
+    for (const g of Object.values(games)) {
+        if (g.name === 'My own game' && g.connector === 'websocket') {
+            delete games[g.id];
+            fs.rmSync(gamePath(g.id), { force: true });
+        } else if (g.name === 'Minecraft' && g.connector === 'minecraft' && g.modes.length === 1) {
+            // Keeps the gifts you set up as the Parkour list; the untouched old starter is replaced.
+            const old = g.modes[0].rules;
+            const starter = old.map(r => r.label).join('|') === 'Spawns a zombie|Gives a diamond|Lightning strike!';
+            Object.assign(g, normalizeModes({ modes: minecraftModes(starter || !old.length ? PARKOUR_RULES : old) }));
+            saveGame(g);
+        }
+    }
+}
+if (!settings.minecraftTypes) { settings.minecraftTypes = true; saveSettings(); }
+if (!settings.presets) {
+    const OLD_BLOCK_DELETE = 'Spawns a zombie|Diamond kit|Spawns a ghast|Spawns a warden|Spawns the Ender Dragon|Clears your inventory';
+    for (const g of Object.values(games)) {
+        let changed = false;
+        for (const m of g.modes) {
+            if (m.name === 'Block Delete Survival' && m.rules.map(r => r.label).join('|') === OLD_BLOCK_DELETE) { m.rules = normalizeRules(BLOCK_DELETE_RULES); changed = true; }
+            if (m.name === 'Parkour Paradise') for (const r of m.rules) if (r.gift === 'Galaxy' && r.label === 'Back to the start' && r.sound === 'builtin/sad-trombone.mp3') { r.sound = 'builtin/i-need-a-hero.mp3'; changed = true; }
+        }
+        if (changed) saveGame(g);
+    }
+    settings.presets = true; saveSettings();
+}
+if (!settings.bedrockNuke) {
+    // the nuke now digs to bedrock across about 20 chunks: older starting sizes (12, 35) become 40
+    for (const g of Object.values(games)) {
+        let changed = false;
+        for (const m of g.modes) for (const r of m.rules) for (const act of r.actions) if (act.type === 'nuke' && [12, 35].includes(+act.size || 12)) { act.size = 40; changed = true; }
+        if (changed) saveGame(g);
+    }
+    settings.bedrockNuke = true; saveSettings();
+}
+if (!settings.singleplayer) {
+    // Block Delete opens first and plays in your newest singleplayer world (switch to Server any time)
+    for (const g of Object.values(games)) {
+        if (g.connector !== 'minecraft') continue;
+        const bd = g.modes.find(m => /block delete/i.test(m.name));
+        if (bd) g.mode = bd.id;
+        if (!g.minecraft.world) g.minecraft.world = listWorlds()[0]?.name || '';
+        if (g.minecraft.world) { g.minecraft.single = true; g.minecraft.manual = false; }
+        saveGame(g);
+    }
+    settings.singleplayer = true; saveSettings();
+}
+if (!settings.levelSlots) {
+    // the level slot machine is added to Dropper gift lists made before it existed
+    for (const g of Object.values(games)) {
+        let changed = false;
+        for (const m of g.modes) if (/dropper/i.test(m.name) && !m.rules.some(r => r.actions.some(a => a.type === 'levelWheel')) && !m.rules.some(r => r.gift === 'Hand Hearts')) {
+            m.rules.push(...normalizeRules([DROPPER_RULES.find(r => r.actions[0].type === 'levelWheel')])); changed = true;
+        }
+        if (changed) saveGame(g);
+    }
+    settings.levelSlots = true; saveSettings();
+}
+if (!settings.dropper) {
+    // the Dropper type is added to Minecraft
+    for (const g of Object.values(games)) {
+        if (g.connector !== 'minecraft' || !/minecraft/i.test(g.name) || g.modes.some(m => /dropper/i.test(m.name))) continue;
+        g.modes.push({ id: newId(), name: 'Dropper', rules: normalizeRules(DROPPER_RULES) });
+        saveGame(g);
+    }
+    settings.dropper = true; saveSettings();
+}
+if (!settings.covers) {
+    for (const g of Object.values(games)) if (g.connector === 'minecraft' && /minecraft/i.test(g.name) && !g.cover) { g.cover = MINECRAFT_COVER; saveGame(g); }
+    settings.covers = true; saveSettings();
 }
 if (!games[settings.activeGame]) settings.activeGame = Object.keys(games)[0] || null;
 for (const g of Object.values(games)) {
@@ -124,6 +275,85 @@ for (const g of Object.values(games)) {
 const activeGame = () => games[settings.activeGame] || null;
 
 // ---------- Sounds ----------
+
+// ---------- Real sound clips (from MyInstants) ----------
+// The starter sounds are the real meme clips. They aren't stored in this app's files: each PC
+// downloads them the first time Gift Hype opens, into sounds/builtin.
+const MYINSTANTS = 'https://www.myinstants.com';
+const SOUND_PACK = {
+    'fahh': 'fahhh_KcgAXfs.mp3',
+    'vine-boom': 'vine-boom.mp3',
+    'bruh': 'movie_1.mp3',
+    'airhorn': 'airhorn.mp3',
+    'sad-trombone': 'sadtrombone.swf.mp3',
+    'lets-go': 'lets-go-meme_m93gdas.mp3',
+    'oh-no': 'oh-no_h28Tjuw.mp3',
+    'sheesh': 'sheesh-mpl-echo-ph.mp3',
+    'nooo': 'charles-leclerc-scream-noooo.mp3',
+    'cha-ching': 's1_c5-online-audio-converter.mp3',
+    'ding': 'ding-sound-effect_2.mp3',
+    'record-scratch': 'record-scratch-clean.mp3',
+    'wrong-buzzer': 'wrong-answer-buzzer.mp3',
+    'explosion': 'explosion-meme_dTCfAHs.mp3',
+    'drumroll': 'drum-roll-gaming-sound-effect-hd.mp3',
+    'level-up': 'levelup.mp3',
+    'boing': 'cartoon-boing_7vRWDlc.mp3',
+    'whoosh': 'transition-whoosh.mp3',
+    'emotional-damage': 'emotional-damage-meme.mp3',
+    'rizz': 'rizz-sound-effect.mp3',
+    'taco-bell-bong': 'taco-bell-bong-sfx.mp3',
+    'metal-pipe': 'metal-pipe-falling-sound-effect.mp3',
+    'windows-error': 'erro.mp3',
+    'among-us': 'among-us-role-reveal-sound.mp3',
+    'anime-wow': 'anime-wow-sound-effect.mp3',
+    'bonk': 'bonk_7zPAD7C.mp3',
+    'oof': 'roblox-death-sound_1.mp3',
+    'i-need-a-hero': 'i-need-a-hero.mp3',
+    'dababy-lets-go': 'lets-go-sound-effect.mp3',
+    'here-comes-the-money': 'here-comes-the-money.mp3',
+};
+const BUILTIN_SOUNDS = path.join(SOUNDS_DIR, 'builtin');
+const isMp3 = b => b.length > 512 && (b.subarray(0, 3).toString() === 'ID3' || (b[0] === 0xff && (b[1] & 0xe0) === 0xe0));
+const isClipPath = p => /^\/media\/sounds\/[\w.%()-]+\.mp3$/i.test(p) && !p.includes('..');
+
+async function fetchClip(clipPath) {
+    if (!isClipPath(clipPath)) throw new Error('Not a sound');
+    const r = await fetch(MYINSTANTS + clipPath, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+    const buf = Buffer.from(await r.arrayBuffer());
+    if (!r.ok || !isMp3(buf)) throw new Error("Couldn't get that sound");
+    if (buf.length > 6e6) throw new Error('That sound is too long');
+    return buf;
+}
+
+async function getSoundPack() {
+    fs.mkdirSync(BUILTIN_SOUNDS, { recursive: true });
+    // made-up sounds from older versions
+    for (const f of fs.readdirSync(BUILTIN_SOUNDS)) if (f.endsWith('.wav')) fs.rmSync(path.join(BUILTIN_SOUNDS, f), { force: true });
+    const missing = Object.entries(SOUND_PACK).filter(([name]) => !fs.existsSync(path.join(BUILTIN_SOUNDS, `${name}.mp3`)));
+    if (!missing.length) return;
+    log(`Getting ${missing.length} starter sounds...`);
+    let got = 0;
+    for (const [name, clip] of missing) {
+        try { fs.writeFileSync(path.join(BUILTIN_SOUNDS, `${name}.mp3`), await fetchClip(`/media/sounds/${clip}`)); got++; } catch { }
+    }
+    log(got === missing.length ? 'Starter sounds ready.' : `Got ${got} of ${missing.length} starter sounds. The rest will be tried next time Gift Hype opens.`);
+    broadcast('sounds', listSounds());
+}
+
+const unescapeHtml = t => t.replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16))).replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(+d))
+    .replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+async function searchClips(q) {
+    q = String(q || '').trim().slice(0, 80);
+    if (!q) return [];
+    const r = await fetch(`${MYINSTANTS}/en/search/?name=${encodeURIComponent(q)}`, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+    if (!r.ok) throw new Error("Couldn't search right now");
+    const html = await r.text(), out = [];
+    for (const m of html.matchAll(/play\('(\/media\/sounds\/[^']+?\.mp3)'[\s\S]*?class="instant-link[^"]*"[^>]*>([^<]*)</g)) {
+        if (isClipPath(m[1]) && !out.some(o => o.path === m[1])) out.push({ path: m[1], name: unescapeHtml(m[2]).trim() });
+        if (out.length >= 40) break;
+    }
+    return out;
+}
 
 function listSounds() {
     const out = [];
@@ -146,12 +376,39 @@ function soundFilePath(file) {
     return fs.existsSync(p) ? p : null;
 }
 
+// TikTok LIVE Studio on this PC: its program, or its Start menu shortcut
+function findLiveStudio() {
+    const tries = [];
+    for (const base of [process.env.ProgramFiles, process.env['ProgramFiles(x86)'], path.join(process.env.LOCALAPPDATA || '', 'Programs'), process.env.LOCALAPPDATA]) {
+        if (!base) continue;
+        const dir = path.join(base, 'TikTok LIVE Studio');
+        if (!fs.existsSync(dir)) continue;
+        tries.push(path.join(dir, 'TikTok LIVE Studio.exe'));
+        for (const v of fs.readdirSync(dir).sort().reverse()) tries.push(path.join(dir, v, 'TikTok LIVE Studio.exe'));
+    }
+    for (const base of [path.join(process.env.APPDATA || '', 'Microsoft', 'Windows', 'Start Menu', 'Programs'), path.join(process.env.ProgramData || 'C:\\ProgramData', 'Microsoft', 'Windows', 'Start Menu', 'Programs')]) {
+        const walk = (d, depth) => { try { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const q = path.join(d, e.name); if (e.isDirectory() && depth < 2) walk(q, depth + 1); else if (/tiktok live studio.*\.lnk$/i.test(e.name)) tries.push(q); } } catch { } };
+        walk(base, 0);
+    }
+    return tries.find(t => fs.existsSync(t)) || null;
+}
+
 // ---------- Live updates (Server-Sent Events) ----------
 
 const clients = new Set();
+const OVERLAY_EVENTS = new Set(['alert', 'play', 'stopSound', 'reset', 'wheel', 'settings', 'state']);
+const overlaySettings = () => ({ overlay: settings.overlay, theme: settings.theme, soundsIn: settings.soundsIn });
 function broadcast(event, data) {
     const msg = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
-    for (const res of clients) res.write(msg);
+    let small = null;
+    for (const res of clients) {
+        if (!res.overlayOnly) { res.write(msg); continue; }
+        if (!OVERLAY_EVENTS.has(event)) continue;
+        // settings and state: only the overlay's own settings go to an overlay-only listener
+        small ||= event === 'settings' ? `event: settings\ndata: ${JSON.stringify(overlaySettings())}\n\n`
+            : event === 'state' ? `event: state\ndata: ${JSON.stringify({ settings: overlaySettings() })}\n\n` : msg;
+        res.write(small);
+    }
 }
 
 const recentLog = [];
@@ -198,11 +455,12 @@ function readProps(file) {
     return props;
 }
 
-const SKIP_DIRS = new Set(['node_modules', '.git', 'AppData', 'world', 'world_nether', 'world_the_end', 'libraries', 'versions', 'cache', 'logs', 'plugins', 'bundler', 'window']);
 var foundServers = foundServers || []; // may already be filled by the startup scan above
 
 // Looks in Downloads, Desktop, Documents (a few folders deep) for server.properties files.
 function findServers() {
+    // Declared in here: the startup scan runs before the rest of this file has loaded.
+    const SKIP_DIRS = new Set(['node_modules', '.git', 'AppData', 'world', 'world_nether', 'world_the_end', 'libraries', 'versions', 'cache', 'logs', 'plugins', 'bundler', 'window']);
     const home = os.homedir();
     const roots = ['Downloads', 'Desktop', 'Documents', 'OneDrive\\Desktop', 'OneDrive\\Documents', 'curseforge\\minecraft\\Instances']
         .map(r => path.join(home, r)).concat(path.dirname(ROOT));
@@ -242,6 +500,7 @@ function findServers() {
 // Where to connect for a Minecraft game: the found server's own settings, or what was typed.
 function rconTarget(g) {
     const m = g.minecraft;
+    if (isSingle(g)) return localState === 'ready' && localServer.world() === worldOf(g) ? localServer.rcon() : { error: localState };
     if (m.manual) {
         if (!m.password) return { error: 'no password' };
         return { host: m.host || '127.0.0.1', port: +m.port || 25575, password: m.password };
@@ -279,10 +538,56 @@ function enableRcon(folder) {
 
 // Minecraft over RCON. Connected while a Minecraft game is the active one.
 let rcon = null, rconFor = null, rconTimer = null, rconQueue = Promise.resolve();
+// Your singleplayer world, opened on a hidden server on this PC so gifts can reach it (localserver.js).
+let localState = 'stopped';
+const localServer = makeLocalServer({
+    dir: path.join(DATA, 'mcserver'),
+    log,
+    onState: st => {
+        localState = st;
+        if (st === 'ready') { packNeedsReload = false; rconFor = null; connectMinecraft(); }
+        else if (!rcon || st !== 'ready') setStatus({ minecraft: st === 'stopped' ? 'world closed' : st });
+    },
+});
+
+// Singleplayer: keep the Gift Hype data pack in the world up to date (with a crater for each nuke size).
+let packNeedsReload = false;
+function nukeSizes(g) {
+    return g.modes.flatMap(m => m.rules.flatMap(r => r.actions.filter(a => a.type === 'nuke').map(a => Math.max(16, Math.min(64, Math.round(+a.size || 40))))));
+}
+function syncPack(g) {
+    if (isDropper(g)) {
+        try { if (installDropperPack()) { packNeedsReload = true; log('Dropper pack updated.'); } return 'singleplayer'; }
+        catch (e) { log(`Couldn't put the Dropper pack in place: ${e.message}`); return 'world failed'; }
+    }
+    if (!g.minecraft.world) return 'no world picked';
+    try {
+        if (installPack(g.minecraft.world, nukeSizes(g))) { packNeedsReload = true; log(`Gift Hype pack put into "${g.minecraft.world}".`); }
+        return 'singleplayer';
+    } catch (e) { log(`Couldn't put the pack into the world: ${e.message}`); return 'world not found'; }
+}
+
 async function connectMinecraft() {
     clearTimeout(rconTimer);
     const g = activeGame();
     if (!g || g.connector !== 'minecraft') return disconnectMinecraft();
+    if (isSingle(g)) {
+        const st = syncPack(g);
+        if (st !== 'singleplayer') { await disconnectMinecraft(); return setStatus({ minecraft: st }); }
+        if (!settings.mcEula) { await disconnectMinecraft(); localServer.stop(); return setStatus({ minecraft: 'eula not accepted' }); }
+        const world = worldOf(g);
+        if (!localServer.running() || localServer.world() !== world) {
+            await disconnectMinecraft();
+            rconFor = null;
+            // the Dropper world is made the first time, on the same Minecraft version as your own world
+            const opts = isDropper(g) ? { version: newWorldVersion(), props: DROPPER_PROPS } : {};
+            localServer.start(world, { eula: settings.mcEula, ...opts }).catch(e => { log(`Couldn't open the world: ${e.message}`); setStatus({ minecraft: 'world failed' }); });
+            return;
+        }
+        if (localState !== 'ready') return setStatus({ minecraft: localState });
+    } else if (localServer.running()) {
+        localServer.stop();
+    }
     const target = rconTarget(g);
     const key = JSON.stringify([g.id, target]);
     if (rcon && rconFor === key) return;
@@ -291,7 +596,7 @@ async function connectMinecraft() {
     if (target.error) {
         setStatus({ minecraft: target.error });
         // check again in a bit (e.g. RCON was just turned on and the server restarted)
-        if (target.error !== 'no server picked') rconTimer = setTimeout(() => { rconFor = null; connectMinecraft(); }, 10000);
+        if (target.error !== 'no server picked' && !isSingle(g)) rconTimer = setTimeout(() => { rconFor = null; connectMinecraft(); }, 10000);
         return;
     }
     setStatus({ minecraft: 'connecting' });
@@ -302,13 +607,15 @@ async function connectMinecraft() {
         r.on('end', () => {
             if (rcon !== r) return;
             rcon = null;
-            setStatus({ minecraft: 'offline' });
+            setStatus({ minecraft: isSingle(g) ? (localServer.running() ? 'starting' : 'world closed') : 'offline' });
+            if (isSingle(g)) return;
             log('Minecraft disconnected. Trying again in 10s...');
             rconTimer = setTimeout(() => { rconFor = null; connectMinecraft(); }, 10000);
         });
         r.on('error', () => {});
         setStatus({ minecraft: 'connected' });
-        log(`Connected to Minecraft${g.minecraft.serverFolder ? ` (${path.basename(path.dirname(g.minecraft.serverFolder))})` : ` at ${target.host}:${target.port}`}.`);
+        if (isDropper(g) && !dropperBuilt()) buildDropperWorld();
+        if (!isSingle(g)) log(`Connected to Minecraft${g.minecraft.serverFolder ? ` (${path.basename(path.dirname(g.minecraft.serverFolder))})` : ` at ${target.host}:${target.port}`}.`);
     } catch (e) {
         if (rconFor !== key) return;
         // "offline" here usually means the server isn't started yet
@@ -323,6 +630,39 @@ async function disconnectMinecraft() {
     rcon = null;
     if (r) await r.end().catch(() => {});
     setStatus({ minecraft: 'offline' });
+}
+// The Minecraft version for a new world: the same as your newest world (so your game can join it).
+function newWorldVersion() {
+    for (const w of listWorlds()) { try { const v = worldVersion(w.name); if (v) return v; } catch { } }
+    return '26.2';
+}
+// Builds the 100 Dropper levels into its world the first time it opens (about a minute).
+let dropperBuilding = false;
+async function buildDropperWorld() {
+    if (dropperBuilding) return;
+    dropperBuilding = true;
+    log('Building the Dropper: 100 levels (a few minutes, only the first time)...');
+    setStatus({ dropper: `building 0/${DROPPER_LEVELS}` });
+    try {
+        // the building functions are a pack of their own, only in the world while it builds,
+        // 20 levels at a time so the game never has to load all of them at once
+        packNeedsReload = false;
+        for (let from = 1; from <= DROPPER_LEVELS; from += 20) {
+            const to = Math.min(DROPPER_LEVELS, from + 19);
+            const buildPack = installDropperBuildPack(undefined, from, to);
+            await mc('reload');
+            await mc(`datapack enable "${buildPack}"`).catch(() => {});
+            await buildDropper(mc, { from, to, log, progress: n => { if (n % 5 === 0 || n === 1) setStatus({ dropper: `building ${n}/${DROPPER_LEVELS}` }); } });
+        }
+        markDropperBuilt();
+        removeDropperBuildPack();
+        await mc('reload').catch(() => {});
+        setStatus({ dropper: 'ready' });
+        log('The Dropper is built. Join Gift Hype in Minecraft to play.');
+    } catch (e) {
+        setStatus({ dropper: 'build stopped' });
+        log(`The Dropper build stopped (${e.message}). It starts again next time the world opens.`);
+    } finally { dropperBuilding = false; }
 }
 function mc(command) {
     // one command at a time, in order
@@ -357,6 +697,8 @@ function sendToGames(message) {
 // Key presses: one PowerShell process that types into whatever window is in front.
 let keyProc = null;
 function pressKeys(keys) {
+    // for testing: write the keys to a file instead of pressing them
+    if (process.env.GIFTHYPE_KEYLOG) return fs.appendFileSync(process.env.GIFTHYPE_KEYLOG, String(keys) + '\n');
     if (!keyProc || keyProc.exitCode !== null) {
         keyProc = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
             'Add-Type -AssemblyName System.Windows.Forms; while (($l = [Console]::In.ReadLine()) -ne $null) { try { [System.Windows.Forms.SendKeys]::SendWait($l) } catch { } }'],
@@ -384,8 +726,41 @@ const fill = (text, ctx) => String(text)
 // Stops a huge streak from flooding the game. Each action runs at most this many times per gift event.
 const MAX_REPEAT = 50;
 
+// Ready-made Minecraft actions (nuke, jail, chunk fills, kits...), in minecraft-presets.js.
+const PRESETS = makePresets({ mc, log });
+
 async function runAction(game, a, ctx) {
     const times = Math.min(MAX_REPEAT, Math.max(1, (+a.times || 1) * (ctx.perCount ? ctx.count : 1)));
+    if (isDropper(game) && DROPPER_ACTIONS.has(a.type)) {
+        // the Dropper's own data pack does it, run as you
+        if (!rcon) return log('The Dropper world is not open yet.');
+        if (packNeedsReload) { packNeedsReload = false; await mc('reload'); }
+        const who = /^\w{1,16}$/.test(ctx.player) ? `@a[name=${ctx.player},limit=1]` : '@a[limit=1]';
+        if (a.type === 'levelWheel') {
+            // the slot machine spins on the stream overlay; when it stops you go up or down that many levels
+            const amounts = wheelAmounts(a), result = amounts[Math.floor(Math.random() * amounts.length)], spinMs = 4500;
+            broadcast('wheel', { amounts, result, spinMs, from: ctx.from, gift: ctx.gift, image: ctx.image || null });
+            log(`Level slots for ${ctx.from}: ${result > 0 ? '+' : ''}${result}`);
+            await sleep(spinMs + 500);
+            await mc(`execute as ${who} at @s run function dropper:${result > 0 ? 'up' : 'down'} {n:${Math.abs(result)}}`).catch(e => log(`Level slots failed: ${e.message}`));
+            return;
+        }
+        const saveGift = rulesOf(game).find(r => r.actions.some(x => x.type === 'saveReset'))?.gift;
+        for (const c of dropperCommands(a, ctx.perCount ? Math.min(MAX_REPEAT, ctx.count) : 1, { saveGift })) {
+            await mc(`execute as ${who} at @s run ${c}`).catch(e => log(`${a.type} failed: ${e.message}`));
+        }
+        return;
+    }
+    if (game.connector === 'minecraft' && game.minecraft.single && PRESETS[a.type]) {
+        // your world: the Gift Hype data pack does it, run as you
+        if (!rcon) return log('Your world is not open yet.');
+        if (packNeedsReload) { packNeedsReload = false; await mc('reload'); }
+        const who = /^\w{1,16}$/.test(ctx.player) ? `@a[name=${ctx.player},limit=1]` : '@a[limit=1]';
+        for (const c of singleplayerCommands(a, ctx.perCount ? Math.min(MAX_REPEAT, ctx.count) : 1, MOBS)) {
+            await mc(`execute as ${who} at @s run ${c}`).catch(e => log(`${a.type} failed: ${e.message}`));
+        }
+        return;
+    }
     if (a.type === 'command') {
         if (game.connector !== 'minecraft') return;
         for (let i = 0; i < times; i++) await mc(fill(a.command || '', ctx)).catch(e => log(`Command failed: ${e.message}`));
@@ -394,14 +769,63 @@ async function runAction(game, a, ctx) {
         if (!sent) log(`No game is connected to receive "${a.name}".`);
     } else if (a.type === 'keys') {
         for (let i = 0; i < times; i++) { pressKeys(a.keys || ''); if (times > 1) await sleep(Math.max(30, +a.gap || 120)); }
+    } else if (PRESETS[a.type]) {
+        if (game.connector !== 'minecraft') return;
+        await PRESETS[a.type](a, ctx, ctx.perCount ? Math.min(MAX_REPEAT, ctx.count) : 1).catch(e => log(`${a.type} failed: ${e.message}`));
     } else if (a.type === 'wait') {
         await sleep(Math.max(0, Math.min(60000, (+a.seconds || 1) * 1000)));
     }
 }
 
 function findRule(game, giftName) {
-    const n = giftName.toLowerCase();
-    return game.rules.find(r => r.gift.toLowerCase() === n) || game.rules.find(r => r.gift === '*') || null;
+    const n = giftName.toLowerCase(), rules = rulesOf(game);
+    return rules.find(r => r.gift.toLowerCase() === n) || rules.find(r => r.gift === '*') || null;
+}
+
+// ---------- The Dropper's reset countdown, kept in step with the game for the stream overlay ----------
+// (the same rules as in the game: a shield blocks a reset, a second reset while one runs does nothing,
+// a save stops it or, with no countdown, gives a shield)
+let dropperReset = null, dropperShields = 0, resetTicker = null;
+function resetPublic() {
+    if (!dropperReset) return { active: false };
+    return { active: true, secondsLeft: Math.max(0, Math.ceil((dropperReset.endsAt - Date.now()) / 1000)), total: dropperReset.total, saveGift: dropperReset.save };
+}
+function saveGiftOf(game) {
+    const r = rulesOf(game).find(x => x.actions.some(a => a.type === 'saveReset'));
+    return r ? { name: r.gift, image: findGift(r.gift)?.image || r.image || null } : null;
+}
+function dropperResetGift(game, rule, from) {
+    const reset = rule.actions.find(a => a.type === 'resetTimer'), save = rule.actions.some(a => a.type === 'saveReset');
+    if (reset) {
+        if (dropperShields > 0) { dropperShields--; broadcast('reset', { active: false, event: 'blocked', by: from }); return 'blocked'; }
+        if (dropperReset) return 'running';
+        const secs = Math.max(5, Math.min(600, Math.round(+reset.seconds || 60)));
+        dropperReset = { endsAt: Date.now() + secs * 1000, total: secs, save: saveGiftOf(game), by: from };
+        clearInterval(resetTicker);
+        resetTicker = setInterval(() => {
+            if (!dropperReset) return clearInterval(resetTicker);
+            if (Date.now() >= dropperReset.endsAt) {
+                const by = dropperReset.by; dropperReset = null; clearInterval(resetTicker);
+                broadcast('stopSound', { id: 'reset' });
+                return broadcast('reset', { active: false, event: 'done', by });
+            }
+            broadcast('reset', resetPublic());
+        }, 1000);
+        broadcast('reset', resetPublic());
+        return 'started';
+    }
+    if (save) {
+        if (dropperReset) {
+            dropperReset = null; clearInterval(resetTicker);
+            broadcast('stopSound', { id: 'reset' });
+            broadcast('reset', { active: false, event: 'saved', by: from });
+            return 'saved';
+        }
+        dropperShields = Math.min(3, dropperShields + 1);
+        broadcast('reset', { active: false, event: 'shield', by: from });
+        return 'shield';
+    }
+    return null;
 }
 
 async function handleGift(giftName, count, from, image, coins) {
@@ -420,10 +844,12 @@ async function handleGift(giftName, count, from, image, coins) {
     log(`${from} sent ${count > 1 ? count + ' x ' : ''}${giftName}${rule ? ` -> ${entry.did}` : ' (nothing set up for it)'}`);
     if (!rule) return;
 
-    if (rule.sound) broadcast('play', { file: rule.sound, volume: rule.volume * settings.masterVolume });
-    if (rule.alert) broadcast('alert', { ...entry, label: rule.label });
+    const dropper = isDropper(game), resetEvent = dropper ? dropperResetGift(game, rule, from) : null;
+    // a reset's sound plays on (looping) for the whole countdown, until it's saved or runs out
+    if (rule.sound) broadcast('play', { file: rule.sound, volume: rule.volume * settings.masterVolume, ...(resetEvent === 'started' ? { id: 'reset', loopFor: dropperReset.total } : {}) });
+    if (rule.alert) broadcast('alert', { ...entry, label: rule.label, ...(dropper ? { dropper: true, action: dropperAlertText(rule, count).what, actionColor: dropperAlertText(rule, count).color } : {}) });
 
-    const ctx = { player: game.minecraft.player || await onlinePlayer(game) || '@p', from, gift: giftName, count, perCount: rule.perCount };
+    const ctx = { player: game.minecraft.player || await onlinePlayer(game) || '@p', from, gift: giftName, count, perCount: rule.perCount, image: entry.image };
     try {
         for (const a of rule.actions) await runAction(game, a, ctx);
     } catch (e) {
@@ -522,10 +948,12 @@ function readBody(req, limit = 1e6) {
 
 const publicState = () => ({
     settings: { ...settings, eulerStreamApiKey: settings.eulerStreamApiKey ? '••••••' : '' },
-    games: Object.values(games).map(g => ({ id: g.id, name: g.name, icon: g.icon, connector: g.connector, gifts: g.rules.length })),
+    games: Object.values(games).map(g => ({ id: g.id, name: g.name, cover: coverVersion(g), connector: g.connector, gifts: rulesOf(g).length, mode: g.modes.length > 1 ? currentMode(g).name : '' })),
     game: activeGame(),
     sounds: listSounds(),
     status, feed, log: recentLog.slice(-80),
+    reset: resetPublic(),
+    version: localVersion(ROOT),
 });
 
 function setActive(id) {
@@ -534,11 +962,39 @@ function setActive(id) {
     saveSettings();
     connectMinecraft();
     broadcast('state', publicState());
-    log(`Now playing: ${games[id].name}`);
+    const g = games[id];
+    log(`Now playing: ${g.name}${g.modes.length > 1 ? ` (${currentMode(g).name})` : ''}`);
 }
 
 const routes = {
     'GET /api/state': () => publicState(),
+    // Opens TikTok LIVE Studio if it's on this PC (its scene files aren't documented, so the overlay
+    // is added there by hand: the app copies the address and shows the clicks).
+    'POST /api/live-studio/open': () => {
+        const exe = findLiveStudio();
+        if (!exe) return { opened: false };
+        spawn(exe.endsWith('.lnk') ? 'explorer.exe' : exe, exe.endsWith('.lnk') ? [exe] : [], { detached: true, stdio: 'ignore' }).unref();
+        return { opened: true };
+    },
+    // Updates (updater.js): is there a newer version on GitHub, and install it
+    'GET /api/update/check': async () => { const u = await checkForUpdate(ROOT); setStatus({ update: u }); return u; },
+    'POST /api/update/apply': async () => {
+        if (updating) throw new Error('Already updating');
+        updating = true;
+        setStatus({ update: { ...(status.update || {}), state: 'updating' } });
+        try {
+            const v = await applyUpdate(ROOT, log);
+            log(`Updated to version ${v}. Restarting Gift Hype...`);
+            setStatus({ update: { current: v, latest: v, available: false, state: 'restarting' } });
+            setTimeout(restartAfterUpdate, 800);
+            return { ok: true, version: v };
+        } catch (e) {
+            updating = false;
+            setStatus({ update: { ...(status.update || {}), state: 'failed', error: e.message } });
+            throw new Error(`The update didn't work: ${e.message}`);
+        }
+    },
+    'GET /api/overlay-state': () => ({ settings: overlaySettings(), reset: resetPublic() }),
     'GET /api/catalog': () => [...learned, ...catalog.filter(c => !learned.some(l => l.name.toLowerCase() === c.name.toLowerCase()))].sort((a, b) => (a.coins ?? 0) - (b.coins ?? 0) || a.name.localeCompare(b.name)),
     'POST /api/connect': async b => { await connectTikTok(b.username); return { ok: true }; },
     'POST /api/disconnect': async () => { await disconnectTikTok(); return { ok: true }; },
@@ -547,6 +1003,8 @@ const routes = {
         if (Number.isFinite(+b.masterVolume)) settings.masterVolume = Math.max(0, Math.min(1, +b.masterVolume));
         if (['app', 'overlay'].includes(b.soundsIn)) settings.soundsIn = b.soundsIn;
         if (typeof b.autoConnect === 'boolean') settings.autoConnect = b.autoConnect;
+        if (typeof b.mcEula === 'boolean' && b.mcEula !== settings.mcEula) { settings.mcEula = b.mcEula; setTimeout(connectMinecraft, 50); }
+        if (['sky', 'blaze', 'punk', 'egyptian'].includes(b.theme)) settings.theme = b.theme;
         if (b.overlay && typeof b.overlay === 'object') {
             const o = settings.overlay;
             if (['top', 'middle', 'bottom'].includes(b.overlay.position)) o.position = b.overlay.position;
@@ -558,7 +1016,7 @@ const routes = {
         return { ok: true };
     },
     'POST /api/games/new': b => {
-        const g = normalizeGame({ id: newId(), name: b.name || 'New game', icon: b.icon || '🎮', connector: b.connector || 'none', rules: [] });
+        const g = normalizeGame({ id: newId(), name: b.name || 'New game', connector: b.connector || 'none', cover: /minecraft/i.test(b.name || '') && b.connector === 'minecraft' ? MINECRAFT_COVER : '', rules: [] });
         if (g.connector === 'minecraft') g.minecraft.serverFolder = findServers().find(f => f.rcon)?.folder || '';
         games[g.id] = g;
         saveGame(g);
@@ -567,7 +1025,9 @@ const routes = {
     },
     'POST /api/games/save': b => {
         if (!games[b.id]) throw new Error('No such game');
-        const g = normalizeGame(b);
+        // covers are changed only by uploading: keep the ones this side has
+        const old = games[b.id], keepCover = m => ({ ...m, cover: old.modes.find(x => x.id === m.id)?.cover || '' });
+        const g = normalizeGame({ ...b, cover: old.cover, modes: Array.isArray(b.modes) ? b.modes.map(keepCover) : b.modes });
         games[g.id] = g;
         saveGame(g);
         if (g.id === settings.activeGame) connectMinecraft();
@@ -576,8 +1036,10 @@ const routes = {
     },
     'POST /api/games/delete': b => {
         if (!games[b.id]) throw new Error('No such game');
+        const cover = games[b.id].cover;
         delete games[b.id];
         fs.rmSync(gamePath(b.id), { force: true });
+        removeCoverIfUnused(cover);
         if (settings.activeGame === b.id) {
             settings.activeGame = Object.keys(games)[0] || null;
             saveSettings();
@@ -589,7 +1051,7 @@ const routes = {
     'POST /api/games/duplicate': b => {
         const src = games[b.id];
         if (!src) throw new Error('No such game');
-        const g = normalizeGame({ ...structuredClone(src), id: newId(), name: `${src.name} (copy)`, rules: src.rules.map(r => ({ ...r, id: newId() })) });
+        const g = normalizeGame({ ...structuredClone(src), id: newId(), name: `${src.name} (copy)`, modes: src.modes.map(m => ({ ...m, rules: m.rules.map(r => ({ ...r, id: newId() })) })) });
         games[g.id] = g;
         saveGame(g);
         setActive(g.id);
@@ -598,11 +1060,21 @@ const routes = {
     'POST /api/games/active': b => { setActive(b.id); return { ok: true }; },
     'POST /api/test': async b => {
         const game = activeGame();
-        const rule = game?.rules.find(r => r.id === b.ruleId);
+        const rule = game && rulesOf(game).find(r => r.id === b.ruleId);
         if (!rule) throw new Error('Save the gift first');
         const known = findGift(rule.gift);
         await handleGift(rule.gift === '*' ? 'Any gift' : rule.gift, Math.max(1, Math.min(100, +b.count || 1)), 'TEST', known?.image || rule.image, known?.coins);
         return { ok: true };
+    },
+    'POST /api/sounds/add': async b => {
+        const buf = await fetchClip(String(b.path || ''));
+        const base = String(b.name || 'sound').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-').toLowerCase().slice(0, 40) || 'sound';
+        let name = `${base}.mp3`, i = 2;
+        while (fs.existsSync(path.join(CUSTOM_SOUNDS, name))) name = `${base}-${i++}.mp3`;
+        fs.writeFileSync(path.join(CUSTOM_SOUNDS, name), buf);
+        log(`Added sound: ${name}`);
+        broadcast('sounds', listSounds());
+        return { ok: true, file: `custom/${name}` };
     },
     'POST /api/sounds/delete': b => {
         const p = soundFilePath(b.file);
@@ -611,6 +1083,34 @@ const routes = {
         broadcast('sounds', listSounds());
         return { ok: true };
     },
+    'GET /api/minecraft/worlds': () => listWorlds(),
+    'POST /api/minecraft/install-pack': () => {
+        const g = activeGame();
+        if (!g?.minecraft.single) throw new Error('Pick a singleplayer world first');
+        const st = syncPack(g);
+        setStatus({ minecraft: st });
+        if (st !== 'singleplayer') throw new Error(st === 'no world picked' ? 'Pick a world first' : "Couldn't put the pack into that world");
+        return { ok: true };
+    },
+    // The Play button: open your world, wait until it's ready, then open Minecraft set to join it.
+    'POST /api/minecraft/play': async () => {
+        const g = activeGame();
+        if (!g || g.connector !== 'minecraft' || !isSingle(g)) throw new Error('Pick Singleplayer world for this game first');
+        if (!worldOf(g)) throw new Error('Pick your world first');
+        if (!settings.mcEula) throw new Error('Tick the Minecraft EULA box first');
+        connectMinecraft();
+        for (let i = 0; i < 240 && status.minecraft !== 'connected'; i++) {
+            if (['world open in singleplayer', 'java missing', 'world failed', 'crashed', 'world not found'].includes(localState) || ['world open in singleplayer', 'world failed'].includes(status.minecraft)) break;
+            await sleep(500);
+        }
+        if (status.minecraft !== 'connected') throw new Error(localState === 'world open in singleplayer' ? 'Close that world in Minecraft singleplayer first' : "Your world didn't open in time, try again");
+        setupLauncher(worldVersion(worldOf(g)));
+        openLauncher();
+        log('Minecraft launcher opened: press Play on "Gift Hype" and you go straight into your world.');
+        return { ok: true };
+    },
+    'POST /api/minecraft/restart-world': async () => { await disconnectMinecraft(); await localServer.stop(); rconFor = null; connectMinecraft(); return { ok: true }; },
+    'GET /api/minecraft/mobs': () => Object.entries(MOBS).map(([id, m]) => ({ id, name: m.name })),
     'GET /api/minecraft/servers': () => findServers().map(({ folder, name, rcon, port, world }) => ({ folder, name, rcon, port, world })),
     'POST /api/minecraft/enable-rcon': b => { enableRcon(String(b.folder || '')); connectMinecraft(); return { ok: true }; },
     'POST /api/minecraft/test': async () => {
@@ -621,9 +1121,19 @@ const routes = {
     },
 };
 
+// The overlay's own address, for streaming apps that won't take "localhost" (TikTok LIVE Studio).
+// localtest.me is a public name that always points to 127.0.0.1, so it's still this PC. Through it
+// only the overlay works (the page, its sounds, gift pictures and the live gift events), nothing else.
+const OVERLAY_HOST = 'gifthype.localtest.me';
+const OVERLAY_PATHS = new Set(['/overlay', '/api/overlay-state', '/api/events', '/gift-img']);
+const overlayOnly = req => String(req.headers.host || '').replace(/:\d+$/, '').toLowerCase() === OVERLAY_HOST;
 // Pages only from this PC: blocks other websites (and DNS tricks) from using the app.
 function allowed(req) {
     const host = String(req.headers.host || '').replace(/:\d+$/, '');
+    if (overlayOnly(req)) {
+        const p = new URL(req.url, 'http://x').pathname;
+        return req.method === 'GET' && (OVERLAY_PATHS.has(p) || p.startsWith('/sounds/') || /^\/fonts\/[\w-]+\.ttf$/.test(p));
+    }
     if (!['localhost', '127.0.0.1'].includes(host)) return false;
     const origin = req.headers.origin;
     if (req.method !== 'GET' && origin && !/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin)) return false;
@@ -632,16 +1142,57 @@ function allowed(req) {
 
 const STATIC = { '/': 'app.html', '/overlay': 'overlay.html' };
 
+// ---------- Covers ----------
+const coverVersion = g => g.cover ? crypto.createHash('md5').update(g.cover).digest('hex').slice(0, 8) : '';
+const IMAGE_TYPES = { '.jpg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp', '.gif': 'image/gif' };
+function imageExt(buf) {
+    if (buf[0] === 0xff && buf[1] === 0xd8) return '.jpg';
+    if (buf.subarray(0, 4).toString('hex') === '89504e47') return '.png';
+    if (buf.subarray(0, 4).toString() === 'RIFF' && buf.subarray(8, 12).toString() === 'WEBP') return '.webp';
+    if (buf.subarray(0, 3).toString() === 'GIF') return '.gif';
+    return null;
+}
+function removeCoverIfUnused(cover) {
+    if (!cover?.startsWith('file:') || Object.values(games).some(g => g.cover === cover || g.modes.some(m => m.cover === cover))) return;
+    fs.rmSync(path.join(COVERS_DIR, cover.slice(5)), { force: true });
+}
+const coverDownloads = new Map();
+async function coverFile(g) {
+    if (!g.cover) return null;
+    if (g.cover.startsWith('file:')) return path.join(COVERS_DIR, g.cover.slice(5));
+    // Store picture: downloaded once (720 x 1080) and kept.
+    const name = `store-${coverVersion(g)}.jpg`, p = path.join(COVERS_DIR, name);
+    if (fs.existsSync(p)) return p;
+    if (!coverDownloads.has(name)) coverDownloads.set(name, (async () => {
+        const r = await fetch(`${g.cover}?w=720&h=1080`, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+        const buf = Buffer.from(await r.arrayBuffer());
+        if (!r.ok || !imageExt(buf)) throw new Error('no picture');
+        fs.mkdirSync(COVERS_DIR, { recursive: true });
+        fs.writeFileSync(p, buf);
+    })().finally(() => coverDownloads.delete(name)));
+    await coverDownloads.get(name);
+    return p;
+}
+
 const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://localhost');
     if (!allowed(req)) return send(res, 403, { error: 'Not allowed' });
 
     if (STATIC[url.pathname]) return send(res, 200, fs.readFileSync(path.join(ROOT, 'public', STATIC[url.pathname])), 'text/html; charset=utf-8');
     if (url.pathname === '/icon.png') return send(res, 200, fs.readFileSync(path.join(ROOT, 'public', 'icon.png')), 'image/png');
+    if (req.method === 'GET' && /^\/fonts\/[\w-]+\.ttf$/.test(url.pathname)) {
+        const f = path.join(ROOT, 'public', url.pathname);
+        if (fs.existsSync(f)) { res.writeHead(200, { 'Content-Type': 'font/ttf', 'Cache-Control': 'max-age=86400', 'Access-Control-Allow-Origin': '*' }); return res.end(fs.readFileSync(f)); }
+    }
+    if (req.method === 'GET' && /^\/img\/[\w-]+\.svg$/.test(url.pathname)) {
+        const f = path.join(ROOT, 'public', url.pathname);
+        if (fs.existsSync(f)) { res.writeHead(200, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'max-age=3600' }); return res.end(fs.readFileSync(f)); }
+    }
 
     if (url.pathname === '/api/events') {
         res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive' });
         res.write(': hi\n\n');
+        res.overlayOnly = overlayOnly(req);
         clients.add(res);
         req.on('close', () => clients.delete(res));
         return;
@@ -672,6 +1223,64 @@ const server = http.createServer(async (req, res) => {
             return send(res, 200, { ok: true, file: `custom/${name}` });
         } catch (e) {
             return send(res, 400, { error: e.message });
+        }
+    }
+
+    // Find sounds online: GET /api/sounds/search?q=fahh, and a preview of one before adding it
+    if (req.method === 'GET' && url.pathname === '/api/sounds/search') {
+        try { return send(res, 200, await searchClips(url.searchParams.get('q'))); } catch (e) { return send(res, 502, { error: e.message }); }
+    }
+    if (req.method === 'GET' && url.pathname === '/sound-preview') {
+        try {
+            const buf = await fetchClip(url.searchParams.get('p') || '');
+            res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Cache-Control': 'max-age=86400' });
+            return res.end(buf);
+        } catch (e) { return send(res, 404, { error: e.message }); }
+    }
+
+    // Game covers
+    if (req.method === 'GET' && url.pathname.startsWith('/cover/')) {
+        const g = games[url.pathname.slice('/cover/'.length)];
+        try {
+            // a type's own cover (?mode=), or the game's
+            const m = g && url.searchParams.get('mode') && g.modes.find(x => x.id === url.searchParams.get('mode'));
+            const p = m ? (m.cover ? path.join(COVERS_DIR, m.cover.slice(5)) : null) : g && await coverFile(g);
+            if (!p || !fs.existsSync(p)) return send(res, 404, { error: 'No cover' });
+            const buf = fs.readFileSync(p);
+            res.writeHead(200, { 'Content-Type': IMAGE_TYPES[imageExt(buf)] || 'application/octet-stream', 'Cache-Control': 'max-age=86400' });
+            return res.end(buf);
+        } catch {
+            return send(res, 502, { error: 'Cover unavailable' });
+        }
+    }
+
+    // Upload a cover: the picture in the body, ?id=<game>. ?remove=1 takes the cover off.
+    if (req.method === 'POST' && url.pathname === '/api/games/cover') {
+        const g = games[url.searchParams.get('id')];
+        if (!g) return send(res, 400, { error: 'No such game' });
+        // with ?mode= it's that type's cover
+        const m = url.searchParams.get('mode') ? g.modes.find(x => x.id === url.searchParams.get('mode')) : null;
+        if (url.searchParams.get('mode') && !m) return send(res, 400, { error: 'No such type' });
+        const holder = m || g;
+        try {
+            const old = holder.cover;
+            if (url.searchParams.get('remove')) holder.cover = '';
+            else {
+                if (!/^application\/octet-stream/i.test(req.headers['content-type'] || '')) throw new Error('Bad upload');
+                const buf = await readBody(req, 8e6);
+                const ext = imageExt(buf);
+                if (!ext) throw new Error('Use a .jpg, .png, .webp or .gif picture');
+                const name = `${g.id}-${newId()}${ext}`;
+                fs.mkdirSync(COVERS_DIR, { recursive: true });
+                fs.writeFileSync(path.join(COVERS_DIR, name), buf);
+                holder.cover = `file:${name}`;
+            }
+            saveGame(g);
+            removeCoverIfUnused(old);
+            broadcast('state', publicState());
+            return send(res, 200, { ok: true });
+        } catch (e) {
+            return send(res, 400, { error: e.message === 'Too big' ? 'That picture is too big (8 MB max)' : e.message });
         }
     }
 
@@ -708,6 +1317,19 @@ const server = http.createServer(async (req, res) => {
 
 // ---------- App window ----------
 
+// After an update: close the world and the window, and start Gift Hype again (the new version)
+let updating = false, appWindow = null;
+async function restartAfterUpdate() {
+    if (localServer.running()) { log('Saving your world...'); await localServer.stop(); }
+    if (!process.env.GIFTHYPE_NO_RESTART) {
+        const script = path.join(DATA, 'restart.cmd');
+        fs.writeFileSync(script, '@echo off\r\nping -n 3 127.0.0.1 >nul\r\nstart "" wscript "%~dp0..\\Gift Hype.vbs"\r\n');
+        spawn('cmd', ['/c', script], { cwd: ROOT, detached: true, stdio: 'ignore', windowsHide: true }).unref();
+    }
+    appWindow?.removeAllListeners('exit');
+    try { appWindow?.kill(); } catch { }
+    setTimeout(() => process.exit(0), 300);
+}
 const appUrl = () => `http://localhost:${settings.port}/`;
 const EDGE = ['C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe', 'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe']
     .find(p => fs.existsSync(p));
@@ -738,13 +1360,20 @@ server.on('error', async e => {
 });
 
 server.listen(settings.port, '127.0.0.1', () => {
-    log(`Gift Hype is running: ${appUrl()}   Overlay for OBS: ${appUrl()}overlay`);
+    log(`Gift Hype is running: ${appUrl()}   Overlay for OBS / TikTok LIVE Studio: http://${OVERLAY_HOST}:${settings.port}/overlay`);
     startGameSocket();
     connectMinecraft();
+    getSoundPack().catch(e => log(`Starter sounds: ${e.message}`));
     if (settings.autoConnect && settings.tiktokUsername) connectTikTok(settings.tiktokUsername);
-    const win = openWindow();
+    const win = appWindow = openWindow();
+    // Is there a newer version? (checked once, a little after opening)
+    setTimeout(() => checkForUpdate(ROOT).then(u => { setStatus({ update: u }); if (u.available) log(`Update available: version ${u.latest} (you have ${u.current}). Press Update in the bar at the top.`); }).catch(() => {}), 6000);
     // Close the app when its window is closed.
-    win?.on('exit', () => { log('Window closed, Gift Hype is stopping.'); setTimeout(() => process.exit(0), 300); });
+    win?.on('exit', async () => {
+        log('Window closed, Gift Hype is stopping.');
+        if (localServer.running()) { log('Saving your world...'); await localServer.stop(); }
+        setTimeout(() => process.exit(0), 300);
+    });
 });
 
 process.on('uncaughtException', e => log(`Error: ${e.message}`));
