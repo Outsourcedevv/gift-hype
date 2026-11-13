@@ -2,9 +2,10 @@
 
 TikTok LIVE gifts play sounds, pop up on your stream, and make things happen in your games.
 
-- **Games**: every game with a TikTok LIVE mod. It starts with **Minecraft**, which has two types:
+- **Games**: every game with a TikTok LIVE mod. It starts with **Minecraft**, which has four types (Block Delete Survival, Chunk Chat, Parkour Paradise and the Dropper):
   - **Parkour Paradise**: arrows, freezing, drunk, speed, jumps, back to the start.
-  - **Block Delete Survival**: a nuke that falls from the sky and blows a crater, jail, cobweb / lava / air chunks, clear inventory, teleport to the End, god kit, diamond kit, mobs.
+  - **Block Delete Survival**: a nuke that falls from the sky and blows a crater, jail, cobweb / lava / air chunks, clear inventory, teleport to the End, god kit, diamond kit, mobs. Viewers can also type a block in the LIVE chat ("stone", "oak log", "logs"): after a countdown on the overlay and in the game, every block of that kind around you is deleted.
+  - **Chunk Chat**: viewers type blocks in the LIVE chat, and every 30 seconds the whole chunk you're in turns into the block typed most (or the last one typed). Same gifts as Block Delete. Blocks you'd fall through and blocks the gifts do (lava, air, cobwebs) can't be picked.
 
   The games screen shows each game's cover (Minecraft's official one is loaded from the Microsoft Store; other games can use any picture). Click a cover, pick its type, and gifts do what that type says. Each type has its own gift list, and you can add more types or games. Minecraft commands go over RCON. Servers on your PC are found automatically, with no password to type.
 - **Gifts**: pick from about 1,760 TikTok gifts with their pictures and prices. Each gift gets a sound, a stream popup and any number of actions. There's a Test button for every gift.

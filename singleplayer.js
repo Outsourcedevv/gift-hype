@@ -7,6 +7,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import { CHUNK_REPLACE } from './chunkchat.js';
 
 export const SAVES_DIR = path.join(process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'), '.minecraft', 'saves');
 
@@ -207,6 +208,8 @@ function packFiles(nukeSizes) {
     const sizes = [...new Set([40, ...nukeSizes])].sort((a, b) => a - b);
     const f = {
         'pack.mcmeta': JSON.stringify({ pack: { description: 'Gift Hype: TikTok gift actions', min_format: 94, max_format: 999 } }, null, 2),
+        // Chunk Chat: the blocks that get turned (not required, so a world on an older version still loads it)
+        'data/gifthype/tags/block/chunk_chat.json': JSON.stringify({ values: CHUNK_REPLACE.map(id => ({ id: `minecraft:${id}`, required: false })) }),
         'data/minecraft/tags/function/load.json': JSON.stringify({ values: ['gifthype:load'] }),
         'data/minecraft/tags/function/tick.json': JSON.stringify({ values: ['gifthype:tick'] }),
     };

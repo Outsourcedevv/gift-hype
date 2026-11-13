@@ -190,7 +190,7 @@ export function makeLocalServer({ dir, log, onState }) {
         world = w;
         onState('starting');
         log(`Opening "${w}" (Minecraft ${version}) for gifts...`);
-        const p = spawn(java.path, ['-Xms1G', '-Xmx3G', '-jar', jar, '--nogui', '--universe', SAVES_DIR, '--world', w],
+        const p = spawn(java.path, ['-Xms1G', '-Xmx2G', '-jar', jar, '--nogui', '--universe', SAVES_DIR, '--world', w],
             { cwd: dir, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
         proc = p;
         const out = fs.createWriteStream(path.join(dir, 'console.log'));

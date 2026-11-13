@@ -31,17 +31,48 @@ GAMES
   is in front) or Sounds only (just sounds and stream popups).
 
 MINECRAFT'S TYPES
-  Click Minecraft on the Games screen and you pick a type: Dropper, Block Delete Survival or Parkour
-  Paradise, each with its own cover and its own gifts. The one marked LIVE is where gifts go. On a
-  type's page, "Change cover" changes that type's picture.
+  Click Minecraft on the Games screen and you pick a type: Dropper, Block Delete Survival, Chunk Chat
+  or Parkour Paradise, each with its own cover and its own gifts. The one marked LIVE is where gifts
+  go. On a type's page, "Change cover" changes that type's picture.
+
+CHUNK CHAT (Minecraft -> Chunk Chat)
+  Viewers type blocks in your LIVE chat (stone, diamond block, oak leaves, water...). Every 30 seconds
+  the whole chunk you're in turns into the block chat picked: every block from the bottom of the world
+  to the top, except air (so you're never buried) and the bedrock floor. You choose whether the block
+  typed MOST wins (each viewer has one vote per round; typing another block moves their vote) or the
+  LAST block typed. Nothing about the timer shows on stream, so you can add your own in TikTok LIVE
+  Studio; you only hear a sound when the chunk changes. To have Gift Hype show it, tick "Show the
+  timer and the winning block on stream": a box on the overlay (top right), plus a green bar and a
+  title in the game. The timer waits while you're not in the world.
+  Some blocks can't be picked: what the gifts do (lava, air, cobwebs), blocks you'd fall through
+  (chains, candles, torches, flowers, rails, ladders, signs, carpets, doors...), blocks with an inside
+  (chests, furnaces, hoppers...), blocks that set themselves off (TNT, pistons, observers) and bedrock.
+  You can add more under "Other blocks chat can't pick". The gifts are the same as Block Delete
+  Survival (nuke, jail, cobweb / lava / air chunk, End, kits, mobs). "Try" adds a vote without TikTok;
+  "Change the chunk now" ends the round straight away.
+
+CHAT BLOCK DELETE (Minecraft -> Block Delete Survival)
+  Viewers type a block's name in your LIVE chat, like stone, oak log, dirt or minecraft:sand. A
+  countdown starts on the stream overlay (top right) and as a red bar at the top of your game. When it
+  runs out, every block of that kind around you is gone, from the top of the world to the bottom.
+  Some plural words mean a whole group: logs, leaves, planks, wool, flowers, slabs, stairs, stones,
+  diamond ores... Anything in chat that isn't a block is ignored.
+  It's on by itself for Block Delete Survival. Under the gift list you can set the countdown, how far it
+  reaches (just your chunk up to 7x7 chunks), how long each viewer waits before picking again, how many
+  countdowns can run at once, and the blocks chat can never delete (bedrock is on that list). Type a
+  block in the Try box to test it without TikTok; "Stop all countdowns" cancels them.
 
 THE DROPPER (Minecraft -> Dropper)
   100 dropper levels in 10 chapters (Dawn Gardens, Sunstone Halls, Tidal Vaults, Cherry Grove,
   Frostpeak, Ember Depths, Verdant Wilds, Clockwork Foundry, Shadow Realm, Golden Ascent), each level
-  with its own name and design, slowly getting harder. Gift Hype makes its own world for it
-  ("Gift Hype Dropper") and builds the levels the first time (a few minutes). Press Play Minecraft,
-  then Play in the launcher.
-  Each level starts in a garden on top: walk down the catwalk and drop in. Land in the water at the
+  with its own name and design, slowly getting harder. Each level is a big shaft (up to 69 blocks
+  across) with a fall of 340 to 690 blocks. Gift Hype makes its own world for it ("Gift Hype Dropper
+  2", with a taller sky than normal worlds) and builds the levels the first time. That takes a while;
+  the Dropper type shows how far it is. If it stops (you close Gift Hype or switch type), it carries on
+  from the same level next time. Press Play Minecraft, then Play in the launcher.
+  ("Gift Hype Dropper", the first Dropper world with the shorter levels, isn't used any more. You can
+  delete it in Minecraft's Singleplayer list.)
+  Each level starts on a small bridge at the top: walk to the end and drop in. Land in the water at the
   bottom and you go straight to the next level; touch anything else and you start that level again.
   "LEVEL 07 / 100" is at the top of your screen, fails and punches ON/OFF at the bottom, and the reset
   countdown under the level bar. You start on a bridge on one side and drop off the end; you only

@@ -20,11 +20,13 @@ import { fileURLToPath } from 'node:url';
 import { TikTokLiveConnection, WebcastEvent } from 'tiktok-live-connector';
 import { Rcon } from 'rcon-client';
 import { WebSocketServer } from 'ws';
-import { makePresets, MOBS } from './minecraft-presets.js';
+import { makePresets, MOBS, DELETE_BLOCKS, FILL_CHUNK } from './minecraft-presets.js';
+import { makeChunkChat, normalizeChunkChat } from './chunkchat.js';
+import { makeChatDelete, normalizeChatDelete } from './chatdelete.js';
 import { listWorlds, installPack, singleplayerCommands } from './singleplayer.js';
 import { makeLocalServer, setupLauncher, openLauncher, worldVersion } from './localserver.js';
 import { checkForUpdate, applyUpdate, localVersion } from './updater.js';
-import { DROPPER_WORLD, DROPPER_PROPS, DROPPER_ACTIONS, LEVELS as DROPPER_LEVELS, installDropperPack, wheelAmounts, installDropperBuildPack, removeDropperBuildPack, dropperCommands, dropperAlertText, buildDropper, dropperBuilt, markDropperBuilt } from './dropper.js';
+import { DROPPER_WORLD, DROPPER_PROPS, DROPPER_ACTIONS, LEVELS as DROPPER_LEVELS, installDropperPack, wheelAmounts, installDropperBuildPack, removeDropperBuildPack, dropperCommands, dropperAlertText, buildDropper, dropperBuilt, markDropperBuilt, dropperProgress } from './dropper.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const DATA = path.join(ROOT, 'data');
@@ -118,6 +120,10 @@ function normalizeModes(g) {
         name: String(m.name || '').slice(0, 40),
         cover: typeof m.cover === 'string' && /^file:[\w.-]+$/.test(m.cover) ? m.cover : '',
         rules: normalizeRules(m.rules),
+        // chat block delete (chatdelete.js): on by itself for Block Delete types
+        chat: normalizeChatDelete(m.chat, /block delete/i.test(m.name || '')),
+        // Chunk Chat (chunkchat.js): on by itself for Chunk Chat types
+        chunkChat: normalizeChunkChat(m.chunkChat, /chunk chat/i.test(m.name || '')),
     }));
     return { modes, mode: modes.some(m => m.id === g.mode) ? g.mode : modes[0].id };
 }
@@ -175,6 +181,7 @@ const minecraftModes = (parkourRules = PARKOUR_RULES) => [
     { id: newId(), name: 'Block Delete Survival', rules: BLOCK_DELETE_RULES },
     { id: newId(), name: 'Parkour Paradise', rules: parkourRules },
     { id: newId(), name: 'Dropper', rules: DROPPER_RULES },
+    { id: newId(), name: 'Chunk Chat', rules: BLOCK_DELETE_RULES },
 ];
 const isDropper = g => g?.connector === 'minecraft' && /dropper/i.test(currentMode(g)?.name || '');
 // the world gifts go to: the Dropper has its own, the other types use the world you picked
@@ -260,6 +267,15 @@ if (!settings.dropper) {
         saveGame(g);
     }
     settings.dropper = true; saveSettings();
+}
+if (!settings.chunkChat) {
+    // the Chunk Chat type is added to Minecraft, with Block Delete's gifts
+    for (const g of Object.values(games)) {
+        if (g.connector !== 'minecraft' || !/minecraft/i.test(g.name) || g.modes.some(m => /chunk chat/i.test(m.name))) continue;
+        g.modes.push({ id: newId(), name: 'Chunk Chat', rules: normalizeRules(BLOCK_DELETE_RULES), chunkChat: normalizeChunkChat({}, true) });
+        saveGame(g);
+    }
+    settings.chunkChat = true; saveSettings();
 }
 if (!settings.covers) {
     for (const g of Object.values(games)) if (g.connector === 'minecraft' && /minecraft/i.test(g.name) && !g.cover) { g.cover = MINECRAFT_COVER; saveGame(g); }
@@ -396,7 +412,7 @@ function findLiveStudio() {
 // ---------- Live updates (Server-Sent Events) ----------
 
 const clients = new Set();
-const OVERLAY_EVENTS = new Set(['alert', 'play', 'stopSound', 'reset', 'wheel', 'settings', 'state']);
+const OVERLAY_EVENTS = new Set(['alert', 'play', 'stopSound', 'reset', 'wheel', 'chatdel', 'chunkchat', 'settings', 'state']);
 const overlaySettings = () => ({ overlay: settings.overlay, theme: settings.theme, soundsIn: settings.soundsIn });
 function broadcast(event, data) {
     const msg = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
@@ -601,9 +617,10 @@ async function connectMinecraft() {
     }
     setStatus({ minecraft: 'connecting' });
     try {
-        const r = await Rcon.connect({ host: target.host, port: target.port, password: target.password, timeout: 5000 });
+        const r = await Rcon.connect({ host: target.host, port: target.port, password: target.password, timeout: 20000 });
         if (rconFor !== key) return r.end().catch(() => {});
         rcon = r;
+        chatDelete.forget();
         r.on('end', () => {
             if (rcon !== r) return;
             rcon = null;
@@ -641,13 +658,14 @@ let dropperBuilding = false;
 async function buildDropperWorld() {
     if (dropperBuilding) return;
     dropperBuilding = true;
-    log('Building the Dropper: 100 levels (a few minutes, only the first time)...');
-    setStatus({ dropper: `building 0/${DROPPER_LEVELS}` });
+    const start = dropperProgress() + 1;
+    log(start > 1 ? `Building the Dropper: carrying on from level ${start}...` : `Building the Dropper: ${DROPPER_LEVELS} levels (up to an hour, only the first time)...`);
+    setStatus({ dropper: `building ${start - 1}/${DROPPER_LEVELS}` });
     try {
         // the building functions are a pack of their own, only in the world while it builds,
         // 20 levels at a time so the game never has to load all of them at once
         packNeedsReload = false;
-        for (let from = 1; from <= DROPPER_LEVELS; from += 20) {
+        for (let from = start; from <= DROPPER_LEVELS; from += 20) {
             const to = Math.min(DROPPER_LEVELS, from + 19);
             const buildPack = installDropperBuildPack(undefined, from, to);
             await mc('reload');
@@ -728,6 +746,48 @@ const MAX_REPEAT = 50;
 
 // Ready-made Minecraft actions (nuke, jail, chunk fills, kits...), in minecraft-presets.js.
 const PRESETS = makePresets({ mc, log });
+
+// Chat block delete (chatdelete.js): a block typed in the LIVE chat is removed around you when its countdown ends.
+const chatDelete = makeChatDelete({
+    mc, log, broadcast,
+    target: async () => {
+        const g = activeGame();
+        if (!g || g.connector !== 'minecraft' || isDropper(g) || !rcon) return null;
+        const cfg = currentMode(g).chat;
+        return cfg?.on && !isChunkChat(g) ? { cfg, player: g.minecraft.player || await onlinePlayer(g) } : null;
+    },
+    deleteBlocks: (player, filter, chunks) => PRESETS[DELETE_BLOCKS](player, filter, chunks),
+});
+// Chunk Chat (chunkchat.js): on a timer, the chunk you're in turns into the block chat picked.
+const isChunkChat = g => g?.connector === 'minecraft' && /chunk chat/i.test(currentMode(g)?.name || '');
+// On a server (no Gift Hype pack) these are the blocks that get turned: the ground, trees, water...
+const CHUNK_FILTERS_SERVER = ['#minecraft:base_stone_overworld', '#minecraft:dirt', '#minecraft:sand', 'minecraft:gravel', 'minecraft:sandstone', 'minecraft:red_sandstone',
+    '#minecraft:terracotta', '#minecraft:logs', '#minecraft:leaves', 'minecraft:water', 'minecraft:lava', '#minecraft:coal_ores', '#minecraft:iron_ores', '#minecraft:copper_ores',
+    '#minecraft:gold_ores', '#minecraft:redstone_ores', '#minecraft:lapis_ores', '#minecraft:diamond_ores', '#minecraft:emerald_ores', 'minecraft:clay', 'minecraft:snow_block',
+    'minecraft:ice', 'minecraft:packed_ice', '#minecraft:base_stone_nether', 'minecraft:end_stone', 'minecraft:obsidian'];
+const chunkChat = makeChunkChat({
+    mc, log, broadcast,
+    target: async () => {
+        const g = activeGame();
+        if (!isChunkChat(g) || !rcon) return null;
+        const cfg = currentMode(g).chunkChat;
+        if (!cfg?.on) return null;
+        const player = g.minecraft.player || await onlinePlayer(g);
+        return player ? { cfg, player } : null;            // the timer waits while nobody's in the world
+    },
+    fillChunk: async (player, block) => {
+        const g = activeGame();
+        if (isSingle(g) && packNeedsReload) { packNeedsReload = false; await mc('reload'); }
+        return PRESETS[FILL_CHUNK](player, block, isSingle(g) ? ['#gifthype:chunk_chat'] : CHUNK_FILTERS_SERVER);
+    },
+});
+function onChat(data) {
+    const text = String(data.content || '');
+    if (text.length > 60) return;
+    const by = data.user?.nickname || data.user?.uniqueId || 'someone';
+    if (isChunkChat(activeGame())) chunkChat.onChat(text, by).catch(e => log(`Chunk Chat: ${e.message}`));
+    else chatDelete.onChat(text, by).catch(e => log(`Chat block delete: ${e.message}`));
+}
 
 async function runAction(game, a, ctx) {
     const times = Math.min(MAX_REPEAT, Math.max(1, (+a.times || 1) * (ctx.perCount ? ctx.count : 1)));
@@ -893,6 +953,7 @@ async function connectTikTok(username) {
     });
     tiktok = conn;
     conn.on(WebcastEvent.GIFT, onGift);
+    conn.on(WebcastEvent.CHAT, onChat);
     conn.on('disconnected', () => {
         if (tiktok !== conn) return;
         log('TikTok disconnected. Reconnecting in 10s...');
@@ -994,7 +1055,21 @@ const routes = {
             throw new Error(`The update didn't work: ${e.message}`);
         }
     },
-    'GET /api/overlay-state': () => ({ settings: overlaySettings(), reset: resetPublic() }),
+    'GET /api/overlay-state': async () => ({ settings: overlaySettings(), reset: resetPublic(), chatdel: chatDelete.list(), chunkchat: await chunkChat.state() }),
+    // Chunk Chat: try a block as if it was typed in chat, or change the chunk now
+    'POST /api/chunkchat/try': async b => {
+        const r = await chunkChat.onChat(String(b.text || ''), 'You (test)');
+        if (!r.ok) throw new Error(r.why);
+        return r;
+    },
+    'POST /api/chunkchat/now': async () => { await chunkChat.skip(); return { ok: true }; },
+    // Chat block delete: try a block name as if it was typed in chat, or stop every countdown
+    'POST /api/chatdel/try': async b => {
+        const r = await chatDelete.onChat(String(b.text || ''), 'You (test)', { test: true });
+        if (!r.ok) throw new Error(r.why);
+        return r;
+    },
+    'POST /api/chatdel/clear': async () => ({ cleared: await chatDelete.clear() }),
     'GET /api/catalog': () => [...learned, ...catalog.filter(c => !learned.some(l => l.name.toLowerCase() === c.name.toLowerCase()))].sort((a, b) => (a.coins ?? 0) - (b.coins ?? 0) || a.name.localeCompare(b.name)),
     'POST /api/connect': async b => { await connectTikTok(b.username); return { ok: true }; },
     'POST /api/disconnect': async () => { await disconnectTikTok(); return { ok: true }; },

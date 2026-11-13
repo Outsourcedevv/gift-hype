@@ -20,15 +20,21 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { SAVES_DIR } from './singleplayer.js';
 
-export const DROPPER_WORLD = 'Gift Hype Dropper';
-export const DROPPER_BUILD = 8;                 // bump when the levels change, to rebuild them
+// "2": the levels got twice as tall, so the world needs a taller sky than an existing world can be
+// given. The first Dropper world ("Gift Hype Dropper") is left as it was.
+export const DROPPER_WORLD = 'Gift Hype Dropper 2';
+export const DROPPER_BUILD = 9;                 // bump when the levels change, to rebuild them
 export const LEVELS = 100;
-const TOP = 300;                                 // your feet on the start ledge
+// The Dropper world's sky goes up to y=959 (normal worlds stop at 319), set by the pack when the
+// world is made, so the falls can be about 700 blocks.
+const WORLD_MIN = -64, WORLD_HEIGHT = 1024;
+const TOP = 900;                                 // your feet on the start ledge
 const ORIGIN = 3000, SPACING = 100;              // level 1 at x=3000 z=3000, 10 levels per row
-const JAIL = [900, 300, 900];
-const WIN = [880, 300, 1000];
+const JAIL = [900, TOP, 900];
+const WIN = [880, TOP, 1000];
 
 // Settings for making the world the first time: a void world (nothing but the levels), no mobs.
 export const DROPPER_PROPS = [
@@ -80,15 +86,15 @@ const THEMES = [
     th('Copper', ['waxed_cut_copper', 'waxed_exposed_cut_copper', 'waxed_copper_block'], 'waxed_chiseled_copper', 'waxed_copper_bulb[lit=true]', 'waxed_copper_block', ['waxed_oxidized_cut_copper', 'waxed_weathered_cut_copper'], 'waxed_copper_block', ['waxed_cut_copper', 'waxed_oxidized_cut_copper'], 'orange_stained_glass'),
     th('Deepslate', ['deepslate_tiles', 'cracked_deepslate_tiles', 'deepslate_bricks'], 'chiseled_deepslate', 'verdant_froglight', 'polished_deepslate', ['polished_blackstone', 'deepslate_tiles'], 'verdant_froglight', ['deepslate_tiles', 'polished_deepslate'], 'gray_stained_glass'),
     th('Purpur', ['purpur_block', 'purpur_pillar', 'end_stone_bricks'], 'end_stone_bricks', 'sea_lantern', 'purpur_pillar', ['end_stone_bricks', 'end_stone'], 'purpur_pillar', ['purpur_block', 'end_stone'], 'magenta_stained_glass'),
-    th('Terracotta', ['white_terracotta', 'light_gray_terracotta', 'white_terracotta'], 'cyan_glazed_terracotta', 'glowstone', 'light_gray_terracotta', ['cyan_terracotta', 'red_terracotta', 'yellow_terracotta'], 'white_concrete', ['red_terracotta', 'white_terracotta'], 'cyan_stained_glass'),
-    th('Rainbow', ['white_wool', 'white_concrete', 'light_gray_wool'], 'light_gray_concrete', 'sea_lantern', 'white_wool', ['red_wool', 'orange_wool', 'yellow_wool', 'lime_wool', 'light_blue_wool', 'purple_wool'], 'white_concrete', ['red_concrete', 'white_concrete'], 'white_stained_glass'),
+    th('Terracotta', ['white_terracotta', 'light_gray_terracotta', 'white_terracotta'], 'brown_terracotta', 'glowstone', 'light_gray_terracotta', ['orange_terracotta', 'brown_terracotta', 'white_terracotta'], 'smooth_sandstone', ['orange_terracotta', 'white_terracotta'], 'orange_stained_glass'),
+    th('Blossom', ['white_wool', 'white_concrete', 'pink_wool'], 'pink_concrete', 'pearlescent_froglight', 'white_wool', ['pink_wool', 'white_wool'], 'white_concrete', ['pink_concrete', 'white_concrete'], 'pink_stained_glass'),
     th('Mud', ['mud_bricks', 'packed_mud', 'mud_bricks'], 'mangrove_planks', 'shroomlight', 'muddy_mangrove_roots', ['packed_mud', 'mangrove_planks'], 'mangrove_planks', ['mangrove_planks', 'packed_mud'], 'brown_stained_glass'),
     th('Amethyst', ['amethyst_block', 'calcite', 'smooth_basalt'], 'smooth_basalt', 'sea_lantern', 'calcite', ['purple_concrete', 'amethyst_block'], 'calcite', ['amethyst_block', 'calcite'], 'purple_stained_glass'),
     th('Blackstone', ['polished_blackstone_bricks', 'cracked_polished_blackstone_bricks', 'blackstone'], 'gilded_blackstone', 'shroomlight', 'chiseled_polished_blackstone', ['gilded_blackstone', 'polished_blackstone'], 'gold_block', ['polished_blackstone', 'gold_block'], 'black_stained_glass'),
     th('Bamboo', ['bamboo_planks', 'bamboo_mosaic', 'stripped_bamboo_block'], 'bamboo_block', 'glowstone', 'stripped_bamboo_block', ['bamboo_mosaic', 'bamboo_planks'], 'lime_concrete', ['bamboo_planks', 'bamboo_mosaic'], 'lime_stained_glass'),
     th('Tuff', ['tuff_bricks', 'polished_tuff', 'chiseled_tuff_bricks'], 'chiseled_tuff', 'pearlescent_froglight', 'chiseled_tuff', ['polished_tuff', 'tuff_bricks'], 'waxed_cut_copper', ['tuff_bricks', 'polished_tuff'], 'glass'),
     th('Sky Glass', ['light_blue_stained_glass', 'white_stained_glass', 'light_blue_stained_glass'], 'smooth_quartz', 'sea_lantern', 'smooth_quartz', ['white_concrete', 'light_blue_concrete'], 'light_blue_concrete', ['white_concrete', 'light_blue_concrete'], 'glass'),
-    th('Concrete', ['gray_concrete', 'light_gray_concrete', 'gray_concrete'], 'black_concrete', 'sea_lantern', 'light_gray_concrete', ['lime_concrete', 'magenta_concrete', 'cyan_concrete'], 'black_concrete', ['yellow_concrete', 'black_concrete'], 'gray_stained_glass'),
+    th('Concrete', ['gray_concrete', 'light_gray_concrete', 'gray_concrete'], 'black_concrete', 'sea_lantern', 'light_gray_concrete', ['cyan_concrete', 'light_gray_concrete'], 'black_concrete', ['cyan_concrete', 'black_concrete'], 'cyan_stained_glass'),
 ];
 const BOSS_THEMES = [
     th('Obsidian', ['obsidian', 'crying_obsidian', 'obsidian'], 'polished_blackstone_bricks', 'shroomlight', 'polished_blackstone', ['crying_obsidian', 'obsidian'], 'magma_block', ['obsidian', 'crying_obsidian'], 'purple_stained_glass'),
@@ -111,11 +117,11 @@ const FLOWERS = ['short_grass', 'short_grass', 'short_grass', 'poppy', 'dandelio
 const CHAPTERS = [
     ch('Dawn Gardens', ['Prismarine', 'Mossy', 'Stone', 'Cherry'], 'Emerald', 'grass_block', ['fancy_oak', 'oak', 'azalea_tree'], 'smooth_stone', 'polished_andesite', FLOWERS,
         ['Dawnbreak', 'Morning Dew', 'Ivy Steps', 'Lantern Walk', 'Petal Drop', 'Mossway', 'Bramble Gate', 'Sunrise Well', 'Willow Shaft', 'Garden Gauntlet']),
-    ch('Sunstone Halls', ['Sandstone', 'Terracotta', 'Bamboo', 'Concrete'], 'Honey', 'sand', ['acacia'], 'smooth_sandstone', 'cut_sandstone', ['dead_bush', 'short_dry_grass', 'tall_dry_grass'],
+    ch('Sunstone Halls', ['Sandstone', 'Terracotta', 'Bamboo', 'Sandstone'], 'Honey', 'sand', ['acacia'], 'smooth_sandstone', 'cut_sandstone', ['dead_bush', 'short_dry_grass', 'tall_dry_grass'],
         ['Solar Gate', 'Dune Spiral', 'Amber Hall', 'Sandglass', 'Golden Arches', 'Mirage', 'Scarab Vault', 'Desert Bloom', "Pharaoh's Drop", 'Sunstone Gauntlet'], true),
     ch('Tidal Vaults', ['Prismarine', 'Sky Glass', 'Copper', 'Quartz'], 'Lapis', 'grass_block', ['birch', 'oak'], 'prismarine_bricks', 'dark_prismarine', FLOWERS,
         ['Coral Gate', 'Tidepool', 'Kelp Forest', 'Pearl Drop', 'Lighthouse', 'Undertow', 'Lantern Reef', 'Abyss Window', 'Shipwreck', 'Tidal Gauntlet']),
-    ch('Cherry Grove', ['Cherry', 'Rainbow', 'Amethyst', 'Quartz'], 'Redstone', 'grass_block', ['cherry'], 'calcite', 'stripped_cherry_wood', ['pink_petals', 'short_grass', 'lily_of_the_valley', 'pink_tulip', 'white_tulip'],
+    ch('Cherry Grove', ['Cherry', 'Blossom', 'Amethyst', 'Quartz'], 'Redstone', 'grass_block', ['cherry'], 'calcite', 'stripped_cherry_wood', ['pink_petals', 'short_grass', 'lily_of_the_valley', 'pink_tulip', 'white_tulip'],
         ['Blossom Fall', 'Pink Lanterns', 'Petal Storm', 'Rose Window', 'Silk Road', 'Paper Cranes', 'Spring Rain', 'Moon Bridge', 'Tea Garden', 'Cherry Gauntlet']),
     ch('Frostpeak', ['Frozen', 'Sky Glass', 'Quartz', 'Purpur'], 'Diamond', 'snow_block', ['spruce'], 'packed_ice', 'snow_block', [],
         ['Snowfall', 'Ice Halls', 'Frozen Falls', 'Glacier Eye', 'Aurora', 'Hailstone', 'Crystal Spire', 'Blizzard', 'Polar Night', 'Frostpeak Gauntlet']),
@@ -494,13 +500,13 @@ function designLevel(n, attempt = 0) {
     const t = (n - 1) / (LEVELS - 1), boss = n % 10 === 0, final = n === LEVELS;
     const chapter = CHAPTERS[Math.floor((n - 1) / 10)];
     const theme = final ? FINAL_THEME : boss ? ALL_THEMES[chapter.boss] : ALL_THEMES[chapter.themes[((n - 1) % 10) % chapter.themes.length]];
-    const h = final ? 26 : boss ? 24 : t < 0.3 ? pick(rng, [18, 19, 20]) : pick(rng, [19, 20, 21, 22, 23, 24]);
-    const height = final ? 345 : Math.round(170 + 150 * t + randInt(rng, -5, 10) + (boss ? 10 : 0));
+    const h = final ? 34 : boss ? 32 : t < 0.3 ? pick(rng, [24, 25, 26]) : pick(rng, [26, 27, 28, 29, 30, 31]);
+    const height = final ? 690 : Math.round(340 + 300 * t + randInt(rng, -10, 20) + (boss ? 20 : 0));
     // how much of the steering you could do that a level asks for: never more than about 60%
     const k = (final ? 0.55 : Math.min(0.52, 0.22 + 0.3 * t + (boss ? 0.03 : 0))) * 0.9 ** Math.floor(attempt / 4);
     MARGIN = 0.35 - 0.2 * t;
     const lo = final ? 0.55 : Math.min(0.55, 0.25 + 0.35 * t);
-    const slots = final ? 28 : Math.max(8, Math.min(26, Math.round(8 + 15 * t + rng() * 3) + (boss ? 2 : 0)));
+    const slots = final ? 46 : Math.max(13, Math.min(42, Math.round((8 + 15 * t + rng() * 3) * 1.6) + (boss ? 3 : 0)));
     // which designs this level uses: the newest one you've reached, plus one or two others
     const avail = Object.entries(DESIGNS).filter(([, d]) => n >= d.from).map(([id]) => id);
     const newest = avail.reduce((a, b) => DESIGNS[b].from > DESIGNS[a].from ? b : a);
@@ -523,12 +529,16 @@ function designLevel(n, attempt = 0) {
     // you drop off the end of the bridge (5 wide, on the north side): the route starts there
     let reach = { x1: -2.3, x2: 2.3 + 1, z1: -h + BRIDGE + 0.3, z2: -h + BRIDGE + 0.9 }, prevRegion = { x: -1, z: -h + BRIDGE, s: 3 }, lastDepth = 0, fails = 0;
     const placed = []; let studsLeft = 1;
+    // the level's look, the same all the way down: its ground (grass, sand, snow...) or its own blocks,
+    // one accent for hole edges, two floor patterns
+    const look = { ground: rng() < 0.5 ? groundOf(chapter) : { top: theme.ob[0], side: theme.wall[0] }, rim2: rng() < 0.5 ? 'gold_block' : theme.light,
+        inlays: [pick(rng, INLAYS), pick(rng, INLAYS)], glass: t > 0.7 && rng() < 0.3 };
     for (let i = 0; i < depths.length; i++) {
         const depth = depths[i], room = (depths[i + 1] ?? height - 4) - depth - 1;
-        const glass = t > 0.7 && rng() < 0.15;
+        const glass = look.glass && rng() < 0.4;
         let rows = null, used = order[i];
         for (const id of [order[i], 'plate']) {
-            const c = { rng, t, h, s: Math.min(3, holeSize(rng, t) + Math.floor(attempt / 12)), reach, prevRegion, lo, room, depth, budget: budgetBetween(lastDepth, depth), budgetBetween, theme, ground: rng() < 0.6 ? groundOf(chapter) : { top: theme.ob[0], side: theme.wall[0] } };
+            const c = { rng, t, h, s: Math.min(3, holeSize(rng, t) + Math.floor(attempt / 12)), reach, prevRegion, lo, room, depth, budget: budgetBetween(lastDepth, depth), budgetBetween, theme, ground: look.ground };
             rows = DESIGNS[id].make(c); used = id;
             if (rows) break;
         }
@@ -541,11 +551,11 @@ function designLevel(n, attempt = 0) {
         if (!ok) { i--; if (++fails > 60) throw new Error(`level ${n}: couldn't make a fair layer`); continue; }
         const ob = theme.ob[i % theme.ob.length];
         placed.push({
-            id: used, depth, rows, block: glass ? 'white_stained_glass' : DESIGNS[used].canopy ? chapter.leaves : ob, rim2: rng() < 0.5 ? 'gold_block' : theme.light,
+            id: used, depth, rows, block: glass ? theme.win : DESIGNS[used].canopy ? chapter.leaves : ob, rim2: look.rim2,
             studs: DESIGNS[used].rim && !glass && chapter.spikes && (studsLeft-- > 0) && rng() < 0.25,
             hangers: DESIGNS[used].rim && rng() < 0.4,
-            rim: DESIGNS[used].rim ? (glass ? 'white_concrete' : theme.rim) : null,
-            inlay: glass ? 'none' : DESIGNS[used].canopy ? 'lanterns' : pick(rng, INLAYS), inlayBlock: theme.ob.find(b => b !== ob) || theme.trim, lamp: theme.light, flower: theme.trim,
+            rim: DESIGNS[used].rim ? theme.rim : null,
+            inlay: glass ? 'none' : DESIGNS[used].canopy ? 'lanterns' : look.inlays[i % 2], inlayBlock: theme.ob.find(b => b !== ob) || theme.trim, lamp: theme.light, flower: theme.trim,
         });
         const lastRow = solidRows[solidRows.length - 1];
         reach = now; prevRegion = lastRow.main; lastDepth = depth + lastRow.dy;
@@ -569,8 +579,24 @@ function fairLevel(n) {
     }
     return L;
 }
-let cache = null;
-export function dropperLevels() { return cache ||= Array.from({ length: LEVELS }, (_, i) => fairLevel(i + 1)); }
+// A level's full design is big (every block of every layer), so it's made when it's needed and not
+// kept: only a few numbers about each level are remembered.
+// Those numbers are saved (data/dropper-levels.json), so the levels are only designed once per build.
+const INFO_FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), 'data', 'dropper-levels.json');
+const infoCache = new Map();
+try { const f = JSON.parse(fs.readFileSync(INFO_FILE, 'utf8')); if (f.build === DROPPER_BUILD) for (const i of f.levels) infoCache.set(i.n, i); } catch { }
+function levelDesign(n) {
+    const L = fairLevel(n), had = infoCache.size;
+    infoCache.set(n, { n, h: L.h, name: L.name, height: L.height });
+    if (infoCache.size === LEVELS && had < LEVELS) {
+        try { fs.mkdirSync(path.dirname(INFO_FILE), { recursive: true }); fs.writeFileSync(INFO_FILE, JSON.stringify({ build: DROPPER_BUILD, levels: [...infoCache.values()].sort((a, b) => a.n - b.n) })); } catch { }
+    }
+    return L;
+}
+function levelInfo(n) { if (!infoCache.has(n)) levelDesign(n); return infoCache.get(n); }
+function* levelRange(from, to) { for (let n = from; n <= to; n++) yield levelDesign(n); }
+// every level's full design (for checking them; uses a lot of memory)
+export function dropperLevels() { return [...levelRange(1, LEVELS)]; }
 
 // The bot: Minecraft's own movement maths each tick. In the air: speed += input * 0.02, move,
 // speed *= 0.91. Falling: y += vy, vy = (vy - 0.08) * 0.98. You're 0.6 wide and 1.8 tall, and
@@ -630,7 +656,7 @@ function botRun(L, power, react, startX, vz0 = 0.15) {
 }
 
 const levelCenter = n => [ORIGIN + ((n - 1) % 10) * SPACING, ORIGIN + Math.floor((n - 1) / 10) * SPACING];
-export function levelStart(n) { const [cx, cz] = levelCenter(n), L = dropperLevels()[n - 1]; return [cx, TOP, cz - L.h]; }
+export function levelStart(n) { const [cx, cz] = levelCenter(n), L = levelInfo(n); return [cx, TOP, cz - L.h]; }
 
 // ---------- building: the commands for one level ----------
 // greedy rectangles over a set of solid cells
@@ -705,12 +731,12 @@ export function levelCommands(L) {
         ? `fill ${X(u1)} ${y1} ${Z(v)} ${X(u2)} ${y2} ${Z(v)} ${B(b)}`
         : `fill ${X(v)} ${y1} ${Z(u1)} ${X(v)} ${y2} ${Z(u2)} ${B(b)}`;
     // patches of the other wall blocks
-    for (const f of faces) for (let i = 0, n = Math.round((2 * h + 1) * (top - bottom) * 0.02); i < n; i++) {
+    for (const f of faces) for (let i = 0, n = Math.round((2 * h + 1) * (top - bottom) * 0.01); i < n; i++) {
         const u = randInt(rng, -h, h), y = randInt(rng, bottom + 1, top - 1);
         out.push(onFace(f, u, y, Math.min(h, u + randInt(rng, 0, 1)), Math.min(top - 1, y + randInt(rng, 0, 2)), T.wall[1 + (i % 2)]));
     }
     // a grid of glass lines over the walls, with lamps where they cross
-    const gx = 4, gy = 5, ph = randInt(rng, 0, gx - 1);
+    const gx = 4, gy = 7, ph = randInt(rng, 0, gx - 1);
     for (const f of faces) {
         for (let u = -h + ph; u <= h; u += gx) out.push(onFace(f, u, floorTop + 2, u, TOP - 3, T.win));
         for (let y = floorTop + 4, row = 0; y <= TOP - 3; y += gy, row++) {
@@ -720,7 +746,7 @@ export function levelCommands(L) {
     }
     // alcoves set into the walls: a recess with a window at the back and a lamp under it
     const back = ([ax, v]) => [ax, v + Math.sign(v)];
-    for (const f of faces) for (let y = floorTop + 10; y < TOP - 8; y += randInt(rng, 11, 15)) for (let u = -h + 3 + randInt(rng, 0, 4); u <= h - 5; u += randInt(rng, 9, 13)) {
+    for (const f of faces) for (let y = floorTop + 10; y < TOP - 8; y += randInt(rng, 15, 20)) for (let u = -h + 3 + randInt(rng, 0, 4); u <= h - 5; u += randInt(rng, 9, 13)) {
         out.push(onFace(f, u, y, u + 2, y + 3, 'air'), onFace(back(f), u, y + 1, u + 2, y + 3, T.win), onFace(back(f), u + 1, y, u + 1, y, T.light));
         out.push(onFace(f, u - 1, y + 4, u + 3, y + 4, T.trim), onFace(f, u - 1, y - 1, u + 3, y - 1, T.trim));
     }
@@ -832,6 +858,35 @@ function extraCommands() {
 
 // Builds every level. The building commands are functions in the data pack (dropper:build/N), so
 // the game runs them itself; this just loads each level's area, runs its function and lets go.
+// A big part can take the game a while. If the answer is late, wait until the game answers again
+// (the part still finishes) and carry on.
+async function patient(mc, command) {
+    try { return await mc(command); } catch (e) {
+        if (!/timeout/i.test(e.message)) throw e;
+        for (let i = 0; i < 60; i++) { try { await mc('list'); return ''; } catch (e2) { if (!/timeout/i.test(e2.message)) throw e2; } }
+        throw e;
+    }
+}
+// A level's commands in parts of about the same work (blocks changed), at most 400 commands each.
+function levelParts(L) {
+    const parts = [[]]; let work = 0;
+    for (const c of levelCommands(L)) {
+        const m = /^fill (-?\d+) (-?\d+) (-?\d+) (-?\d+) (-?\d+) (-?\d+)/.exec(c);
+        const w = m ? (Math.abs(m[4] - m[1]) + 1) * (Math.abs(m[5] - m[2]) + 1) * (Math.abs(m[6] - m[3]) + 1) : 1;
+        if (parts[parts.length - 1].length && (work + w > 400000 || parts[parts.length - 1].length >= 400)) { parts.push([]); work = 0; }
+        parts[parts.length - 1].push(c); work += w;
+    }
+    return parts;
+}
+const progressFile = world => path.join(SAVES_DIR, world, 'gifthype-dropper.json');
+function saveProgress(n, world = DROPPER_WORLD) {
+    try { fs.writeFileSync(progressFile(world), JSON.stringify({ build: DROPPER_BUILD, levels: LEVELS, done: n, saved: new Date().toISOString() }, null, 2)); } catch { }
+}
+// How many levels of this build are already in the world (it carries on from there)
+export function dropperProgress(world = DROPPER_WORLD) {
+    try { const p = JSON.parse(fs.readFileSync(progressFile(world), 'utf8')); return p.build === DROPPER_BUILD ? Math.min(LEVELS, p.done ?? p.levels ?? 0) : 0; } catch { return 0; }
+}
+
 export async function buildDropper(mc, { log = () => {}, progress = () => {}, from = 1, to = LEVELS } = {}) {
     const area = async (x1, z1, x2, z2, fn) => {
         await mc(`forceload add ${x1} ${z1} ${x2} ${z2}`);
@@ -839,15 +894,18 @@ export async function buildDropper(mc, { log = () => {}, progress = () => {}, fr
             if (/passed/i.test(await mc(`execute if loaded ${x1} 0 ${z1} if loaded ${x2} 0 ${z2} if loaded ${x1} 0 ${z2} if loaded ${x2} 0 ${z1}`))) break;
             await new Promise(r => setTimeout(r, 100));
         }
-        const res = await mc(`function dropper:${fn}`);
-        if (/Unknown|Incorrect|Expected|Invalid|not loaded|Too many|Can't find/i.test(res)) log(`Dropper build (${fn}): ${res.trim().slice(0, 200)}`);
+        for (const part of Array.isArray(fn) ? fn : [fn]) {
+            const res = await patient(mc, `function dropper:${part}`);
+            if (/Unknown|Incorrect|Expected|Invalid|not loaded|Too many|Can't find/i.test(res)) log(`Dropper build (${part}): ${res.trim().slice(0, 200)}`);
+        }
         await mc(`forceload remove ${x1} ${z1} ${x2} ${z2}`);
     };
     if (from === 1) await area(Math.min(JAIL[0], WIN[0]) - 8, Math.min(JAIL[2], WIN[2]) - 8, Math.max(JAIL[0], WIN[0]) + 8, Math.max(JAIL[2], WIN[2]) + 8, 'build/extra');
-    for (const L of dropperLevels().slice(from - 1, to)) {
+    for (const L of levelRange(from, to)) {
         const [cx, cz] = levelCenter(L.n);
         const r = L.h + 3;
-        await area(cx - r, cz - r, cx + r, cz + r, `build/${L.n}`);
+        await area(cx - r, cz - r, cx + r, cz + r, Array.from({ length: levelParts(L).length }, (_, i) => `build/${L.n}_${i + 1}`));
+        saveProgress(L.n);
         progress(L.n);
     }
     const [sx, sy, sz] = levelStart(1);
@@ -855,14 +913,34 @@ export async function buildDropper(mc, { log = () => {}, progress = () => {}, fr
 }
 
 export function dropperBuilt(world = DROPPER_WORLD) {
-    try { return JSON.parse(fs.readFileSync(path.join(SAVES_DIR, world, 'gifthype-dropper.json'), 'utf8')).build === DROPPER_BUILD; } catch { return false; }
+    try { const p = JSON.parse(fs.readFileSync(progressFile(world), 'utf8')); return p.build === DROPPER_BUILD && !!p.built; } catch { return false; }
 }
 export function markDropperBuilt(world = DROPPER_WORLD) {
-    fs.writeFileSync(path.join(SAVES_DIR, world, 'gifthype-dropper.json'), JSON.stringify({ build: DROPPER_BUILD, levels: LEVELS, built: new Date().toISOString() }, null, 2));
+    fs.writeFileSync(progressFile(world), JSON.stringify({ build: DROPPER_BUILD, levels: LEVELS, done: LEVELS, built: new Date().toISOString() }, null, 2));
 }
 
 // ---------- the data pack: the game ----------
 const J = o => JSON.stringify(o);
+// Minecraft 26.2's overworld, only taller (only in the Dropper world)
+const TALL_OVERWORLD = {
+    ambient_light: 0.0,
+    attributes: {
+        'minecraft:audio/ambient_sounds': { mood: { block_search_extent: 8, offset: 2.0, sound: 'minecraft:ambient.cave', tick_delay: 6000 } },
+        'minecraft:audio/background_music': { creative: { max_delay: 24000, min_delay: 12000, sound: 'minecraft:music.creative' }, default: { max_delay: 24000, min_delay: 12000, sound: 'minecraft:music.game' } },
+        'minecraft:gameplay/bed_rule': { can_set_spawn: 'always', can_sleep: 'when_dark', error_message: { translate: 'block.minecraft.bed.no_sleep' } },
+        'minecraft:gameplay/nether_portal_spawns_piglin': true,
+        'minecraft:gameplay/respawn_anchor_works': false,
+        'minecraft:visual/ambient_light_color': '#0a0a0a',
+        'minecraft:visual/cloud_color': '#ccffffff',
+        'minecraft:visual/cloud_height': 192.33,
+        'minecraft:visual/fog_color': '#c0d8ff',
+        'minecraft:visual/sky_color': '#78a7ff',
+    },
+    coordinate_scale: 1.0, default_clock: 'minecraft:overworld', has_ceiling: false, has_ender_dragon_fight: false, has_skylight: true,
+    height: WORLD_HEIGHT, infiniburn: '#minecraft:infiniburn_overworld', logical_height: WORLD_HEIGHT, min_y: WORLD_MIN,
+    monster_spawn_block_light_limit: 0, monster_spawn_light_level: { type: 'minecraft:uniform', max_inclusive: 7, min_inclusive: 0 },
+    timelines: '#minecraft:in_overworld',
+};
 function packFiles() {
     const f = {
         'pack.mcmeta': JSON.stringify({ pack: { description: 'Gift Hype Dropper: 100 levels', min_format: 94, max_format: 999 } }, null, 2),
@@ -894,9 +972,9 @@ function packFiles() {
         // landed in the water: on to the next level
         'execute as @a[tag=dr_in] at @s if block ~ ~ ~ minecraft:water if block ~0.3 ~ ~0.3 minecraft:water if block ~-0.3 ~ ~-0.3 minecraft:water if block ~0.3 ~ ~-0.3 minecraft:water if block ~-0.3 ~ ~0.3 minecraft:water unless score @s dr_jail matches 1.. run function dropper:landed',
         // touched something on the way down (anywhere under the ledge that isn't the water): start the level again
-        'execute as @a[tag=dr_in] at @s if predicate dropper:on_ground unless score @s dr_jail matches 1.. positioned ~ -64 ~ if entity @s[dy=362.4] run function dropper:fail',
+        `execute as @a[tag=dr_in] at @s if predicate dropper:on_ground unless score @s dr_jail matches 1.. positioned ~ ${WORLD_MIN} ~ if entity @s[dy=${TOP - 300 + 362.4}] run function dropper:fail`,
         // fell out of the levels somehow: back to your level
-        'execute as @a[tag=dr_in] at @s unless score @s dr_jail matches 1.. positioned ~ -64 ~ if entity @s[dy=1] run function dropper:goto',
+        `execute as @a[tag=dr_in] at @s unless score @s dr_jail matches 1.. positioned ~ ${WORLD_MIN} ~ if entity @s[dy=1] run function dropper:goto`,
         'execute as @a[scores={dr_jail=1..}] run function dropper:jail/tick',
         'execute as @e[tag=dr_alert] run function dropper:alert/tick',
         'execute if score #reset dr_v matches 1.. run function dropper:reset/tick',
@@ -954,7 +1032,7 @@ function packFiles() {
     fn('hud_shield', [`$title @s actionbar [${J({ text: 'Fails ', color: 'gold' })},${J({ text: '$(fails)', color: 'white' })},${J({ text: '     Punches ', color: 'gold' })},{"text":"$(punch)","color":"$(pc)","bold":true},${J({ text: '     Shield x$(shield)', color: 'aqua', bold: true })}]`]);
 
     // go to the start of your level (not while you're in jail: you go there when you're let out)
-    const levels = dropperLevels();
+    const levels = Array.from({ length: LEVELS }, (_, i) => levelInfo(i + 1));
     fn('goto', [
         'execute if score @s dr_jail matches 1.. run return 0',
         'execute if score @s dr_level matches ..0 run scoreboard players set @s dr_level 1',
@@ -968,6 +1046,7 @@ function packFiles() {
             ...[`title @s times 3 30 8`, `title @s title ${J({ text: `Level ${L.n}`, color: 'gold', bold: true })}`, `title @s subtitle ${J({ text: L.name, color: 'white' })}`].map(l => `execute unless entity @s[tag=dr_quiet] run ${l}`),
         ]);
     }
+    f['data/minecraft/dimension_type/overworld.json'] = JSON.stringify(TALL_OVERWORLD, null, 2);
     f['data/dropper/predicate/on_ground.json'] = J({ condition: 'minecraft:entity_properties', entity: 'this', predicate: { flags: { is_on_ground: true } } });
     fn('fail', [
         'scoreboard players add @s dr_fails 1',
@@ -1106,7 +1185,7 @@ function packFiles() {
 function buildPackFiles(from, to) {
     const f = { 'pack.mcmeta': JSON.stringify({ pack: { description: 'Gift Hype Dropper: building the levels', min_format: 94, max_format: 999 } }, null, 2) };
     if (from === 1) f['data/dropper/function/build/extra.mcfunction'] = extraCommands().join('\n') + '\n';
-    for (const L of dropperLevels().slice(from - 1, to)) f[`data/dropper/function/build/${L.n}.mcfunction`] = levelCommands(L).join('\n') + '\n';
+    for (const L of levelRange(from, to)) levelParts(L).forEach((p, i) => { f[`data/dropper/function/build/${L.n}_${i + 1}.mcfunction`] = p.join('\n') + '\n'; });
     return f;
 }
 const BUILD_PACK = 'giftdropper_build';

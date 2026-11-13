@@ -135,6 +135,9 @@ button.icon { padding: 6px 9px; }
 .add-card:hover .art { color: var(--main-text); }
 .upd { display: flex; align-items: center; justify-content: center; gap: 14px; padding: 9px 16px; background: var(--hot); color: var(--on-hot); font-weight: 700; font-size: 14px; }
 .upd .hot { background: var(--on-hot); color: var(--hot); }
+.chatgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px 14px; margin-top: 12px; }
+.chatgrid label { display: flex; flex-direction: column; gap: 5px; font-size: 13px; color: var(--muted); }
+.chatgrid .wide { grid-column: 1 / -1; }
 .back { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 14px; }
 .steps { margin: 6px 0 12px; padding-left: 22px; display: grid; gap: 10px; line-height: 1.45; }
 .steps code { display: inline-block; margin-top: 4px; word-break: break-all; }
@@ -320,6 +323,11 @@ dialog::backdrop { background: rgba(0,0,0,.5); }
           <button id="browse">Browse all gifts</button>
           <button id="addAny" title="Plays for any gift you haven't set up">+ Any other gift</button>
         </div>
+      </section>
+
+      <section id="chatSec" hidden>
+        <h2 id="chatTitle">Chat block delete</h2>
+        <div id="chatBox"></div>
       </section>
     </div>
   </div>
@@ -667,7 +675,7 @@ const coverHtml = g => g.cover
   ? `<img src="/cover/${encodeURIComponent(g.id)}?v=${g.cover}" alt="" onerror="this.outerHTML='<div class=blank>'+this.dataset.name+'</div>'" data-name="${esc(esc(g.name))}">`
   : `<div class="blank">${esc(g.name)}</div>`;
 // A type's cover: its own picture, or the built-in one for Dropper / Block Delete / Parkour
-const TYPE_ART = [[/dropper/i, '/img/type-dropper.svg'], [/block delete/i, '/img/type-blockdelete.svg'], [/parkour/i, '/img/type-parkour.svg']];
+const TYPE_ART = [[/dropper/i, '/img/type-dropper.svg'], [/block delete/i, '/img/type-blockdelete.svg'], [/chunk chat/i, '/img/type-chunkchat.svg'], [/parkour/i, '/img/type-parkour.svg']];
 const typeCoverHtml = m => {
   if (m.cover) return `<img src="/cover/${encodeURIComponent(game.id)}?mode=${encodeURIComponent(m.id)}&v=${encodeURIComponent(m.cover)}" alt="">`;
   const art = TYPE_ART.find(([re]) => re.test(m.name || ''));
@@ -1013,7 +1021,7 @@ function addActionOptions() {
   if (!usable.length) return '';
   if (game.connector !== 'minecraft') return usable.map(([k, t]) => `<option value="${k}">${t.label}</option>`).join('');
   // the ready-made actions (nuke, jail, chunks, kits...) belong to Block Delete only
-  const blockDelete = /block delete/i.test(curMode().name || ''), dropper = isDropperMode();
+  const blockDelete = /block delete|chunk chat/i.test(curMode().name || ''), dropper = isDropperMode();
   const DROPPER = ['punch', 'punchToggle', 'levelUp', 'levelDown', 'levelWheel', 'jail', 'resetTimer', 'saveReset'];
   const mcOpts = blockDelete ? usable.filter(([k, t]) => t.conn === 'minecraft' && k !== 'command' && (k === 'jail' || !DROPPER.includes(k)))
     : dropper ? DROPPER.map(k => [k, ACTION_TYPES[k]]) : [];
@@ -1029,7 +1037,102 @@ function giftImgHtml(r) {
   return `<div class="gimg">${img ? `<img src="${pic(img)}" alt="" onerror="this.outerHTML=IC.gift">` : IC.gift}</div>`;
 }
 
+// ----- Chunk Chat: on a timer, your chunk turns into the block chat picked -----
+function renderChunkChat() {
+  $('chatTitle').textContent = 'Chunk Chat';
+  const m = curMode();
+  m.chunkChat ||= { on: true, seconds: 30, pick: 'most', blocked: '', show: false };
+  const c = m.chunkChat;
+  $('chatBox').innerHTML = `
+    <label class="check"><input type="checkbox" data-k="on" ${c.on ? 'checked' : ''}> Chat picks the block your chunk turns into</label>
+    <p class="hint" style="margin-top:6px">Viewers type a block in the LIVE chat, like <b>stone</b>, <b>diamond block</b>, <b>oak leaves</b> or <b>water</b>. When the timer runs out, every block in the chunk you're in turns into it, from the bottom of the world to the top. Air stays air (you're never buried) and the bedrock floor stays. Blocks a gift does (lava, air, cobwebs), blocks you'd fall through (chains, candles, flowers, rails, ladders...) and blocks with an inside (chests, furnaces...) can't be picked. The timer waits while you're not in the world.</p>
+    <div class="chatgrid" ${c.on ? '' : 'style="opacity:.55"'}>
+      <label>Every (seconds)<input type="number" min="10" max="600" data-k="seconds" value="${c.seconds}"></label>
+      <label>Which block wins<select data-k="pick"><option value="most" ${c.pick === 'most' ? 'selected' : ''}>The one typed most (one vote each)</option><option value="last" ${c.pick === 'last' ? 'selected' : ''}>The last one typed</option></select></label>
+      <label class="wide">Other blocks chat can't pick<input type="text" data-k="blocked" value="${esc(c.blocked)}" placeholder="e.g. obsidian, ice"></label>
+      <label class="check wide" style="flex-direction:row"><input type="checkbox" data-k="show" ${c.show ? 'checked' : ''}> Show the timer and the winning block on stream (a box on the overlay, a bar and a title in the game). Leave it off to add your own in TikTok LIVE Studio.</label>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <input type="text" id="ccTry" placeholder="Try it: type a block, e.g. diamond block" style="flex:1;min-width:180px">
+      <button class="small" id="ccTryGo">Try</button>
+      <button class="small ghost" id="ccNow">Change the chunk now</button>
+    </div>`;
+  $('chatBox').querySelectorAll('[data-k]').forEach(el => {
+    el.onchange = () => {
+      const k = el.dataset.k;
+      c[k] = el.type === 'checkbox' ? el.checked : el.type === 'number' ? +el.value : el.value;
+      queueSave();
+      if (k === 'on') renderChunkChat();
+    };
+  });
+  const tryIt = async () => {
+    const text = $('ccTry').value.trim();
+    if (!text) return;
+    try {
+      await flushSave();
+      const r = await api('/api/chunkchat/try', { text });
+      toast(r.pick === 'last' ? `${r.label} is next` : `1 vote for ${r.label}`);
+      $('ccTry').value = '';
+    } catch (e) { toast(e.message, true); }
+  };
+  $('ccTryGo').onclick = tryIt;
+  $('ccTry').onkeydown = e => { if (e.key === 'Enter') tryIt(); };
+  $('ccNow').onclick = async () => { try { await flushSave(); await api('/api/chunkchat/now', {}); toast('Changing the chunk…'); } catch (e) { toast(e.message, true); } };
+}
+
+// ----- Chat block delete (Minecraft types other than the Dropper) -----
+const isChunkChatMode = () => game?.connector === 'minecraft' && /chunk chat/i.test(curMode().name || '');
+function renderChat() {
+  const sec = $('chatSec');
+  const on = game && game.connector === 'minecraft' && !isDropperMode();
+  sec.hidden = !on;
+  if (!on) return;
+  if (isChunkChatMode()) return renderChunkChat();
+  $('chatTitle').textContent = 'Chat block delete';
+  const m = curMode();
+  m.chat ||= { on: false, seconds: 30, chunks: 1, cooldown: 20, max: 5, blocked: '' };
+  const c = m.chat;
+  const area = ['just your chunk (16x16)', '3x3 chunks (48x48)', '5x5 chunks (80x80)', '7x7 chunks (112x112)'];
+  $('chatBox').innerHTML = `
+    <label class="check"><input type="checkbox" data-c="on" ${c.on ? 'checked' : ''}> Viewers can type a block in the LIVE chat to delete it</label>
+    <p class="hint" style="margin-top:6px">Someone types a block's name, like <b>stone</b>, <b>oak log</b> or <b>dirt</b> (or a group: <b>logs</b>, <b>leaves</b>, <b>wool</b>, <b>flowers</b>, <b>diamond ores</b>). A countdown shows on the stream overlay and as a bar in the game, then every block of that kind around you is gone, from the top of the world to the bottom. Anything else in chat is ignored.</p>
+    <div class="chatgrid" ${c.on ? '' : 'style="opacity:.55"'}>
+      <label>Countdown (seconds)<input type="number" min="5" max="600" data-c="seconds" value="${c.seconds}"></label>
+      <label>How far<select data-c="chunks">${area.map((t, i) => `<option value="${i}" ${+c.chunks === i ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+      <label>Wait per viewer (seconds)<input type="number" min="0" max="600" data-c="cooldown" value="${c.cooldown}"></label>
+      <label>Countdowns at once<input type="number" min="1" max="8" data-c="max" value="${c.max}"></label>
+      <label class="wide">Blocks chat can't delete<input type="text" data-c="blocked" value="${esc(c.blocked)}" placeholder="bedrock, barrier, ..."></label>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <input type="text" id="chatTry" placeholder="Try it: type a block, e.g. stone" style="flex:1;min-width:180px">
+      <button class="small" id="chatTryGo">Try</button>
+      <button class="small ghost" id="chatStop">Stop all countdowns</button>
+    </div>`;
+  $('chatBox').querySelectorAll('[data-c]').forEach(el => {
+    el.onchange = () => {
+      const k = el.dataset.c;
+      c[k] = el.type === 'checkbox' ? el.checked : el.type === 'number' || el.tagName === 'SELECT' ? +el.value : el.value;
+      queueSave();
+      if (k === 'on') renderChat();
+    };
+  });
+  const tryIt = async () => {
+    const text = $('chatTry').value.trim();
+    if (!text) return;
+    try {
+      await flushSave();
+      const r = await api('/api/chatdel/try', { text });
+      toast(`${r.label} will be deleted in ${r.seconds}s`);
+      $('chatTry').value = '';
+    } catch (e) { toast(e.message, true); }
+  };
+  $('chatTryGo').onclick = tryIt;
+  $('chatTry').onkeydown = e => { if (e.key === 'Enter') tryIt(); };
+  $('chatStop').onclick = async () => { try { const r = await api('/api/chatdel/clear', {}); toast(r.cleared ? `Stopped ${r.cleared} countdown${r.cleared > 1 ? 's' : ''}` : 'No countdowns running'); } catch (e) { toast(e.message, true); } };
+}
+
 function renderRules() {
+  renderChat();
   const box = $('rules');
   if (!R().length) { box.innerHTML = '<div class="empty">No gifts yet. Press <b>+ Add gift</b> or <b>Browse all gifts</b>.</div>'; return; }
   const soundOpts = sel => `<option value="">No sound</option>` + sounds.map(s => `<option value="${esc(s.file)}" ${s.file === sel ? 'selected' : ''}>${esc(s.name)}${s.custom ? ' (yours)' : ''}</option>`).join('');

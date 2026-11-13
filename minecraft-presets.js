@@ -44,6 +44,11 @@ const GOD_ITEMS = [
 ];
 const DIAMOND_ARMOR = [['armor.head', 'diamond_helmet'], ['armor.chest', 'diamond_chestplate'], ['armor.legs', 'diamond_leggings'], ['armor.feet', 'diamond_boots']];
 
+// The chat block delete's remover (not a gift action): presets[DELETE_BLOCKS](player, filter, chunks)
+export const DELETE_BLOCKS = Symbol('deleteBlocks');
+// Chunk Chat's filler: presets[FILL_CHUNK](player, block, filters)
+export const FILL_CHUNK = Symbol('fillChunk');
+
 export function makePresets({ mc, log }) {
     const sel = ctx => /^[\w]{1,16}$/.test(ctx.player) ? `@a[name=${ctx.player},limit=1]` : '@p';
 
@@ -73,6 +78,40 @@ export function makePresets({ mc, log }) {
         const top = block === 'minecraft:air' ? p.maxY : Math.min(p.maxY, Math.floor(p.y) + 4);
         await mc(`title ${p.s} actionbar ${text(label, color, ',"bold":true')}`);
         await fillColumn(p, cx, cz, cx + 15, cz + 15, top, p.minY, block);
+    }
+
+    // Chat block delete: every block matching filter (a block or #tag) in your chunk and the chunks
+    // around it, top to bottom of the world, becomes air. Returns how many blocks went.
+    async function deleteBlocks(player, filter, chunks) {
+        const p = await where({ player });
+        const cx = Math.floor(p.x / 16) * 16, cz = Math.floor(p.z / 16) * 16, r = chunks * 16;
+        const x1 = cx - r, z1 = cz - r, x2 = cx + 15 + r, z2 = cz + 15 + r;
+        const step = Math.max(1, Math.floor(30000 / ((x2 - x1 + 1) * (z2 - z1 + 1))));
+        let n = 0;
+        for (let y = p.maxY; y >= p.minY; y -= step) {
+            const reply = String(await mc(`execute in ${p.dim} run fill ${x1} ${Math.max(p.minY, y - step + 1)} ${z1} ${x2} ${y} ${z2} minecraft:air replace ${filter}`).catch(e => e.message));
+            const m = /filled (\d+)/i.exec(reply);
+            if (m) n += +m[1];
+            else if (!/No blocks/i.test(reply)) log(`Delete: ${reply.trim()}`);
+        }
+        return n;
+    }
+
+    // Chunk Chat: every block in your chunk that matches one of the filters (from the bottom of the
+    // world up) becomes `block`; air stays air. Leaves are placed so they never fall off.
+    async function fillChunk(player, block, filters) {
+        const p = await where({ player });
+        const x1 = Math.floor(p.x / 16) * 16, z1 = Math.floor(p.z / 16) * 16, x2 = x1 + 15, z2 = z1 + 15;
+        const b = `minecraft:${block}${/_leaves$/.test(block) ? '[persistent=true]' : ''}`;
+        const step = 112;                                  // 16 x 16 x 112 = 28672 blocks a fill (the most is 32768)
+        let n = 0;
+        for (const f of filters) for (let y = p.minY; y <= p.maxY; y += step) {
+            const reply = String(await mc(`execute in ${p.dim} run fill ${x1} ${y} ${z1} ${x2} ${Math.min(p.maxY, y + step - 1)} ${z2} ${b} replace ${f}`).catch(e => e.message));
+            const m = /filled (\d+)/i.exec(reply);
+            if (m) n += +m[1];
+            else if (!/No blocks/i.test(reply)) throw new Error(reply.trim().slice(0, 200));
+        }
+        return n;
     }
 
     async function giveArmor(s, armor) {
@@ -196,6 +235,8 @@ export function makePresets({ mc, log }) {
 
     // type -> run(action, ctx, times). times = how many gifts (for streaks).
     return {
+        [DELETE_BLOCKS]: deleteBlocks,
+        [FILL_CHUNK]: fillChunk,
         nuke: async (a, ctx, times) => { for (let i = 0; i < Math.min(times, 3); i++) await nuke(ctx, clamp(a.size, 16, 64, 40)); },
         jail: (a, ctx, times) => jail(ctx, Math.min(3600, clamp(a.seconds, 1, 3600, 30) * times)),
         cobwebChunk: (a, ctx) => chunk(ctx, 'minecraft:cobweb', 'COBWEB CHUNK', 'white'),
