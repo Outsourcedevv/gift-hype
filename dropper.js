@@ -584,7 +584,11 @@ function fairLevel(n) {
 // Those numbers are saved (data/dropper-levels.json), so the levels are only designed once per build.
 const INFO_FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), 'data', 'dropper-levels.json');
 const infoCache = new Map();
-try { const f = JSON.parse(fs.readFileSync(INFO_FILE, 'utf8')); if (f.build === DROPPER_BUILD) for (const i of f.levels) infoCache.set(i.n, i); } catch { }
+// A copy comes with Gift Hype (dropper-levels.json next to this file), so a new install doesn't
+// spend a minute or two designing every level before the world can open.
+for (const file of [INFO_FILE, path.join(path.dirname(fileURLToPath(import.meta.url)), 'dropper-levels.json')]) {
+    try { const f = JSON.parse(fs.readFileSync(file, 'utf8')); if (f.build === DROPPER_BUILD && f.levels?.length === LEVELS) { for (const i of f.levels) infoCache.set(i.n, i); break; } } catch { }
+}
 function levelDesign(n) {
     const L = fairLevel(n), had = infoCache.size;
     infoCache.set(n, { n, h: L.h, name: L.name, height: L.height });

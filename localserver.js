@@ -145,7 +145,7 @@ export const RCON_PORT = +process.env.GIFTHYPE_RCON_PORT || 25576;
 
 // Runs the hidden server. One at a time.
 export function makeLocalServer({ dir, log, onState }) {
-    let proc = null, world = null, password = null, stopping = null;
+    let proc = null, world = null, password = null, stopping = null, lastProblem = '';
     const propsFile = path.join(dir, 'server.properties');
 
     function writeProps(extra = []) {
@@ -194,8 +194,11 @@ export function makeLocalServer({ dir, log, onState }) {
             { cwd: dir, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
         proc = p;
         const out = fs.createWriteStream(path.join(dir, 'console.log'));
+        lastProblem = '';
         const onLine = line => {
             out.write(line + '\n');
+            // the first real error, to say why it stopped if it does
+            if (!lastProblem && /ERROR|FATAL|Exception|Failed to|FAILED|Caused by/i.test(line) && !/joined the game|left the game/.test(line)) lastProblem = line.replace(/^\[[^\]]*\] \[[^\]]*\]: /, '').trim().slice(0, 220);
             if (/Done \(/.test(line)) { log(`"${w}" is ready. In Minecraft: Multiplayer, then Gift Hype.`); onState('ready'); }
             else if (/session\.lock|already locked|LockException|locked a portion/i.test(line)) onState('world open in singleplayer');
             else if (/joined the game|left the game/.test(line)) log(line.replace(/^.*INFO\]: /, ''));
@@ -207,7 +210,11 @@ export function makeLocalServer({ dir, log, onState }) {
         p.stderr.setEncoding('utf8').on('data', feed);
         p.on('exit', code => {
             out.end();
-            if (proc === p) { proc = null; world = null; onState(stopping ? 'stopped' : code ? 'crashed' : 'stopped'); }
+            if (proc === p) {
+                proc = null; world = null;
+                if (!stopping && code) log(`Minecraft's server for "${w}" stopped${lastProblem ? `: ${lastProblem}` : ` (code ${code})`}`);
+                onState(stopping ? 'stopped' : code ? 'crashed' : 'stopped');
+            }
         });
     }
 
@@ -245,6 +252,7 @@ export function makeLocalServer({ dir, log, onState }) {
         running: () => !!proc,
         world: () => world,
         rcon: () => ({ host: '127.0.0.1', port: RCON_PORT, password }),
+        problem: () => lastProblem,      // Minecraft's first error, if it stopped
     };
 }
 
@@ -262,9 +270,10 @@ export function setupLauncher(version) {
         mainClass: 'net.minecraft.client.main.Main',
         arguments: { game: ['--quickPlayMultiplayer', `localhost:${SERVER_PORT}`], jvm: [] },
     }, null, 2));
+    // the launcher's list of installations; made if the launcher hasn't made it yet (it keeps what's there)
     const pf = path.join(MC_DIR, 'launcher_profiles.json');
-    const raw = fs.readFileSync(pf, 'utf8');
-    if (!fs.existsSync(pf + '.before-gift-hype')) fs.writeFileSync(pf + '.before-gift-hype', raw);
+    const raw = fs.existsSync(pf) ? fs.readFileSync(pf, 'utf8') : JSON.stringify({ profiles: {}, settings: {}, version: 3 });
+    if (fs.existsSync(pf) && !fs.existsSync(pf + '.before-gift-hype')) fs.writeFileSync(pf + '.before-gift-hype', raw);
     const j = JSON.parse(raw);
     j.profiles ||= {};
     const old = j.profiles['gift-hype'] || {};

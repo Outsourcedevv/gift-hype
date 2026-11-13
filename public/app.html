@@ -872,8 +872,8 @@ function renderPlay() {
     playing_ = true; renderPlay();
     try {
       await flushSave();
-      await api('/api/minecraft/play', {});
-      toast('Minecraft is opening: press Play on "Gift Hype"');
+      const r = await api('/api/minecraft/play', {});
+      toast(r.quick === false ? 'Minecraft is opening: play, then Multiplayer, then "Gift Hype"' : 'Minecraft is opening: press Play on "Gift Hype"');
     } catch (e) { toast(e.message, true); }
     playing_ = false; renderPlay();
   };

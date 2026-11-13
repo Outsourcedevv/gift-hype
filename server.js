@@ -1174,15 +1174,32 @@ const routes = {
         if (!worldOf(g)) throw new Error('Pick your world first');
         if (!settings.mcEula) throw new Error('Tick the Minecraft EULA box first');
         connectMinecraft();
-        for (let i = 0; i < 240 && status.minecraft !== 'connected'; i++) {
-            if (['world open in singleplayer', 'java missing', 'world failed', 'crashed', 'world not found'].includes(localState) || ['world open in singleplayer', 'world failed'].includes(status.minecraft)) break;
+        // the first time takes longest (Minecraft's server is downloaded, a new world is made), so it
+        // waits up to 10 minutes while it's still getting there, and stops at once if something's wrong
+        const deadline = Date.now() + 10 * 60 * 1000;
+        const FAIL = ['world open in singleplayer', 'java missing', 'world failed', 'crashed', 'world not found', 'no world picked', 'eula not accepted'];
+        const is = s => localState === s || status.minecraft === s;
+        while (status.minecraft !== 'connected' && Date.now() < deadline) {
+            if (FAIL.some(is)) break;
             await sleep(500);
         }
-        if (status.minecraft !== 'connected') throw new Error(localState === 'world open in singleplayer' ? 'Close that world in Minecraft singleplayer first' : "Your world didn't open in time, try again");
-        setupLauncher(worldVersion(worldOf(g)));
+        if (status.minecraft !== 'connected') {
+            const why = is('world open in singleplayer') ? 'That world is open in Minecraft singleplayer: close it (Save and Quit to Title), then press Play again'
+                : is('java missing') ? "Java wasn't found. Open the Minecraft Launcher, play any version once (that downloads Java), then press Play again"
+                : is('world not found') || is('no world picked') ? "Your world wasn't found. Pick your world again under Connects to, then press Play"
+                : is('eula not accepted') ? 'Tick the Minecraft EULA box first'
+                : is('crashed') ? `Minecraft's server stopped${localServer.problem() ? `: ${localServer.problem()}` : ''}. Press Play to try again; if it keeps happening, send the Activity log (Settings)`
+                : is('world failed') ? "Your world couldn't be opened (see the Activity log in Settings). Press Play to try again"
+                : localState === 'downloading' ? "Still downloading Minecraft's server (only the first time). Wait a minute and press Play again"
+                : "Your world is still starting (the first time takes longest). Wait a minute and press Play again";
+            throw new Error(why);
+        }
+        let quick = true;
+        try { setupLauncher(worldVersion(worldOf(g))); }
+        catch (e) { quick = false; log(`Couldn't add "Gift Hype" to the launcher (${e.message}). In Minecraft: Multiplayer, then Gift Hype.`); }
         openLauncher();
-        log('Minecraft launcher opened: press Play on "Gift Hype" and you go straight into your world.');
-        return { ok: true };
+        log(quick ? 'Minecraft launcher opened: press Play on "Gift Hype" and you go straight into your world.' : 'Minecraft launcher opened: play Minecraft, then Multiplayer, then Gift Hype.');
+        return { ok: true, quick };
     },
     'POST /api/minecraft/restart-world': async () => { await disconnectMinecraft(); await localServer.stop(); rconFor = null; connectMinecraft(); return { ok: true }; },
     'GET /api/minecraft/mobs': () => Object.entries(MOBS).map(([id, m]) => ({ id, name: m.name })),
