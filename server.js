@@ -26,7 +26,7 @@ import { makeChatDelete, normalizeChatDelete } from './chatdelete.js';
 import { listWorlds, installPack, singleplayerCommands } from './singleplayer.js';
 import { makeLocalServer, setupLauncher, openLauncher, worldVersion } from './localserver.js';
 import { checkForUpdate, applyUpdate, localVersion } from './updater.js';
-import { DROPPER_WORLD, DROPPER_PROPS, DROPPER_ACTIONS, LEVELS as DROPPER_LEVELS, installDropperPack, wheelAmounts, installDropperBuildPack, removeDropperBuildPack, dropperCommands, dropperAlertText, buildDropper, dropperBuilt, markDropperBuilt, dropperProgress } from './dropper.js';
+import { DROPPER_WORLD, DROPPER_MC, DROPPER_PROPS, DROPPER_ACTIONS, LEVELS as DROPPER_LEVELS, installDropperPack, wheelAmounts, installDropperBuildPack, removeDropperBuildPack, dropperCommands, dropperAlertText, buildDropper, dropperBuilt, markDropperBuilt, dropperProgress } from './dropper.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const DATA = path.join(ROOT, 'data');
@@ -595,8 +595,9 @@ async function connectMinecraft() {
         if (!localServer.running() || localServer.world() !== world) {
             await disconnectMinecraft();
             rconFor = null;
-            // the Dropper world is made the first time, on the same Minecraft version as your own world
-            const opts = isDropper(g) ? { version: newWorldVersion(), props: DROPPER_PROPS } : {};
+            // the Dropper world is made the first time, on your newest world's Minecraft version, but never
+            // older than the one its pack is made for (the launcher's "Gift Hype" install gets that version)
+            const opts = isDropper(g) ? { version: newWorldVersion(), props: DROPPER_PROPS, atLeast: DROPPER_MC } : {};
             localServer.start(world, { eula: settings.mcEula, ...opts }).catch(e => { log(`Couldn't open the world: ${e.message}`); setStatus({ minecraft: 'world failed' }); });
             return;
         }

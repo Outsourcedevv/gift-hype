@@ -26,6 +26,8 @@ import { SAVES_DIR } from './singleplayer.js';
 // "2": the levels got twice as tall, so the world needs a taller sky than an existing world can be
 // given. The first Dropper world ("Gift Hype Dropper") is left as it was.
 export const DROPPER_WORLD = 'Gift Hype Dropper 2';
+// the Minecraft version the Dropper's pack is written for (its commands, text and taller sky)
+export const DROPPER_MC = '26.2';
 export const DROPPER_BUILD = 9;                 // bump when the levels change, to rebuild them
 export const LEVELS = 100;
 // The Dropper world's sky goes up to y=959 (normal worlds stop at 319), set by the pack when the

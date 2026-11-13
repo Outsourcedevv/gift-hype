@@ -73,6 +73,26 @@ export function worldVersion(world) {
     return nbt.v.get('Data')?.v.get('Version')?.v.get('Name')?.v || null;
 }
 
+// A line from Minecraft's server that says why it couldn't start, as { rank, text } (higher = clearer), or null.
+function problemText(line) {
+    if (/Perflib|counter names|joined the game|left the game/i.test(line)) return null;     // harmless Windows / chat lines
+    const msg = line.replace(/^\[[^\]]*\] \[[^\]]*\]: /, '').trim().slice(0, 200);
+    if (/Failed to load datapacks|Failed to load registries/i.test(line)) return { rank: 9, text: "the world's data pack didn't load on this Minecraft version" };
+    if (/FAILED TO BIND/i.test(line)) return { rank: 9, text: "another copy of the world's server is still running (close Gift Hype fully, or restart the PC, then try again)" };
+    if (/OutOfMemory|Native memory|Insufficient system resources/i.test(line)) return { rank: 9, text: 'the PC ran out of memory (close other programs and try again)' };
+    if (/session\.lock|already locked|locked a portion/i.test(line)) return { rank: 8, text: 'the world is open in Minecraft singleplayer' };
+    if (/Failed to start the minecraft server|Exception|Caused by/i.test(line)) return { rank: 5, text: msg };
+    if (/ERROR|FATAL|Failed to|FAILED/.test(line)) return { rank: 2, text: msg };
+    return null;
+}
+
+// "1.21.10" is older than "26.2". Snapshots and odd names count as numbers where they can.
+export function olderVersion(a, b) {
+    const pa = String(a).split(/[.\-]/).map(n => parseInt(n, 10) || 0), pb = String(b).split(/[.\-]/).map(n => parseInt(n, 10) || 0);
+    for (let i = 0; i < Math.max(pa.length, pb.length); i++) if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) < (pb[i] || 0);
+    return false;
+}
+
 // Adds "Gift Hype" to Minecraft's Multiplayer list (once). Minecraft must be closed to keep it,
 // otherwise it can write its own list over it; it's added again each time the world starts.
 export function addServerEntry(port) {
@@ -170,14 +190,15 @@ export function makeLocalServer({ dir, log, onState }) {
     const start = (w, opts) => inTurn(() => doStart(w, opts));
     const stop = () => inTurn(doStop);
 
-    async function doStart(w, { eula, version: newVersion, props = [] }) {
+    // atLeast: the oldest Minecraft version this world works on (the Dropper's pack needs 26.2); an
+    // older world is opened on that version instead (Minecraft updates the world), never a newer one down
+    async function doStart(w, { eula, version: newVersion, props = [], atLeast = null }) {
         if (proc && world === w) return;
         await doStop();
         if (!eula) return onState('eula not accepted');
-        const lock = path.join(SAVES_DIR, w, 'session.lock');
-        void lock;
         let version = newVersion;
         try { version = worldVersion(w) || newVersion; } catch { }
+        if (atLeast && (!version || olderVersion(version, atLeast))) version = atLeast;
         if (!version) return onState('world not found');
         const java = findJava();
         if (!java || java.v < 21) return onState('java missing');
@@ -194,12 +215,14 @@ export function makeLocalServer({ dir, log, onState }) {
             { cwd: dir, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
         proc = p;
         const out = fs.createWriteStream(path.join(dir, 'console.log'));
-        lastProblem = '';
+        lastProblem = ''; let lastRank = 0;
+        let ready = false;
         const onLine = line => {
             out.write(line + '\n');
-            // the first real error, to say why it stopped if it does
-            if (!lastProblem && /ERROR|FATAL|Exception|Failed to|FAILED|Caused by/i.test(line) && !/joined the game|left the game/.test(line)) lastProblem = line.replace(/^\[[^\]]*\] \[[^\]]*\]: /, '').trim().slice(0, 220);
-            if (/Done \(/.test(line)) { log(`"${w}" is ready. In Minecraft: Multiplayer, then Gift Hype.`); onState('ready'); }
+            // why it stopped, if it does: the clearest error Minecraft gave (known ones in plain words)
+            const known = problemText(line);
+            if (known && (!lastProblem || known.rank > lastRank)) { lastProblem = known.text; lastRank = known.rank; }
+            if (/Done \(/.test(line)) { ready = true; log(`"${w}" is ready. In Minecraft: Multiplayer, then Gift Hype.`); onState('ready'); }
             else if (/session\.lock|already locked|LockException|locked a portion/i.test(line)) onState('world open in singleplayer');
             else if (/joined the game|left the game/.test(line)) log(line.replace(/^.*INFO\]: /, ''));
             else if (/Failed to start|FAILED TO BIND|Exception in server tick/i.test(line)) log(`Minecraft: ${line.replace(/^.*\]: /, '')}`);
@@ -212,8 +235,11 @@ export function makeLocalServer({ dir, log, onState }) {
             out.end();
             if (proc === p) {
                 proc = null; world = null;
-                if (!stopping && code) log(`Minecraft's server for "${w}" stopped${lastProblem ? `: ${lastProblem}` : ` (code ${code})`}`);
-                onState(stopping ? 'stopped' : code ? 'crashed' : 'stopped');
+                // stopping by itself, or before the world was ever ready (Minecraft can close "normally"
+                // when it fails to start), is a failure: say so instead of waiting for it
+                const failed = !stopping && (code || !ready);
+                if (failed) log(`Minecraft's server for "${w}" stopped${ready ? '' : ' before the world opened'}${lastProblem ? `: ${lastProblem}` : code ? ` (code ${code})` : ''}. More in data\\mcserver\\console.log`);
+                onState(failed ? 'crashed' : 'stopped');
             }
         });
     }
