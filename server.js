@@ -609,9 +609,10 @@ async function connectMinecraft() {
         if (!localServer.running() || localServer.world() !== world) {
             await disconnectMinecraft();
             rconFor = null;
-            // the Dropper world is made the first time, on your newest world's Minecraft version, but never
-            // older than the one its pack is made for (the launcher's "Gift Hype" install gets that version)
-            const opts = isDropper(g) ? { version: newWorldVersion(), props: DROPPER_PROPS, atLeast: DROPPER_MC } : {};
+            // the Dropper world is made the first time on the Minecraft version its pack is written for
+            // (DROPPER_MC; the launcher's "Gift Hype" install plays it). Not your newest world's version: a
+            // newer Minecraft can change the pack's file formats (26.3 did) and then the world won't open.
+            const opts = isDropper(g) ? { version: DROPPER_MC, props: DROPPER_PROPS, atLeast: DROPPER_MC } : {};
             // the Chat Teleport box pack, from Gift Hype (block pictures from this world's Minecraft)
             let mcVersion = opts.version; try { mcVersion = worldVersion(world) || mcVersion; } catch { }
             const tpCfg = (isChatTeleport(g) ? currentMode(g).chatTeleport : (g.modes || []).find(m => /chat teleport/i.test(m.name || ''))?.chatTeleport) || normalizeChatTeleport({});
@@ -671,11 +672,6 @@ async function disconnectMinecraft() {
     rcon = null;
     if (r) await r.end().catch(() => {});
     setStatus({ minecraft: 'offline' });
-}
-// The Minecraft version for a new world: the same as your newest world (so your game can join it).
-function newWorldVersion() {
-    for (const w of listWorlds()) { try { const v = worldVersion(w.name); if (v) return v; } catch { } }
-    return '26.2';
 }
 // Builds the 100 Dropper levels into its world the first time it opens (about a minute).
 let dropperBuilding = false;
