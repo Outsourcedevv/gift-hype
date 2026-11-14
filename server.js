@@ -22,7 +22,7 @@ import { Rcon } from 'rcon-client';
 import { WebSocketServer } from 'ws';
 import { makePresets, MOBS, DELETE_BLOCKS, FILL_CHUNK, TELEPORT_TO, WHERE } from './minecraft-presets.js';
 import { makeChatTeleport, normalizeChatTeleport } from './chatteleport.js';
-import { hudPack, hudProps, hudInfo } from './hudpack.js';
+import { hudPack, hudProps, hudInfo, hudSpot } from './hudpack.js';
 import { makeChunkChat, normalizeChunkChat } from './chunkchat.js';
 import { makeChatDelete, normalizeChatDelete } from './chatdelete.js';
 import { listWorlds, installPack, singleplayerCommands } from './singleplayer.js';
@@ -614,11 +614,11 @@ async function connectMinecraft() {
             const opts = isDropper(g) ? { version: newWorldVersion(), props: DROPPER_PROPS, atLeast: DROPPER_MC } : {};
             // the Chat Teleport box pack, from Gift Hype (block pictures from this world's Minecraft)
             let mcVersion = opts.version; try { mcVersion = worldVersion(world) || mcVersion; } catch { }
-            const tpCfg = (g.modes || []).find(m => /chat teleport/i.test(m.name || ''))?.chatTeleport || normalizeChatTeleport({});
+            const tpCfg = (isChatTeleport(g) ? currentMode(g).chatTeleport : (g.modes || []).find(m => /chat teleport/i.test(m.name || ''))?.chatTeleport) || normalizeChatTeleport({});
             try {
                 opts.props = [...(opts.props || []), ...hudProps(settings.port, tpCfg, mcVersion)];
                 const hi = hudInfo();
-                if (isChatTeleport(g)) log(hi?.pictures ? `Chat Teleport box: ${hi.pictures} block pictures (from ${hi.jar}), for box size ${hi.size}%`
+                if (isChatTeleport(g)) log(hi?.pictures ? `Chat Teleport box: ${hi.pictures} ${hi.mode === '3d' ? '3D' : 'flat'} block pictures (from ${hi.jar}), for box size ${hi.size}%`
                     : "Chat Teleport box: no block pictures (Minecraft's game files weren't found in .minecraft/versions; play this version once in the launcher)");
             } catch (e) { log(`Couldn't make the Chat Teleport box pack: ${e.message}`); }
             localServer.start(world, { eula: settings.mcEula, ...opts }).catch(e => { log(`Couldn't open the world: ${e.message}`); setStatus({ minecraft: 'world failed' }); });
@@ -800,6 +800,26 @@ const chatTeleport = makeChatTeleport({
     dimOf: async player => (await PRESETS[WHERE](player)).dim.replace(/^minecraft:/, ''),
     teleport: (player, t, range) => PRESETS[TELEPORT_TO](player, t, range),
 });
+// Chat Teleport's box pack is made when the world opens. After its size or 3D setting changes, the
+// hidden world is reopened while nobody's in it (straight away, or once you leave), so your next join
+// gets the new pack.
+let hudReopening = false;
+setInterval(async () => {
+    try {
+        const g = activeGame();
+        if (hudReopening || !isChatTeleport(g) || !isSingle(g) || !localServer.running() || localState !== 'ready') return;
+        const hi = hudInfo(), cfg = currentMode(g).chatTeleport;
+        if (!hi?.pictures || !cfg) return;
+        if (hudSpot(cfg).size === hi.size && (cfg.icon3d === false ? 'flat' : '3d') === hi.mode) return;
+        if (await onlinePlayer(g)) return;                  // wait till you leave
+        hudReopening = true;
+        log('Chat Teleport box settings changed: reopening the world so Minecraft gets the new box (a few seconds)');
+        await disconnectMinecraft();
+        await localServer.stop();
+        await connectMinecraft();
+    } catch (e) { log(`Couldn't reopen the world: ${e.message}`); }
+    finally { hudReopening = false; }
+}, 15000);
 // On a server (no Gift Hype pack) these are the blocks that get turned: the ground, trees, water...
 const CHUNK_FILTERS_SERVER = ['#minecraft:base_stone_overworld', '#minecraft:dirt', '#minecraft:sand', 'minecraft:gravel', 'minecraft:sandstone', 'minecraft:red_sandstone',
     '#minecraft:terracotta', '#minecraft:logs', '#minecraft:leaves', 'minecraft:water', 'minecraft:lava', '#minecraft:coal_ores', '#minecraft:iron_ores', '#minecraft:copper_ores',

@@ -110,7 +110,9 @@ export const SIZES = [75, 100, 125, 150, 200, 250];
 export const HEIGHTS = [-100, -80, -60, -40, -20, 0, 20, 40, 60, 80, 100];
 const CELLS = [80, 160];                         // cell heights: a little see-through padding, lots (for high up)
 const CH = { box: 0xE000, text: 0xE100, digit: 0xE200, icon: 0xE400, space: 0xEC00 };
-const ICONS_PER_ROW = 64;
+const ICON_BOX = 32;                             // the picture's square in the box, in box pixels
+// pictures: flat (16x16, drawn at 2x) or 3D (32x32, drawn at 1x). K = box pixels per picture pixel
+const ICON_MODE = { flat: { K: 2, perRow: 64 }, '3d': { K: 1, perRow: 32 } };
 
 const inkCols = ch => Math.max(-1, ...(FONT[ch] || FONT[' ']).split('|').map(r => r.lastIndexOf('#'))) + 1;
 const inkWidth = (str, scale = 1) => { let w = 0; [...str].forEach((c, i) => { const k = inkCols(c); if (k) w = (i * 6 + k) * scale; }); return w; };
@@ -141,12 +143,13 @@ function boxSheet(H) {        // left edge, middle slice, right edge, cut from t
 }
 function textSheet(y, H) { const s = sheet(CHARS.length, 1, 6, H); [...CHARS].forEach((c, i) => s.glyph(i, c, 0, y)); return s.png(); }
 function digitSheet(H) { const s = sheet(10, 1, DIGIT_PITCH, H); for (let d = 0; d < 10; d++) s.glyph(d, String(d), 0, DIGIT_Y, 2); return s.png(); }
-function iconSheet(icons, cellH) {   // icons: [16x16 RGBA], drawn at 2x, 2 rows down a cell cellH tall
-    const rows = Math.max(1, Math.ceil(icons.length / ICONS_PER_ROW)), s = sheet(ICONS_PER_ROW, rows, 16, cellH);
-    icons.forEach((ic, n) => { for (let i = 0; i < 256; i++) if (ic[i * 4 + 3]) s.put(n, i % 16, ICON_Y / 2 + Math.floor(i / 16), [ic[i * 4], ic[i * 4 + 1], ic[i * 4 + 2], ic[i * 4 + 3]]); });
+function iconSheet(icons, cellH, mode) {   // icons: [P x P RGBA], ICON_Y/K rows down a cell cellH tall
+    const { K, perRow } = ICON_MODE[mode], P = ICON_BOX / K;
+    const rows = Math.max(1, Math.ceil(icons.length / perRow)), s = sheet(perRow, rows, P, cellH);
+    icons.forEach((ic, n) => { for (let i = 0; i < P * P; i++) if (ic[i * 4 + 3]) s.put(n, i % P, ICON_Y / K + Math.floor(i / P), [ic[i * 4], ic[i * 4 + 1], ic[i * 4 + 2], ic[i * 4 + 3]]); });
     return { png: s.png(), rows };
 }
-const iconInk = ic => { let w = 0; for (let i = 0; i < 256; i++) if (ic[i * 4 + 3]) w = Math.max(w, (i % 16) + 1); return w; };
+const iconInk = (ic, P) => { let w = 0; for (let i = 0; i < P * P; i++) if (ic[i * 4 + 3]) w = Math.max(w, (i % P) + 1); return w; };
 
 // Minecraft's sizes for a picture glyph: drawn at height/cellHeight per picture pixel, and it moves the
 // pen by round(width to its last coloured column * that) + 1.
@@ -179,7 +182,7 @@ let current = null, lastMissing = null;
 // why the last "teleported" box had no picture (for the activity log), then forgets it
 export const hudMissing = () => { const m = lastMissing; lastMissing = null; return m; };
 // what the pack has, for the activity log when the world opens
-export const hudInfo = () => current && { pictures: current.iconIndex.size, size: current.iconSize, jar: current.jar };          // { data, sha1, id, iconFont, iconIndex: Map(blockId -> {n, ink}) }
+export const hudInfo = () => current && { pictures: current.iconIndex.size, size: current.iconSize, jar: current.jar, mode: current.iconMode };          // { data, sha1, id, iconFont, iconIndex: Map(blockId -> {n, ink}) }
 const built = new Map();
 export function hudPack() { return current || buildPack({}); }
 function buildPack({ cfg, version }) {
@@ -187,7 +190,8 @@ function buildPack({ cfg, version }) {
     let reader = null;
     let jarFile = null;
     try { jarFile = findClientJar(version); if (jarFile && spot) reader = makeIconReader(jarFile); } catch { reader = null; }
-    const key = `${spot?.size || ''}|${reader ? version || 'any' : 'none'}`;
+    const mode = cfg?.icon3d === false ? 'flat' : '3d', { K, perRow } = ICON_MODE[mode], P = ICON_BOX / K;
+    const key = `${spot?.size || ''}|${mode}|${reader ? version || 'any' : 'none'}`;
     if (built.has(key)) return built.get(key);
 
     const files = [];
@@ -206,7 +210,8 @@ function buildPack({ cfg, version }) {
     const iconCells = new Set();
     // a picture cell: 2 rows, the 16-row picture, then see-through rows so it can sit as high as the box
     // (Minecraft wants ascent <= height); a whole number of rows that makes a whole-number height
-    const iconCell = p => { let c = Math.max(18, Math.ceil(2 * p.a / p.s)); while ((c * p.s / 2) % 1 || c * p.s / 2 < p.a) c++; return c; };
+    const iconHeight = (c, p) => c * K * p.s / 4;
+    const iconCell = p => { let c = Math.max(ICON_Y / K + P, Math.ceil(4 * p.a / (K * p.s))); while (iconHeight(c, p) % 1 || iconHeight(c, p) < p.a) c++; return c; };
     if (reader) {
         const ids = new Set(JSON.parse(fs.readFileSync(path.join(ROOT, 'chatteleport-targets.json'), 'utf8')).blocks);
         for (const kind of ['structure', 'biome']) for (const n of ['village', 'trial_chambers', 'ancient_city', 'stronghold', 'fortress', 'bastion', 'mansion', 'monument', 'desert_pyramid', 'jungle', 'igloo', 'shipwreck', 'ruined_portal', 'end_city', 'mineshaft', 'outpost', 'trail_ruins', 'buried_treasure', 'ocean_ruin', 'swamp_hut', 'nether_fossil',
@@ -214,12 +219,18 @@ function buildPack({ cfg, version }) {
             const b = iconBlockFor({ kind, filter: `minecraft:${n}` }, reader); if (b) ids.add(b);
         }
         const icons = [];
-        for (const id of ids) { const ic = reader.icon(id); if (ic) { iconIndex.set(id, { n: icons.length, ink: iconInk(ic) }); icons.push(ic); } }
+        const same = new Map();                        // blocks with the same picture share one
+        for (const id of ids) {
+            const ic = mode === '3d' ? reader.icon3d(id) : reader.icon(id); if (!ic) continue;
+            const h = crypto.createHash('sha1').update(ic).digest('hex');
+            if (!same.has(h)) { same.set(h, { n: icons.length, ink: iconInk(ic, P) }); icons.push(ic); }
+            iconIndex.set(id, same.get(h));
+        }
         if (icons.length) for (const y of HEIGHTS) {
             const c = iconCell(hudSpot({ boxSize: spot.size, boxY: y }));
             if (iconCells.has(c)) continue;
             iconCells.add(c);
-            const s = iconSheet(icons, c); iconRows = s.rows;
+            const s = iconSheet(icons, c, mode); iconRows = s.rows;
             add(`assets/gifthype/textures/hud/icons${c}.png`, s.png);
         }
     }
@@ -238,8 +249,8 @@ function buildPack({ cfg, version }) {
         ];
         if (iconIndex.size && spot && size === spot.size) {
             const c = iconCell(p);
-            providers.push({ type: 'bitmap', file: `gifthype:hud/icons${c}.png`, height: Math.round(c * p.s / 2), ascent: p.a,
-                chars: Array.from({ length: iconRows }, (_, r) => run(CH.icon + r * ICONS_PER_ROW, ICONS_PER_ROW)) });
+            providers.push({ type: 'bitmap', file: `gifthype:hud/icons${c}.png`, height: Math.round(iconHeight(c, p)), ascent: p.a,
+                chars: Array.from({ length: iconRows }, (_, r) => run(CH.icon + r * perRow, perRow)) });
         }
         add(`assets/gifthype/font/tp/s${size}_y${y + 100}.json`, { providers });
     }
@@ -247,7 +258,7 @@ function buildPack({ cfg, version }) {
     const sha1 = crypto.createHash('sha1').update(data).digest('hex');
     const h = sha1.slice(0, 32);
     const id = `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-a${h.slice(17, 20)}-${h.slice(20, 32)}`;
-    const pack = { data, sha1, id, iconSize: iconIndex.size ? spot.size : null, iconIndex, reader, jar: reader ? path.basename(jarFile) : null };
+    const pack = { data, sha1, id, iconSize: iconIndex.size ? spot.size : null, iconIndex, iconK: K, iconMode: mode, reader, jar: reader ? path.basename(jarFile) : null };
     built.set(key, pack);
     return pack;
 }
@@ -295,7 +306,7 @@ export function hudTitle(cfg, what) {
         const away = what.away ? `${what.away} BLOCK${what.away === 1 ? '' : 'S'} AWAY` : 'TELEPORTED!';
         const x0 = icon ? ICON_X + 32 + 6 : 8;
         W = Math.ceil(Math.max(96, x0 + Math.max(inkWidth(name), inkWidth(away)) + 8) / CAP) * CAP;   // whole slices (overlaps would show)
-        if (icon) content.push(() => at(ICON_X, String.fromCharCode(CH.icon + icon.n), icon.ink, '#FFFFFF', 2 * u));
+        if (icon) content.push(() => at(ICON_X, String.fromCharCode(CH.icon + icon.n), icon.ink, '#FFFFFF', pack.iconK * u));
         content.push(() => write(name, x0, 'name', COL.name));
         content.push(() => write(away, x0, 'away', COL.away));
     } else if (what.looking) {

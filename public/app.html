@@ -1086,7 +1086,7 @@ const isChatTeleportMode = () => game?.connector === 'minecraft' && /chat telepo
 function renderChatTeleport() {
   $('chatTitle').textContent = 'Chat Teleport';
   const m = curMode();
-  m.chatTeleport ||= { on: true, seconds: 30, pick: 'most', range: 50000, rangeV: 3, blocked: '', showGame: true, showOverlay: false, boxX: 0, boxY: 40, boxSize: 100 };
+  m.chatTeleport ||= { on: true, seconds: 30, pick: 'most', range: 50000, rangeV: 3, blocked: '', showGame: true, showOverlay: false, boxX: 0, boxY: 40, boxSize: 100, icon3d: true };
   m.chatTeleport.boxX ??= 0; m.chatTeleport.boxY ??= 40; m.chatTeleport.boxSize ??= 100;
   const c = m.chatTeleport;
   $('chatBox').innerHTML = `
@@ -1101,6 +1101,7 @@ function renderChatTeleport() {
       <label>Box left / right<input type="range" min="-100" max="100" step="5" data-k="boxX" value="${c.boxX}"></label>
       <label>Box down / up<input type="range" min="-100" max="100" step="20" data-k="boxY" value="${c.boxY}"></label>
       <label>Box size<input type="range" min="75" max="250" step="25" data-k="boxSize" value="${c.boxSize}"></label>
+      <label class="check" style="flex-direction:row"><input type="checkbox" data-k="icon3d" ${c.icon3d !== false ? 'checked' : ''}> 3D block pictures (like the inventory; untick for flat). This and the box size reach Minecraft the next time you join the world</label>
       <label class="check wide" style="flex-direction:row"><input type="checkbox" data-k="showOverlay" ${c.showOverlay ? 'checked' : ''}> Timer on the stream overlay too (leave it off to add your own in TikTok LIVE Studio)</label>
     </div>
     <div class="row" style="margin-top:12px">

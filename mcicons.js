@@ -111,6 +111,12 @@ export function makeIconReader(jarFile) {
         tex.set(id, img);
         return img;
     };
+    const raws = new Map();
+    const rawTexture = ref => {        // the whole picture (chests' fold-out textures)
+        const id = ref.replace(/^minecraft:/, '');
+        if (!raws.has(id)) { let d = null; try { const b = z.read(`assets/minecraft/textures/${id}.png`); if (b) d = decodePng(b); } catch { } raws.set(id, d); }
+        return raws.get(id);
+    };
     const models = new Map();
     function model(name) {             // textures merged down the parent chain, elements from the nearest model with them
         name = name.replace(/^minecraft:/, '');
@@ -154,21 +160,28 @@ export function makeIconReader(jarFile) {
             canvas[i * 4 + 3] = Math.max(canvas[i * 4 + 3], img[i * 4 + 3]);
         }
     };
+    // its item, else the same thing on a floor (wall banners, wall heads), else how the block itself is drawn
+    function modelFor(id) {
+        const def = json(`assets/minecraft/items/${id}.json`) || json(`assets/minecraft/items/${id.replace('wall_', '')}.json`);
+        let im = itemModel(def?.model);
+        if (!im) {
+            const bs = json(`assets/minecraft/blockstates/${id}.json`) || {};
+            const first = v => Array.isArray(v) ? v[0] : v;
+            const m0 = bs.variants ? first(Object.values(bs.variants)[0])?.model : bs.multipart ? first(bs.multipart[0]?.apply)?.model : null;
+            im = { model: m0 || `minecraft:block/${id}`, tints: [] };
+        }
+        return { m: model(im.model), im };
+    }
+    const faceTint = (f, im, id) => {
+        if (f.tintindex == null) return null;
+        return tintColor(im.tints[f.tintindex], id) || (/grass|fern|vine|sugar|lily/.test(id) ? GRASS : /leaves/.test(id) ? FOLIAGE : /water/.test(id) ? WATER : null);
+    };
     const cache = new Map();
     function icon(id) {
         if (cache.has(id)) return cache.get(id);
         let out = null;
         try {
-            // its item, else the same thing on a floor (wall banners, wall heads), else how the block itself is drawn
-            const def = json(`assets/minecraft/items/${id}.json`) || json(`assets/minecraft/items/${id.replace('wall_', '')}.json`);
-            let im = itemModel(def?.model);
-            if (!im) {
-                const bs = json(`assets/minecraft/blockstates/${id}.json`) || {};
-                const first = v => Array.isArray(v) ? v[0] : v;
-                const m0 = bs.variants ? first(Object.values(bs.variants)[0])?.model : bs.multipart ? first(bs.multipart[0]?.apply)?.model : null;
-                im = { model: m0 || `minecraft:block/${id}`, tints: [] };
-            }
-            const m = model(im.model);
+            const { m, im } = modelFor(id);
             const canvas = Buffer.alloc(16 * 16 * 4);
             let drew = false;
             if (m.textures.layer0) {                       // a flat item picture (doors, flowers...)
@@ -197,7 +210,107 @@ export function makeIconReader(jarFile) {
         cache.set(id, out);
         return out;
     }
-    return { icon, has: id => z.has(`assets/minecraft/items/${id}.json`) || z.has(`assets/minecraft/blockstates/${id}.json`) };
+
+    // A 3D picture, 32x32, the way the inventory shows a block: seen from above, its north face on the
+    // left and west face on the right, shaded like Minecraft (top lightest). Every part of the model is
+    // drawn (stairs, slabs, fences...), nearest on top. Things that are flat in the inventory (flowers,
+    // doors, torches) and things Minecraft draws in code (chests, beds) stay flat, at 2x.
+    const cache3 = new Map();
+    function icon3d(id) {
+        if (cache3.has(id)) return cache3.get(id);
+        const flat = () => {
+            const f = icon(id); if (!f) return null;
+            const o = Buffer.alloc(32 * 32 * 4);
+            for (let y = 0; y < 32; y++) for (let x = 0; x < 32; x++) f.copy(o, (y * 32 + x) * 4, ((y >> 1) * 16 + (x >> 1)) * 4, ((y >> 1) * 16 + (x >> 1)) * 4 + 4);
+            return o;
+        };
+        let out = null;
+        try {
+            const { m, im } = modelFor(id);
+            // chests are drawn by Minecraft in code: build one from its fold-out texture (lid, bottom, latch)
+            const CHESTS = { chest: 'normal', trapped_chest: 'trapped', ender_chest: 'ender' };
+            let elements = m.elements;
+            if (CHESTS[id]) {
+                const T = rawTexture(`entity/chest/${CHESTS[id]}`);
+                if (T) {
+                    const k = T.w / 64;                              // texture scale (64 wide normally)
+                    const region = (x0, y0, w, h, flip) => (sx, ty) => {
+                        const x = Math.floor((x0 + Math.min(0.999, sx) * w) * k), y = Math.floor((y0 + Math.min(0.999, flip ? 1 - ty : ty) * h) * k);
+                        const i = (y * T.w + x) * 4; return [T.px[i], T.px[i + 1], T.px[i + 2], T.px[i + 3]];
+                    };
+                    elements = [
+                        { from: [1, 0, 1], to: [15, 10, 15], sample: { up: region(28, 19, 14, 14), north: region(42, 33, 14, 10, true), west: region(0, 33, 14, 10, true) } },
+                        { from: [1, 9, 1], to: [15, 14, 15], sample: { up: region(28, 0, 14, 14), north: region(42, 14, 14, 5, true), west: region(0, 14, 14, 5, true) } },
+                        { from: [7, 7, 0], to: [9, 11, 1], sample: { up: region(1, 0, 2, 1), north: region(1, 1, 2, 4, true), west: region(0, 1, 1, 4, true) } },
+                    ];
+                }
+            }
+            // water and lava have no model: a full cube of their still texture
+            if (!elements && /^(water|lava)$/.test(id)) {
+                const tex = `minecraft:block/${id}_still`;
+                elements = [{ from: [0, 0, 0], to: [16, 16, 16], faces: { up: { texture: tex }, north: { texture: tex }, west: { texture: tex } } }];
+            }
+            if (!m.textures.layer0 && elements && (!m.builtin || CHESTS[id])) {
+                const S = 32, img = Buffer.alloc(S * S * 4), depth = new Float32Array(S * S).fill(-1e9);
+                const water = /water|bubble_column/.test(id);
+                let drew = false;
+                for (const el of elements) {
+                    if (el.rotation && el.rotation.angle) continue;           // tilted parts (plants' crossed planes): skip
+                    const [fx, fy, fz] = el.from, [tx, ty, tz] = el.to;
+                    const faces = [   // name, shade, world point for (s, t) across the face, default uv
+                        ['up', 1.0, (s, t) => [fx + s * (tx - fx), ty, fz + t * (tz - fz)], [fx, fz, tx, tz]],
+                        ['north', 0.8, (s, t) => [tx - s * (tx - fx), ty - t * (ty - fy), fz], [16 - tx, 16 - ty, 16 - fx, 16 - fy]],
+                        ['west', 0.6, (s, t) => [fx, ty - t * (ty - fy), fz + s * (tz - fz)], [fz, 16 - ty, tz, 16 - fy]],
+                    ];
+                    for (const [name, shade, at, defUv] of faces) {
+                        if (el.sample) {                                     // a part with its own picture (chests)
+                            const fn = el.sample[name]; if (!fn) continue;
+                            const N = 64;
+                            for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
+                                const s0 = (i + 0.5) / N, t0 = (j + 0.5) / N, c = fn(s0, t0);
+                                if (c[3] < 16) continue;
+                                const [x, y, z] = at(s0, t0);
+                                const px = Math.floor(16 - x + z), py = Math.floor((32 - x - z) / 2 + (16 - y));
+                                if (px < 0 || py < 0 || px >= S || py >= S) continue;
+                                const d = -x - z + y, o = py * S + px;
+                                if (d < depth[o]) continue;
+                                depth[o] = d;
+                                for (let q = 0; q < 3; q++) img[o * 4 + q] = Math.round(c[q] * shade);
+                                img[o * 4 + 3] = c[3]; drew = true;
+                            }
+                            continue;
+                        }
+                        const f = el.faces?.[name]; if (!f) continue;
+                        const ref = resolve(m, f.texture), tex = ref && texture(ref); if (!tex) continue;
+                        const tint = water ? WATER : faceTint(f, im, id), uv = f.uv || defUv, rot = ((f.rotation || 0) / 90) & 3;
+                        const N = 64;
+                        for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
+                            const s0 = (i + 0.5) / N, t0 = (j + 0.5) / N;
+                            let s1 = s0, t1 = t0;
+                            for (let k = 0; k < rot; k++) [s1, t1] = [t1, 1 - s1];
+                            const u = Math.min(15, Math.max(0, Math.floor(uv[0] + s1 * (uv[2] - uv[0])))), v = Math.min(15, Math.max(0, Math.floor(uv[1] + t1 * (uv[3] - uv[1]))));
+                            const ti = (v * 16 + u) * 4, a = tex[ti + 3];
+                            if (a < 16) continue;
+                            const [x, y, z] = at(s0, t0);
+                            const px = Math.floor(16 - x + z), py = Math.floor((32 - x - z) / 2 + (16 - y));
+                            if (px < 0 || py < 0 || px >= S || py >= S) continue;
+                            const d = -x - z + y, o = py * S + px;
+                            if (d < depth[o]) continue;
+                            depth[o] = d;
+                            for (let c = 0; c < 3; c++) img[o * 4 + c] = Math.round(tex[ti + c] * (tint ? tint[c] / 255 : 1) * shade);
+                            img[o * 4 + 3] = a;
+                            drew = true;
+                        }
+                    }
+                }
+                if (drew) out = img;
+            }
+        } catch { out = null; }
+        if (!out) out = flat();
+        cache3.set(id, out);
+        return out;
+    }
+    return { icon, icon3d, has: id => z.has(`assets/minecraft/items/${id}.json`) || z.has(`assets/minecraft/blockstates/${id}.json`) };
 }
 
 // What block stands for a structure or biome (the first one this Minecraft has)

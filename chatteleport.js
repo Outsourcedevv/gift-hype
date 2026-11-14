@@ -214,6 +214,7 @@ export function normalizeChatTeleport(c = {}, onByDefault = false) {
         showGame: c.showGame !== false,                 // the timer box in Minecraft (on)
         boxX: n(c.boxX, -100, 100, 0),                  // where the box is: left (-100) to right (100) of the middle of your screen
         boxY: n(c.boxY, -100, 100, 40),                 // down (-100) to up (100)
+        icon3d: c.icon3d !== false,                     // block pictures in 3D (like the inventory) or flat
         boxSize: n(c.boxSize, 50, 250, 100),            // how big, in % (50, 75, 100, 125, 150, 200, 250)
         showOverlay: c.showOverlay === true,            // the timer on the stream overlay (off: add your own in LIVE Studio)
     };

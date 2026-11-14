@@ -63,9 +63,11 @@ CHAT TELEPORT (Minecraft -> Chat Teleport)
   The thing typed MOST wins (one vote per viewer each round), or the LAST one typed. If it isn't near
   you, the next one is tried. A box fixed on your Minecraft screen says "TELEPORT IN" and the seconds
   left (it never says what you're going to or how many votes). After the teleport it shows what you
-  went to, with a picture of the block, and how many blocks away it was. "Box left / right",
+  went to, with a picture of the block (3D like the inventory, or flat: "3D block pictures"), and how
+  many blocks away it was. "Box left / right",
   "Box down / up" and "Box size" set where it sits and how big it is (untick "Box in Minecraft" to hide
-  it). If you move it while you're in the world, the block picture comes back next time you join. The box comes in a small resource pack Gift Hype gives Minecraft when you join your
+  it). If you change its size (or "3D block pictures") while you're in the world, the
+  picture shows again the next time you join: Gift Hype reopens the world once you've left. The box comes in a small resource pack Gift Hype gives Minecraft when you join your
   world (if Minecraft asks, say Yes). On a server of your own it's plain text above the hotbar.
   The stream overlay can show it too ("Timer on the stream overlay"). "Things chat can't pick" keeps
   anything out (e.g. lava). Same gifts as Block Delete Survival. "Try" adds a vote without TikTok;
