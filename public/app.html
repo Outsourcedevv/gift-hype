@@ -1086,7 +1086,8 @@ const isChatTeleportMode = () => game?.connector === 'minecraft' && /chat telepo
 function renderChatTeleport() {
   $('chatTitle').textContent = 'Chat Teleport';
   const m = curMode();
-  m.chatTeleport ||= { on: true, seconds: 30, pick: 'most', range: 96, blocked: '', showGame: true, showOverlay: false };
+  m.chatTeleport ||= { on: true, seconds: 30, pick: 'most', range: 96, blocked: '', showGame: true, showOverlay: false, boxX: 0, boxY: 35, boxSize: 100 };
+  m.chatTeleport.boxX ??= 0; m.chatTeleport.boxY ??= 35; m.chatTeleport.boxSize ??= 100;
   const c = m.chatTeleport;
   $('chatBox').innerHTML = `
     <label class="check"><input type="checkbox" data-k="on" ${c.on ? 'checked' : ''}> Chat picks where you're teleported</label>
@@ -1096,7 +1097,10 @@ function renderChatTeleport() {
       <label>Which wins<select data-k="pick"><option value="most" ${c.pick === 'most' ? 'selected' : ''}>The one typed most (one vote each)</option><option value="last" ${c.pick === 'last' ? 'selected' : ''}>The last one typed</option></select></label>
       <label>Look for blocks within (blocks)<input type="number" min="32" max="160" step="32" data-k="range" value="${c.range}"></label>
       <label class="wide">Things chat can't pick<input type="text" data-k="blocked" value="${esc(c.blocked)}" placeholder="e.g. lava, deep dark, end portal frame"></label>
-      <label class="check wide" style="flex-direction:row"><input type="checkbox" data-k="showGame" ${c.showGame ? 'checked' : ''}> Timer in Minecraft: a bar at the top saying where you're going and when, and the place's name when you land</label>
+      <label class="check wide" style="flex-direction:row"><input type="checkbox" data-k="showGame" ${c.showGame ? 'checked' : ''}> Timer box in Minecraft: "TELEPORT IN" and the seconds, in a box in front of you (it never says what or how many votes)</label>
+      <label>Box left / right<input type="range" min="-100" max="100" step="5" data-k="boxX" value="${c.boxX}"></label>
+      <label>Box down / up<input type="range" min="-100" max="100" step="5" data-k="boxY" value="${c.boxY}"></label>
+      <label>Box size<input type="range" min="40" max="250" step="10" data-k="boxSize" value="${c.boxSize}"></label>
       <label class="check wide" style="flex-direction:row"><input type="checkbox" data-k="showOverlay" ${c.showOverlay ? 'checked' : ''}> Timer on the stream overlay too (leave it off to add your own in TikTok LIVE Studio)</label>
     </div>
     <div class="row" style="margin-top:12px">
@@ -1107,7 +1111,7 @@ function renderChatTeleport() {
   $('chatBox').querySelectorAll('[data-k]').forEach(el => {
     el.onchange = () => {
       const k = el.dataset.k;
-      c[k] = el.type === 'checkbox' ? el.checked : el.type === 'number' ? +el.value : el.value;
+      c[k] = el.type === 'checkbox' ? el.checked : el.type === 'number' || el.type === 'range' ? +el.value : el.value;
       queueSave();
       if (k === 'on') renderChatTeleport();
     };

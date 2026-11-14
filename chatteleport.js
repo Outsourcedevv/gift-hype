@@ -167,19 +167,28 @@ export function normalizeChatTeleport(c = {}, onByDefault = false) {
         pick: c.pick === 'last' ? 'last' : 'most',      // the last thing typed, or the one typed most
         range: n(c.range, 32, 160, 96),                 // how far to look for blocks (structures and biomes: as far as Minecraft looks)
         blocked: String(c.blocked ?? '').slice(0, 2000),
-        showGame: c.showGame !== false,                 // the timer as a bar in Minecraft (on)
+        showGame: c.showGame !== false,                 // the timer box in Minecraft (on)
+        boxX: n(c.boxX, -100, 100, 0),                  // where the box is: left (-100) to right (100) of the middle of your screen
+        boxY: n(c.boxY, -100, 100, 35),                 // down (-100) to up (100)
+        boxSize: n(c.boxSize, 40, 250, 100),            // how big, in %
         showOverlay: c.showOverlay === true,            // the timer on the stream overlay (off: add your own in LIVE Studio)
     };
 }
 
 const txt = (t, color, extra = '') => `{"text":${JSON.stringify(t)},"color":"${color}"${extra}}`;
-const BAR = 'gifthype:chatteleport';
+const BAR = 'gifthype:chatteleport';          // the old timer bar (removed if it's still there)
+// The timer box: a floating text box a few blocks in front of your eyes that follows your view. It only
+// says when you'll be teleported, never what to or how many votes. Where it sits and how big come from
+// the settings. In your own world Gift Hype's pack moves it every tick (smooth); on a server Gift Hype does.
+export const BOX_TAG = 'gh_tpbox', VIEW_TAG = 'gh_tpview';
+export const boxPos = cfg => ({ x: +(-cfg.boxX / 100 * 2.2).toFixed(2), y: +(cfg.boxY / 100 * 1.4 - 0.25).toFixed(2), d: 3 });
+const BOX_BG = 0xD0140A26 | 0;                // dark purple, a little see-through
 
 // target() -> (promise of) { cfg, player } while Chat Teleport is the type playing (world open, you in it), else null.
 // dimOf(player) -> 'overworld' | 'the_nether' | 'the_end'. teleport(player, target, range) -> { away } or throws.
 export function makeChatTeleport({ mc, log, broadcast, target, dimOf, teleport }) {
     let round = null;           // { endsAt, total, votes: Map viewer -> {t, at}, last: {t, by} }
-    let busy = false, barUp = false;
+    let busy = false, boxUp = false, boxFor = null, holdUntil = 0, follow = null;
 
     const blockedSet = cfg => new Set(String(cfg.blocked).toLowerCase().split(/[\s,;]+/).map(s => s.replace(/^minecraft:/, '').replace(/^#/, '')).filter(Boolean));
     const isBlocked = (cfg, t) => { const b = blockedSet(cfg); return b.has(t.filter.replace(/^#?minecraft:/, '')) || b.has(t.label.toLowerCase().replace(/ /g, '_')); };
@@ -203,33 +212,47 @@ export function makeChatTeleport({ mc, log, broadcast, target, dimOf, teleport }
     const newRound = cfg => { round = { endsAt: Date.now() + cfg.seconds * 1000, total: cfg.seconds, votes: new Map(), last: null }; };
     const say = (cfg, d) => { if (cfg.showOverlay) broadcast('chunkchat', d); };
 
-    async function hideBar() { if (barUp) { barUp = false; await mc(`bossbar remove ${BAR}`).catch(() => {}); } }
+    const sel = p => /^\w{1,16}$/.test(p || '') ? `@a[name=${p},limit=1]` : '@p';
+    // the box: made in front of you, kept in front of you, its text changed each second
+    async function showBox(t, cfg, text) {
+        const s = sel(t.player), p = boxPos(cfg), sc = (0.9 * cfg.boxSize / 100).toFixed(2);
+        await mc(`data modify storage gifthype:tpbox pos set value {x:${p.x},y:${p.y},d:${p.d}}`).catch(() => {});
+        if (!boxUp || boxFor !== t.player) {
+            boxUp = true; boxFor = t.player;
+            await mc(`kill @e[type=minecraft:text_display,tag=${BOX_TAG}]`).catch(() => {});
+            await mc(`tag @a remove ${VIEW_TAG}`).catch(() => {});
+            await mc(`tag ${s} add ${VIEW_TAG}`).catch(() => {});
+            await mc(`execute at ${s} anchored eyes positioned ^${p.x} ^${p.y} ^${p.d} run summon minecraft:text_display ~ ~ ~ {Tags:["${BOX_TAG}"],billboard:"center",see_through:1b,shadow:1b,teleport_duration:2,line_width:220,alignment:"center",background:${BOX_BG},brightness:{sky:15,block:15},text:""}`).catch(() => {});
+        }
+        await mc(`data merge entity @e[type=minecraft:text_display,tag=${BOX_TAG},limit=1] {${text ? `text:${text},` : ''}transformation:{left_rotation:[0f,0f,0f,1f],right_rotation:[0f,0f,0f,1f],translation:[0f,0f,0f],scale:[${sc}f,${sc}f,${sc}f]}}`).catch(() => {});
+        // on a server there's no pack to move it: Gift Hype keeps it in front of you, 10 times a second
+        if (!t.pack && !follow) follow = setInterval(() => {
+            if (!boxUp) return;
+            const q = boxPos(cfg);
+            mc(`execute as @e[type=minecraft:text_display,tag=${BOX_TAG}] at ${sel(boxFor)} anchored eyes positioned ^${q.x} ^${q.y} ^${q.d} run tp @s ~ ~ ~`).catch(() => {});
+        }, 100);
+        if (t.pack && follow) { clearInterval(follow); follow = null; }
+    }
+    async function hideBox() {
+        if (follow) { clearInterval(follow); follow = null; }
+        if (boxUp) { boxUp = false; boxFor = null; await mc(`kill @e[type=minecraft:text_display,tag=${BOX_TAG}]`).catch(() => {}); }
+    }
+    const countdown = left => `[${txt('TELEPORT IN\n', 'light_purple', ',"bold":true')},${txt(String(left), left <= 5 ? 'red' : 'white', ',"bold":true')}]`;
 
     let cleaned = false;
     async function tick() {
         if (busy) return;
         busy = true;
         try {
-            // a bar left over from before Gift Hype was restarted
-            if (!cleaned) { cleaned = true; await mc(`bossbar remove ${BAR}`).catch(() => { cleaned = false; }); }
+            // a bar or box left over from before Gift Hype was restarted
+            if (!cleaned) { cleaned = true; await mc(`bossbar remove ${BAR}`).catch(() => { cleaned = false; }); await mc(`kill @e[type=minecraft:text_display,tag=${BOX_TAG}]`).catch(() => {}); }
             const t = await target();
-            if (!t) { if (round || barUp) { round = null; await hideBar(); broadcast('chunkchat', { on: false }); } return; }
+            if (!t) { if (round || boxUp) { round = null; await hideBox(); broadcast('chunkchat', { on: false }); } return; }
             const cfg = t.cfg;
             if (!round) newRound(cfg);
             const st = publicState(cfg);
-            if (cfg.showGame) {
-                if (!barUp) {
-                    barUp = true;
-                    await mc(`bossbar remove ${BAR}`).catch(() => {});
-                    await mc(`bossbar add ${BAR} ${txt('Teleport', 'light_purple')}`).catch(() => {});
-                    for (const c of ['color purple', 'style notched_10', 'players @a']) await mc(`bossbar set ${BAR} ${c}`).catch(() => {});
-                }
-                const what = st.leader ? [txt('Teleporting to ', 'white'), txt(st.leader.label, 'light_purple', ',"bold":true'), txt(st.leader.votes ? ` (${st.leader.votes} vote${st.leader.votes > 1 ? 's' : ''})` : st.leader.by ? ` (${st.leader.by})` : '', 'gray')]
-                    : [txt('Teleport in', 'white')];
-                await mc(`bossbar set ${BAR} name [${[...what, txt(`  ${st.left}s`, 'yellow', ',"bold":true')].join(',')}]`).catch(() => {});
-                await mc(`bossbar set ${BAR} max ${round.total}`).catch(() => {});
-                await mc(`bossbar set ${BAR} value ${st.left}`).catch(() => {});
-            } else await hideBar();
+            if (cfg.showGame) { if (Date.now() >= holdUntil) await showBox(t, cfg, countdown(st.left)); else await showBox(t, cfg, null); }
+            else await hideBox();
             if (Date.now() < round.endsAt) { say(cfg, st); return; }
             await go(t, cfg);
         } finally { busy = false; }
@@ -240,18 +263,14 @@ export function makeChatTeleport({ mc, log, broadcast, target, dimOf, teleport }
         const list = ranking(cfg);
         newRound(cfg);
         if (!list.length) { say(cfg, { ...publicState(cfg), done: { none: true } }); return; }
-        const s = /^\w{1,16}$/.test(t.player || '') ? `@a[name=${t.player},limit=1]` : '@p';
+        const s = sel(t.player);
         const dim = await dimOf(t.player).catch(() => 'overworld');
+        const flash = async (text, color) => { if (cfg.showGame) { holdUntil = Date.now() + 2500; await showBox(t, cfg, `[${txt(text, color, ',"bold":true')}]`); } };
         for (const c of list.slice(0, 4)) {
             if (c.t.dims && !c.t.dims.has(dim)) { log(`Chat Teleport: ${c.t.label} isn't in ${DIM_NAME[dim] || dim}`); continue; }
-            if (cfg.showGame) await mc(`title ${s} actionbar ${txt(`Looking for ${c.t.label}...`, 'light_purple')}`).catch(() => {});
             try {
                 const r = await teleport(t.player, c.t, cfg.range);
-                if (cfg.showGame) {
-                    await mc(`title ${s} times 5 40 10`).catch(() => {});
-                    await mc(`title ${s} subtitle ${txt(`${r.away ? `${r.away} blocks away` : ''}${c.by ? `  picked by ${c.by}` : c.votes ? `  ${c.votes} vote${c.votes > 1 ? 's' : ''}` : ''}`, 'gray')}`).catch(() => {});
-                    await mc(`title ${s} title ${txt(c.t.label, 'light_purple', ',"bold":true')}`).catch(() => {});
-                }
+                await flash('TELEPORTED!', 'light_purple');
                 await mc(`execute at ${s} run playsound minecraft:entity.enderman.teleport master @a ~ ~ ~ 1 1`).catch(() => {});
                 await mc(`execute at ${s} run particle minecraft:portal ~ ~1 ~ 0.6 1 0.6 0.5 120 force`).catch(() => {});
                 log(`Chat Teleport: to ${c.t.label}${r.away ? ` (${r.away} blocks away)` : ''}`);
@@ -259,9 +278,9 @@ export function makeChatTeleport({ mc, log, broadcast, target, dimOf, teleport }
                 return;
             } catch (e) {
                 log(`Chat Teleport: no ${c.t.label} found (${e.message})`);
-                if (cfg.showGame) await mc(`title ${s} actionbar ${txt(`No ${c.t.label} near you`, 'red')}`).catch(() => {});
             }
         }
+        await flash('NOTHING FOUND', 'red');
         say(cfg, { ...publicState(cfg), done: { label: 'NOTHING FOUND', failed: true } });
     }
     setInterval(() => tick().catch(e => log(`Chat Teleport: ${e.message}`)), 1000);

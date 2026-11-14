@@ -50,14 +50,16 @@ CHAT TELEPORT (Minecraft -> Chat Teleport)
   ("crafting", "enchanting"), words in any order ("warm ocean ruin"), split words ("strong hold") and
   ore words ("diamond", "iron" = that ore) all work. Everyday chat ("lol", "gg", "hello") and gift
   names ("rose", "hearts", "galaxy") are ignored.
-  If you'd land inside blocks (buried ores, rock, lava), a pocket 3 wide and 2 high is cleared round
-  you so you can breathe and move.
+  If you'd land inside blocks (buried ores, rock, lava), only the 2 blocks you take up (feet and head)
+  are cleared, so you can breathe; nothing round you is touched.
   You're never sent to another dimension: only things in the dimension you're in count. In the
   Overworld nobody can pick a nether fortress or the End; in the Nether, a village or a cherry grove
   is refused. Blocks are always looked for in the dimension you're in.
   The thing typed MOST wins (one vote per viewer each round), or the LAST one typed. If it isn't near
-  you, the next one is tried. A purple bar at the top of Minecraft says where you're going and the
-  seconds left, and the place's name shows when you land (untick "Timer in Minecraft" to hide it).
+  you, the next one is tried. A box floating in front of you in Minecraft says "TELEPORT IN" and the
+  seconds left, then "TELEPORTED!" (it never says what you're going to or how many votes). It follows
+  your view; "Box left / right", "Box down / up" and "Box size" set where it sits and how big it is
+  (untick "Timer box in Minecraft" to hide it).
   The stream overlay can show it too ("Timer on the stream overlay"). "Things chat can't pick" keeps
   anything out (e.g. lava). Same gifts as Block Delete Survival. "Try" adds a vote without TikTok;
   "Teleport now" ends the round straight away.

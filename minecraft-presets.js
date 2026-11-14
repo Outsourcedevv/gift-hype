@@ -109,10 +109,11 @@ export function makePresets({ mc, log }) {
     // ----- Chat Teleport -----
     // Lands you at x, z: on the ground, or (under) on the highest place you can stand below that height.
     // Water isn't a place spreadplayers will put you, so there it's sea level (you swim).
-    // After a teleport: if your feet or head are inside a block (or lava), a pocket 3x3 and 2 high is
-    // cleared round you, so you can breathe and move (water's left alone: you don't get stuck in it).
+    // After a teleport: if your feet or head are inside a block (or lava), just that block is cleared, so
+    // you have the 2 blocks you take up to breathe in (water's left alone: you don't get stuck in it).
     async function makeRoom(s, p) {
-        for (const dy of [0, 1]) await mc(`execute in ${p.dim} at ${s} unless block ~ ~${dy} ~ #minecraft:air unless block ~ ~${dy} ~ minecraft:water run fill ~-1 ~ ~-1 ~1 ~1 ~1 minecraft:air`).catch(() => {});
+        // just your own space: the block your feet are in and the one your head's in
+        for (const dy of [0, 1]) await mc(`execute in ${p.dim} at ${s} unless block ~ ~${dy} ~ #minecraft:air unless block ~ ~${dy} ~ minecraft:water run setblock ~ ~${dy} ~ minecraft:air`).catch(() => {});
     }
     async function landAt(s, p, x, z, under) {
         if (p.dim === 'minecraft:the_nether' && under == null) under = 120;

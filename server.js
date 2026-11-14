@@ -784,7 +784,8 @@ const chatTeleport = makeChatTeleport({
         const cfg = currentMode(g).chatTeleport;
         if (!cfg?.on) return null;
         const player = g.minecraft.player || await onlinePlayer(g);
-        return player ? { cfg, player } : null;            // the timer waits while nobody's in the world
+        if (isSingle(g) && packNeedsReload) { packNeedsReload = false; await mc('reload'); }
+        return player ? { cfg, player, pack: isSingle(g) } : null;            // the timer waits while nobody's in the world
     },
     dimOf: async player => (await PRESETS[WHERE](player)).dim.replace(/^minecraft:/, ''),
     teleport: (player, t, range) => PRESETS[TELEPORT_TO](player, t, range),
