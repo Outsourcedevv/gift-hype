@@ -98,8 +98,16 @@ const FONT = {
 };
 const CHARS = Object.keys(FONT).join('');
 
-// colours (the Figma design: Gift Hype's navy, sky blue and orange on a light card)
-const COL = { label: '#1474B4', digits: '#E8542A', soon: '#DC2626', name: '#13304A', away: '#1474B4', none: '#DC2626', done: '#1474B4' };
+// The box's colours and words come from Chat Teleport's settings (normalizeChatTeleport); these are the
+// defaults (the Figma design: Gift Hype's navy, sky blue and orange on a light card)
+export const BOX_DEFAULTS = {
+    colFill: '#F4F8FC', colBorder: '#13304A', colStripe: '#4DB3EE', colShade: '#D5E0EA',
+    colLabel: '#1474B4', colDigits: '#E8542A', colWarn: '#DC2626', colName: '#13304A', colAway: '#1474B4', colNone: '#DC2626', colLoading: '#1474B4',
+    txtTeleportIn: 'TELEPORT IN', txtLoading: 'LOADING...', txtNothing: 'NOTHING FOUND', txtAway: 'BLOCKS AWAY', txtTeleported: 'TELEPORTED!',
+};
+// what the box can say: its pixel letters (others are left out), at most 24
+export const boxWords = (v, def) => v == null ? def : String(v).toUpperCase().replace(/[^A-Z0-9 !.'-]/g, '').replace(/\s+/g, ' ').trim().slice(0, 24);
+export const boxColour = (v, def) => /^#[0-9a-f]{6}$/i.test(String(v)) ? String(v).toUpperCase() : def;
 
 // ---- layout (in picture pixels; at size 100% one picture pixel = one GUI pixel) ----
 const BOX_H = 40, CAP = 8, MIN_W = 112;
@@ -130,15 +138,46 @@ function sheet(cols, rows, W, H) {
     }));
     return { put, glyph, png: () => png(cols * W, rows * H, img) };
 }
-function boxSheet(H) {        // left edge, middle slice, right edge, cut from the Figma box
+// The Figma box split into 4 white layers that Minecraft colours as it draws them (so colours change
+// without a new pack): each pixel goes to the layer whose Figma colour it's closest to. Pieces: the
+// left and right edges and middle slices 8 to 128 wide (any width is a sum of them, no overlaps).
+const LAYERS = ['fill', 'shade', 'stripe', 'border'];                 // drawn in this order, border on top
+const LAYER_REF = { border: [19, 48, 74], stripe: [77, 179, 238], fill: [244, 248, 252], shade: [213, 224, 234] };
+const MID_W = [8, 16, 32, 64, 128];
+const BOXCH = { left: l => CH.box + l, right: l => CH.box + 4 + l, mid: (k, l) => CH.box + 8 + k * 4 + l };
+let BOX = null;                      // { alpha(piece, layer) -> (x, y) -> alpha, ink: Map(code -> width) }
+function boxLayers() {
+    if (BOX) return BOX;
     const art = readPng(path.join(ROOT, 'public', 'img', 'hud-box.png'));
-    const s = sheet(3, 1, CAP, H), mid = Math.floor(art.w / 2) - CAP / 2;
-    [0, mid, art.w - CAP].forEach((sx, cell) => {
-        for (let y = 0; y < Math.min(BOX_H, art.h); y++) for (let x = 0; x < CAP; x++) {
-            const i = (y * art.w + sx + x) * 4;
-            s.put(cell, x, y, [art.px[i], art.px[i + 1], art.px[i + 2], art.px[i + 3]]);
-        }
+    const layerOf = (x, y) => {
+        const i = (y * art.w + x) * 4; if (!art.px[i + 3]) return -1;
+        let best = 0, bd = 1e9;
+        LAYERS.forEach((L, li) => { const r = LAYER_REF[L], d = (art.px[i] - r[0]) ** 2 + (art.px[i + 1] - r[1]) ** 2 + (art.px[i + 2] - r[2]) ** 2; if (d < bd) { bd = d; best = li; } });
+        return best;
+    };
+    const mid = Math.floor(art.w / 2);
+    const src = { left: x => x, right: x => art.w - CAP + x, mid: () => mid };   // middle slices repeat the middle column
+    const alpha = (piece, li) => (x, y) => { if (y >= art.h) return 0; const sx = src[piece](x); return layerOf(sx, y) === li ? art.px[(y * art.w + sx) * 4 + 3] : 0; };
+    const ink = new Map();
+    const inkOf = (fn, w) => { let r = 0; for (let x = 0; x < w; x++) for (let y = 0; y < BOX_H; y++) if (fn(x, y)) r = x + 1; return r; };
+    LAYERS.forEach((_, li) => {
+        ink.set(BOXCH.left(li), inkOf(alpha('left', li), CAP));
+        ink.set(BOXCH.right(li), inkOf(alpha('right', li), CAP));
+        MID_W.forEach((w, k) => ink.set(BOXCH.mid(k, li), inkOf(alpha('mid', li), w)));
     });
+    return (BOX = { alpha, ink });
+}
+function boxEdgeSheet(H) {           // 8 cells: left edge layers, then right edge layers
+    const b = boxLayers(), s = sheet(8, 1, CAP, H);
+    LAYERS.forEach((_, li) => [['left', li], ['right', 4 + li]].forEach(([piece, cell]) => {
+        const a = b.alpha(piece, li);
+        for (let y = 0; y < BOX_H; y++) for (let x = 0; x < CAP; x++) { const v = a(x, y); if (v) s.put(cell, x, y, [255, 255, 255, v]); }
+    }));
+    return s.png();
+}
+function boxMidSheet(w, H) {         // 4 cells (layers), w wide
+    const b = boxLayers(), s = sheet(4, 1, w, H);
+    LAYERS.forEach((_, li) => { const a = b.alpha('mid', li); for (let y = 0; y < BOX_H; y++) for (let x = 0; x < w; x++) { const v = a(x, y); if (v) s.put(li, x, y, [255, 255, 255, v]); } });
     return s.png();
 }
 function textSheet(y, H) { const s = sheet(CHARS.length, 1, 6, H); [...CHARS].forEach((c, i) => s.glyph(i, c, 0, y)); return s.png(); }
@@ -199,7 +238,8 @@ function buildPack({ cfg, version }) {
     add('pack.mcmeta', { pack: { description: 'Gift Hype: the Chat Teleport box', pack_format: 15, supported_formats: [15, 999], min_format: 15, max_format: 999 } });
     try { add('pack.png', fs.readFileSync(path.join(ROOT, 'public', 'icon.png'))); } catch { }
     for (const h of CELLS) {
-        add(`assets/gifthype/textures/hud/box${h}.png`, boxSheet(h));
+        add(`assets/gifthype/textures/hud/boxedge${h}.png`, boxEdgeSheet(h));
+        for (const w of MID_W) add(`assets/gifthype/textures/hud/boxmid${w}_${h}.png`, boxMidSheet(w, h));
         ROWS.forEach((y, r) => add(`assets/gifthype/textures/hud/text${r}_${h}.png`, textSheet(y, h)));
         add(`assets/gifthype/textures/hud/digits${h}.png`, digitSheet(h));
     }
@@ -243,7 +283,8 @@ function buildPack({ cfg, version }) {
         const bmp = (file, chars) => ({ type: 'bitmap', file: `gifthype:hud/${file}.png`, height, ascent: p.a, chars });
         const providers = [
             { type: 'space', advances },
-            bmp(`box${p.cell}`, [run(CH.box, 3)]),
+            bmp(`boxedge${p.cell}`, [run(CH.box, 8)]),
+            ...MID_W.map((w, k) => bmp(`boxmid${w}_${p.cell}`, [run(BOXCH.mid(k, 0), 4)])),
             ...ROWS.map((_, r) => bmp(`text${r}_${p.cell}`, [run(CH.text + r * 64, CHARS.length)])),
             bmp(`digits${p.cell}`, [run(CH.digit, 10)]),
         ];
@@ -289,35 +330,49 @@ export function hudTitle(cfg, what) {
         const k = CHARS.indexOf(c); if (k < 0 || !inkCols(c)) return;
         at(xPx + i * 6, String.fromCharCode(CH.text + ROW[row] * 64 + k), inkCols(c), colour);
     });
+    const C = {}; for (const [k, v] of Object.entries(BOX_DEFAULTS)) C[k] = k.startsWith('col') ? boxColour(cfg[k], v) : boxWords(cfg[k], v);
+    const fit = str => Math.max(MIN_W, Math.ceil((inkWidth(str) + 16) / CAP) * CAP);
     let W = MIN_W;
     const content = [];
+    const centred = (str, row, colour) => content.push(() => write(str, Math.round((W - inkWidth(str)) / 2), row, colour));
     if (what.left != null) {
         const n = String(Math.max(0, Math.min(999, what.left)));
-        content.push(() => write('TELEPORT IN', Math.round((W - inkWidth('TELEPORT IN')) / 2), 'label', COL.label));
-        const w = n.length * DIGIT_PITCH - 2, x0 = Math.round((W - w) / 2);
-        content.push(() => [...n].forEach((d, i) => at(x0 + i * DIGIT_PITCH, String.fromCharCode(CH.digit + +d), inkCols(d) * 2, what.left <= 5 ? COL.soon : COL.digits)));
+        W = fit(C.txtTeleportIn);
+        centred(C.txtTeleportIn, 'label', C.colLabel);
+        const w = n.length * DIGIT_PITCH - 2, x0 = Math.round((W - w) / 2), warn = what.left <= (cfg.warnAt ?? 5);
+        content.push(() => [...n].forEach((d, i) => at(x0 + i * DIGIT_PITCH, String.fromCharCode(CH.digit + +d), inkCols(d) * 2, warn ? C.colWarn : C.colDigits)));
     } else if (what.done) {
         const pack = current;
         const block = pack?.reader && what.target ? iconBlockFor(what.target, pack.reader) : null;
-        const icon = block && pack.iconSize === p.size ? pack.iconIndex.get(block) : null;
-        if (block && !icon) lastMissing = pack.iconSize == null ? 'no-pictures' : pack.iconSize !== p.size ? 'other-size' : 'no-picture';
+        const icon = block && cfg.showPicture !== false && pack.iconSize === p.size ? pack.iconIndex.get(block) : null;
+        if (block && !icon && cfg.showPicture !== false) lastMissing = pack.iconSize == null ? 'no-pictures' : pack.iconSize !== p.size ? 'other-size' : 'no-picture';
         let name = String(what.target?.label || 'TELEPORTED').toUpperCase().replace(/[^A-Z0-9 !.'-]/g, ' ').replace(/\s+/g, ' ').trim();
         if (name.length > 24) name = name.slice(0, 23).trim() + '.';
-        const away = what.away ? `${what.away} BLOCK${what.away === 1 ? '' : 'S'} AWAY` : 'TELEPORTED!';
+        // the lines it shows (settings): the name, the distance; neither -> the "teleported" words
+        const lines = [];
+        if (cfg.showName !== false) lines.push([name, C.colName]);
+        if (cfg.showDistance !== false) lines.push(what.away ? [`${what.away} ${C.txtAway}`.trim(), C.colAway] : [C.txtTeleported, C.colAway]);
+        if (!lines.length) lines.push([C.txtTeleported, C.colAway]);
         const x0 = icon ? ICON_X + 32 + 6 : 8;
-        W = Math.ceil(Math.max(96, x0 + Math.max(inkWidth(name), inkWidth(away)) + 8) / CAP) * CAP;   // whole slices (overlaps would show)
+        W = Math.ceil(Math.max(96, x0 + Math.max(...lines.map(l => inkWidth(l[0]))) + 8) / CAP) * CAP;   // whole slices
         if (icon) content.push(() => at(ICON_X, String.fromCharCode(CH.icon + icon.n), icon.ink, '#FFFFFF', pack.iconK * u));
-        content.push(() => write(name, x0, 'name', COL.name));
-        content.push(() => write(away, x0, 'away', COL.away));
+        const rows = lines.length === 2 ? ['name', 'away'] : ['mid'];
+        lines.forEach(([str, col], i) => content.push(() => write(str, x0, rows[i], col)));
     } else if (what.looking) {
-        content.push(() => write('LOOKING...', Math.round((W - inkWidth('LOOKING...')) / 2), 'mid', COL.label));
+        W = fit(C.txtLoading); centred(C.txtLoading, 'mid', C.colLoading);
     } else {
-        content.push(() => write('NOTHING FOUND', Math.round((W - inkWidth('NOTHING FOUND')) / 2), 'mid', COL.none));
+        W = fit(C.txtNothing); centred(C.txtNothing, 'mid', C.colNone);
     }
-    // the box: left edge, middle slices, right edge
-    at(0, String.fromCharCode(CH.box), CAP);
-    for (let x = CAP; x < W - CAP; x += CAP) at(Math.min(x, W - 2 * CAP), String.fromCharCode(CH.box + 1), CAP);
-    at(W - CAP, String.fromCharCode(CH.box + 2), CAP);
+    // the box: 4 layers (fill, bottom shade, top stripe, border), each its own colour: left edge, middle
+    // slices adding up to the width, right edge
+    const bx = boxLayers(), layerCol = { fill: C.colFill, shade: C.colShade, stripe: C.colStripe, border: C.colBorder };
+    const piece = (x, code, col) => { const w = bx.ink.get(code); if (w) at(x, String.fromCharCode(code), w, col); };
+    LAYERS.forEach((L, li) => {
+        piece(0, BOXCH.left(li), layerCol[L]);
+        let x = CAP, rest = W - 2 * CAP;
+        for (let k = MID_W.length - 1; k >= 0; k--) while (rest >= MID_W[k]) { piece(x, BOXCH.mid(k, li), layerCol[L]); x += MID_W[k]; rest -= MID_W[k]; }
+        piece(W - CAP, BOXCH.right(li), layerCol[L]);
+    });
     content.forEach(f => f());
     const dx = Math.round(cfg.boxX * 1.5 / 4 * 2) / 2;           // left/right: up to 150 GUI pixels, in title units
     parts.push([space(W * u - 2 * dx - pen), '#FFFFFF']);

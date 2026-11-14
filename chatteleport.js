@@ -14,7 +14,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { blockGuesses, GROUPS } from './chatdelete.js';
-import { hudTitle, hudMissing } from './hudpack.js';
+import { hudTitle, hudMissing, BOX_DEFAULTS, boxWords, boxColour } from './hudpack.js';
+// the teleport sound (settings: sound)
+export const TP_SOUNDS = { enderman: 'minecraft:entity.enderman.teleport', chorus: 'minecraft:item.chorus_fruit.teleport', level: 'minecraft:entity.player.levelup',
+    orb: 'minecraft:entity.experience_orb.pickup', bell: 'minecraft:block.bell.use', none: null };
 
 const LISTS = JSON.parse(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), 'chatteleport-targets.json'), 'utf8'));
 const BLOCKS = new Set(LISTS.blocks);
@@ -217,6 +220,26 @@ export function normalizeChatTeleport(c = {}, onByDefault = false) {
         icon3d: c.icon3d !== false,                     // block pictures in 3D (like the inventory) or flat
         boxSize: n(c.boxSize, 50, 250, 100),            // how big, in % (50, 75, 100, 125, 150, 200, 250)
         showOverlay: c.showOverlay === true,            // the timer on the stream overlay (off: add your own in LIVE Studio)
+        // ---- the box's look: colours (live, no new pack needed) and words; what the result shows ----
+        ...Object.fromEntries(Object.entries(BOX_DEFAULTS).map(([k, v]) => [k, k.startsWith('col') ? boxColour(c[k], v) : boxWords(c[k], v)])),
+        showPicture: c.showPicture !== false, showName: c.showName !== false, showDistance: c.showDistance !== false,
+        showLoading: c.showLoading !== false,           // "LOADING..." while it searches
+        // ---- timings ----
+        resultSeconds: n(c.resultSeconds, 1, 15, 4),    // how long the result shows
+        pauseWhileLoading: c.pauseWhileLoading !== false, // the next countdown starts after the search and the result
+        warnAt: n(c.warnAt, 0, 30, 5),                  // the last seconds in the warning colour (0: never)
+        warnSound: c.warnSound === true,                // a tick each of those seconds
+        sound: Object.hasOwn(TP_SOUNDS, c.sound) ? c.sound : 'enderman',
+        particles: c.particles !== false,               // portal particles where you land
+        // ---- search ----
+        nearRange: n(c.nearRange, 16, 128, 96),         // the nearby search round you (the whole height of the world)
+        farStructures: c.farStructures !== false,       // far away: look in the structures it's found in
+        farBiomes: c.farBiomes !== false,               // far away: look in the biomes it's found in
+        farOrder: ['nearest', 'structures', 'biomes'].includes(c.farOrder) ? c.farOrder : 'nearest',
+        farSeconds: n(c.farSeconds, 10, 180, 60),       // the most time spent looking far away
+        farTries: n(c.farTries, 1, 6, 3),               // how many far places to look in
+        tryPicks: n(c.tryPicks, 1, 5, 4),               // how many of chat's picks to try before NOTHING FOUND
+        dimOverworld: c.dimOverworld !== false, dimNether: c.dimNether !== false, dimEnd: c.dimEnd !== false,   // where it teleports you
     };
 }
 
@@ -268,7 +291,7 @@ export function makeChatTeleport({ mc, log, broadcast, target, dimOf, teleport }
             if (t.pack) { await mc(`title ${s} reset`).catch(() => {}); await mc(`title ${s} times 0 30 0`).catch(() => {}); }
         }
         if (t.pack) await mc(`title ${s} title ${hudTitle(cfg, what)}`).catch(() => {});
-        else await mc(`title ${s} actionbar ${plain(what)}`).catch(() => {});
+        else await mc(`title ${s} actionbar ${plain(cfg, what)}`).catch(() => {});
     }
     async function hideBox() {
         if (!boxUp) return;
@@ -276,12 +299,13 @@ export function makeChatTeleport({ mc, log, broadcast, target, dimOf, teleport }
         boxUp = false; boxFor = null; last = null;
         await mc(pack ? `title ${s} clear` : `title ${s} actionbar ""`).catch(() => {});
     }
-    const plain = w => w.left != null ? `[${txt('TELEPORT IN ', 'aqua', ',"bold":true')},${txt(String(w.left), w.left <= 5 ? 'red' : 'white', ',"bold":true')}]`
-        : w.looking ? txt('LOOKING...', 'aqua', ',"bold":true')
-        : w.done ? `[${txt(w.target?.label || 'TELEPORTED', 'aqua', ',"bold":true')}${w.away ? ',' + txt(` - ${w.away} blocks away`, 'white') : ''}]`
-        : txt('NOTHING FOUND', 'red', ',"bold":true');
+    // on a server without the pack: text above the hotbar, in the box's words and colours
+    const plain = (c, w) => w.left != null ? `[${txt(c.txtTeleportIn + ' ', c.colLabel, ',"bold":true')},${txt(String(w.left), w.left <= c.warnAt ? c.colWarn : c.colDigits, ',"bold":true')}]`
+        : w.looking ? txt(c.txtLoading, c.colLoading, ',"bold":true')
+        : w.done ? `[${txt(c.showName ? w.target?.label || c.txtTeleported : c.txtTeleported, c.colName, ',"bold":true')}${w.away && c.showDistance ? ',' + txt(` - ${w.away} ${c.txtAway.toLowerCase()}`, c.colAway) : ''}]`
+        : txt(c.txtNothing, c.colNone, ',"bold":true');
 
-    let cleaned = false;
+    let cleaned = false, lastTick = null;
     async function tick() {
         if (busy) return;
         busy = true;
@@ -293,6 +317,10 @@ export function makeChatTeleport({ mc, log, broadcast, target, dimOf, teleport }
             const cfg = t.cfg;
             if (!round) newRound(cfg);
             const st = publicState(cfg);
+            if (cfg.warnSound && cfg.warnAt && st.left > 0 && st.left <= cfg.warnAt && st.left !== lastTick && Date.now() >= holdUntil) {
+                lastTick = st.left;
+                await mc(`execute at ${sel(t.player)} run playsound minecraft:block.note_block.hat master ${sel(t.player)} ~ ~ ~ 1 ${(1 + (cfg.warnAt - st.left) / cfg.warnAt).toFixed(2)}`).catch(() => {});
+            }
             if (cfg.showGame) { if (Date.now() >= holdUntil) await showBox(t, cfg, { left: st.left }); else await showBox(t, cfg, null); }
             else await hideBox();
             if (Date.now() < round.endsAt) { say(cfg, st); return; }
@@ -307,22 +335,35 @@ export function makeChatTeleport({ mc, log, broadcast, target, dimOf, teleport }
         if (!list.length) { say(cfg, { ...publicState(cfg), done: { none: true } }); return; }
         const s = sel(t.player);
         const dim = await dimOf(t.player).catch(() => 'overworld');
-        const flash = async what => { if (cfg.showGame) { holdUntil = Date.now() + 4000; await showBox(t, cfg, what); } };
+        const flash = async what => { if (cfg.showGame) { holdUntil = Date.now() + cfg.resultSeconds * 1000; await showBox(t, cfg, what); } };
+        // dimensions it's turned off in (settings): straight to "nothing found"
+        if (!{ overworld: cfg.dimOverworld, the_nether: cfg.dimNether, the_end: cfg.dimEnd }[dim] && ['overworld', 'the_nether', 'the_end'].includes(dim)) {
+            log(`Chat Teleport: turned off in ${DIM_NAME[dim] || dim}`);
+            await flash({ none: true });
+            if (round && cfg.pauseWhileLoading) round.endsAt = Math.max(Date.now(), holdUntil) + cfg.seconds * 1000;
+            return;
+        }
         // while it looks (far searches take a few seconds), the box says so
         let looking = null;
-        if (cfg.showGame) { await showBox(t, cfg, { looking: true }); looking = setInterval(() => showBox(t, cfg, null).catch(() => {}), 1000); }
-        try { await tryEach(); } finally { if (looking) clearInterval(looking); }
+        if (cfg.showGame && cfg.showLoading) { await showBox(t, cfg, { looking: true }); looking = setInterval(() => showBox(t, cfg, null).catch(() => {}), 1000); }
+        try { await tryEach(); } finally {
+            if (looking) clearInterval(looking);
+            // the next countdown starts now, once the search is done and the result has been shown
+            // (votes typed meanwhile still count for it)
+            if (round && cfg.pauseWhileLoading) round.endsAt = Math.max(Date.now(), holdUntil) + cfg.seconds * 1000;
+        }
         async function tryEach() {
-        for (const c of list.slice(0, 4)) {
+        for (const c of list.slice(0, cfg.tryPicks)) {
             if (c.t.dims && !c.t.dims.has(dim)) { log(`Chat Teleport: ${c.t.label} isn't in ${DIM_NAME[dim] || dim}`); continue; }
             try {
-                const r = await teleport(t.player, { ...c.t, pack: t.pack, far: farHints(c.t) }, cfg.range);
+                const search = { nearRange: cfg.nearRange, farStructures: cfg.farStructures, farBiomes: cfg.farBiomes, farOrder: cfg.farOrder, farSeconds: cfg.farSeconds, farTries: cfg.farTries };
+                const r = await teleport(t.player, { ...c.t, pack: t.pack, far: farHints(c.t), search }, cfg.range);
                 await flash({ done: true, target: c.t, away: r.away || 0 });
                 const why = t.pack && cfg.showGame ? hudMissing() : null;
                 if (why) log(why === 'other-size' ? 'Chat Teleport: the box size changed since you joined, so the block picture shows next time you join the world'
                     : why === 'no-pictures' ? "Chat Teleport: no block pictures (Minecraft's game files weren't found)" : `Chat Teleport: no picture for ${c.t.label}`);
-                await mc(`execute at ${s} run playsound minecraft:entity.enderman.teleport master @a ~ ~ ~ 1 1`).catch(() => {});
-                await mc(`execute at ${s} run particle minecraft:portal ~ ~1 ~ 0.6 1 0.6 0.5 120 force`).catch(() => {});
+                if (TP_SOUNDS[cfg.sound]) await mc(`execute at ${s} run playsound ${TP_SOUNDS[cfg.sound]} master @a ~ ~ ~ 1 1`).catch(() => {});
+                if (cfg.particles) await mc(`execute at ${s} run particle minecraft:portal ~ ~1 ~ 0.6 1 0.6 0.5 120 force`).catch(() => {});
                 log(`Chat Teleport: to ${c.t.label}${r.away ? ` (${r.away} blocks away)` : ''}`);
                 say(cfg, { ...publicState(cfg), done: { label: c.t.label, by: c.by || null, votes: c.votes || null } });
                 return;

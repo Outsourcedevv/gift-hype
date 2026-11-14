@@ -138,6 +138,18 @@ button.icon { padding: 6px 9px; }
 .chatgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px 14px; margin-top: 12px; }
 .chatgrid label { display: flex; flex-direction: column; gap: 5px; font-size: 13px; color: var(--muted); }
 .chatgrid .wide { grid-column: 1 / -1; }
+@font-face { font-family: 'Monocraft'; src: url('/fonts/Monocraft.ttf') format('truetype'); }
+.tpgroup { border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 14px 12px; margin-top: 12px; background: var(--panel-2); }
+.tpgroup > summary { font-weight: 700; color: var(--text); font-size: 14px; }
+.tpgroup .hint { margin-top: 6px; }
+.chatgrid input[type=color] { width: 100%; height: 34px; padding: 2px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); cursor: pointer; }
+.tpprev { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 12px; padding: 14px; border-radius: var(--radius); background: linear-gradient(#7aa8ff, #a9cbff); }
+.tpbox { position: relative; min-width: 150px; padding: 9px 12px 9px; border: 2px solid; font-family: 'Monocraft', monospace; text-align: center; display: flex; align-items: center; gap: 10px; }
+.tpbox::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 4px; background: var(--stripe); }
+.tpbox::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: var(--shade); }
+.tpbox .ln { font-size: 13px; line-height: 1.35; white-space: nowrap; }
+.tpbox .big { font-size: 26px; font-weight: 700; line-height: 1.1; }
+.tpbox .cube { width: 34px; height: 34px; background: linear-gradient(135deg, #6aa84f 0 40%, #8b5a2b 40%); flex: none; }
 .back { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 14px; }
 .steps { margin: 6px 0 12px; padding-left: 22px; display: grid; gap: 10px; line-height: 1.45; }
 .steps code { display: inline-block; margin-top: 4px; word-break: break-all; }
@@ -1104,19 +1116,75 @@ function renderChatTeleport() {
       <label class="check" style="flex-direction:row"><input type="checkbox" data-k="icon3d" ${c.icon3d !== false ? 'checked' : ''}> 3D block pictures (like the inventory; untick for flat). This and the box size reach Minecraft the next time you join the world</label>
       <label class="check wide" style="flex-direction:row"><input type="checkbox" data-k="showOverlay" ${c.showOverlay ? 'checked' : ''}> Timer on the stream overlay too (leave it off to add your own in TikTok LIVE Studio)</label>
     </div>
+    <details class="tpgroup" id="tpLook">
+      <summary>Box look: colours, words, what it shows</summary>
+      <p class="hint">Colours and words change in Minecraft straight away. Words can use A–Z, 0–9 and ! . - ' (the box's pixel letters); leave one empty to show nothing there.</p>
+      <div class="tpprev" id="tpPrev"></div>
+      <div class="chatgrid">
+        ${[['colFill', 'Box'], ['colBorder', 'Border'], ['colStripe', 'Top stripe'], ['colShade', 'Bottom edge'], ['colLabel', '"Teleport in" words'], ['colDigits', 'Seconds'], ['colWarn', 'Last seconds'],
+            ['colName', 'Block name'], ['colAway', 'Distance'], ['colLoading', '"Loading" words'], ['colNone', '"Nothing found" words']]
+            .map(([k, l]) => `<label>${l}<input type="color" data-k="${k}" value="${c[k]}"></label>`).join('')}
+        ${[['txtTeleportIn', 'While counting down'], ['txtLoading', 'While it looks'], ['txtAway', 'After the distance'], ['txtTeleported', 'When there\'s no distance'], ['txtNothing', 'When nothing is found']]
+            .map(([k, l]) => `<label>${l}<input type="text" maxlength="24" data-k="${k}" value="${esc(c[k])}"></label>`).join('')}
+        <label class="check" style="flex-direction:row"><input type="checkbox" data-k="showPicture" ${c.showPicture !== false ? 'checked' : ''}> Block picture</label>
+        <label class="check" style="flex-direction:row"><input type="checkbox" data-k="showName" ${c.showName !== false ? 'checked' : ''}> Block name</label>
+        <label class="check" style="flex-direction:row"><input type="checkbox" data-k="showDistance" ${c.showDistance !== false ? 'checked' : ''}> Distance</label>
+        <label class="check" style="flex-direction:row"><input type="checkbox" data-k="showLoading" ${c.showLoading !== false ? 'checked' : ''}> "Loading" box while it looks</label>
+      </div>
+      <div class="row" style="margin-top:10px"><button class="small ghost" id="tpLookReset">Back to the standard look</button></div>
+    </details>
+    <details class="tpgroup">
+      <summary>Timings and sounds</summary>
+      <div class="chatgrid">
+        <label>Result shows for (seconds)<input type="number" min="1" max="15" data-k="resultSeconds" value="${c.resultSeconds ?? 4}"></label>
+        <label>Last seconds warning (0 = off)<input type="number" min="0" max="30" data-k="warnAt" value="${c.warnAt ?? 5}"></label>
+        <label>Teleport sound<select data-k="sound">${[['enderman', 'Enderman teleport'], ['chorus', 'Chorus fruit'], ['level', 'Level up'], ['orb', 'XP orb'], ['bell', 'Bell'], ['none', 'No sound']]
+            .map(([v, l]) => `<option value="${v}" ${(c.sound || 'enderman') === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+        <label class="check" style="flex-direction:row"><input type="checkbox" data-k="pauseWhileLoading" ${c.pauseWhileLoading !== false ? 'checked' : ''}> Next countdown starts after the search and the result (off: it starts straight away)</label>
+        <label class="check" style="flex-direction:row"><input type="checkbox" data-k="warnSound" ${c.warnSound ? 'checked' : ''}> Tick sound in the last seconds</label>
+        <label class="check" style="flex-direction:row"><input type="checkbox" data-k="particles" ${c.particles !== false ? 'checked' : ''}> Portal particles where you land</label>
+      </div>
+    </details>
+    <details class="tpgroup">
+      <summary>Search</summary>
+      <p class="hint">Blocks are looked for round you first (the whole height of the world). If one isn't there, Gift Hype finds the nearest structures and biomes it's found in and looks there.</p>
+      <div class="chatgrid">
+        <label>Look round you (blocks)<input type="number" min="16" max="128" step="16" data-k="nearRange" value="${c.nearRange ?? 96}"></label>
+        <label>Far away: try first<select data-k="farOrder">${[['nearest', 'Whatever is nearest'], ['structures', 'Structures'], ['biomes', 'Biomes']]
+            .map(([v, l]) => `<option value="${v}" ${(c.farOrder || 'nearest') === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+        <label>Far away: longest search (seconds)<input type="number" min="10" max="180" data-k="farSeconds" value="${c.farSeconds ?? 60}"></label>
+        <label>Far away: places to look in<input type="number" min="1" max="6" data-k="farTries" value="${c.farTries ?? 3}"></label>
+        <label>Chat's picks to try before "nothing found"<input type="number" min="1" max="5" data-k="tryPicks" value="${c.tryPicks ?? 4}"></label>
+        <label class="check" style="flex-direction:row"><input type="checkbox" data-k="farStructures" ${c.farStructures !== false ? 'checked' : ''}> Look in structures</label>
+        <label class="check" style="flex-direction:row"><input type="checkbox" data-k="farBiomes" ${c.farBiomes !== false ? 'checked' : ''}> Look in biomes</label>
+        <label class="check" style="flex-direction:row"><input type="checkbox" data-k="dimOverworld" ${c.dimOverworld !== false ? 'checked' : ''}> Works in the Overworld</label>
+        <label class="check" style="flex-direction:row"><input type="checkbox" data-k="dimNether" ${c.dimNether !== false ? 'checked' : ''}> Works in the Nether</label>
+        <label class="check" style="flex-direction:row"><input type="checkbox" data-k="dimEnd" ${c.dimEnd !== false ? 'checked' : ''}> Works in the End</label>
+      </div>
+    </details>
     <div class="row" style="margin-top:12px">
       <input type="text" id="tpTry" placeholder="Try it: e.g. village, chest, cherry grove" style="flex:1;min-width:180px">
       <button class="small" id="tpTryGo">Try</button>
       <button class="small ghost" id="tpNow">Teleport now</button>
     </div>`;
+  const boxWords = v => String(v).toUpperCase().replace(/[^A-Z0-9 !.'-]/g, '').replace(/\s+/g, ' ').trim().slice(0, 24);
   $('chatBox').querySelectorAll('[data-k]').forEach(el => {
     el.onchange = () => {
       const k = el.dataset.k;
       c[k] = el.type === 'checkbox' ? el.checked : el.type === 'number' || el.type === 'range' ? +el.value : el.value;
+      if (k.startsWith('txt')) { c[k] = boxWords(el.value); el.value = c[k]; }
       queueSave();
+      tpPreview(c);
       if (k === 'on') renderChatTeleport();
     };
+    if (el.type === 'color') el.oninput = () => { c[el.dataset.k] = el.value; tpPreview(c); };
   });
+  $('tpLookReset').onclick = () => {
+    for (const k of Object.keys(TP_LOOK)) c[k] = TP_LOOK[k];
+    Object.assign(c, { showPicture: true, showName: true, showDistance: true, showLoading: true });
+    queueSave(); renderChatTeleport(); $('tpLook').open = true;
+  };
+  tpPreview(c);
   const tryIt = async () => {
     const text = $('tpTry').value.trim();
     if (!text) return;
@@ -1130,6 +1198,23 @@ function renderChatTeleport() {
   $('tpTryGo').onclick = tryIt;
   $('tpTry').onkeydown = e => { if (e.key === 'Enter') tryIt(); };
   $('tpNow').onclick = async () => { try { await flushSave(); await api('/api/chatteleport/now', {}); toast('Teleporting…'); } catch (e) { toast(e.message, true); } };
+}
+// the box's standard look (the same as hudpack.js BOX_DEFAULTS)
+const TP_LOOK = { colFill: '#F4F8FC', colBorder: '#13304A', colStripe: '#4DB3EE', colShade: '#D5E0EA', colLabel: '#1474B4', colDigits: '#E8542A', colWarn: '#DC2626',
+  colName: '#13304A', colAway: '#1474B4', colNone: '#DC2626', colLoading: '#1474B4',
+  txtTeleportIn: 'TELEPORT IN', txtLoading: 'LOADING...', txtNothing: 'NOTHING FOUND', txtAway: 'BLOCKS AWAY', txtTeleported: 'TELEPORTED!' };
+// a rough preview of the box (the real one is pixel letters in Minecraft)
+function tpPreview(c) {
+  const el = $('tpPrev'); if (!el) return;
+  const v = k => c[k] ?? TP_LOOK[k];
+  const box = inner => `<div class="tpbox" style="background:${v('colFill')};border-color:${v('colBorder')};--stripe:${v('colStripe')};--shade:${v('colShade')}">${inner}</div>`;
+  const line = (t, col, cls = 'ln') => t ? `<div class="${cls}" style="color:${col}">${esc(t)}</div>` : '';
+  const done = [c.showName !== false ? line('GRASS BLOCK', v('colName')) : '', c.showDistance !== false ? line(`83 ${v('txtAway')}`, v('colAway')) : ''].join('') || line(v('txtTeleported'), v('colAway'));
+  el.innerHTML = box(`<div style="flex:1">${line(v('txtTeleportIn'), v('colLabel'))}${line('27', v('colDigits'), 'big')}</div>`)
+    + box(`<div style="flex:1">${line(v('txtTeleportIn'), v('colLabel'))}${line('3', v('colWarn'), 'big')}</div>`)
+    + (c.showLoading !== false ? box(`<div style="flex:1">${line(v('txtLoading'), v('colLoading'))}</div>`) : '')
+    + box(`${c.showPicture !== false ? '<div class="cube"></div>' : ''}<div style="text-align:left">${done}</div>`)
+    + box(`<div style="flex:1">${line(v('txtNothing'), v('colNone'))}</div>`);
 }
 const isChunkChatMode = () => game?.connector === 'minecraft' && /chunk chat/i.test(curMode().name || '');
 function renderChat() {

@@ -44,7 +44,7 @@ CHAT TELEPORT (Minecraft -> Chat Teleport)
       is found in (cactus: deserts; bell: villages; spawner: mineshafts, fortresses...), loads it and
       looks there: up to 50,000 blocks away ("Look for blocks up to"). Nothing is loaded ahead of
       time: Minecraft knows where biomes and structures are without loading the land, so only the
-      spot it lands on is loaded. Further away takes longer. The box says "LOOKING..." meanwhile. You land standing on it. Nothing in the
+      spot it lands on is loaded. Further away takes longer. The box says "LOADING..." meanwhile. You land standing on it. Nothing in the
       world is changed to find it.
     - a structure: all 34 (village, trial chamber, ancient city, stronghold, woodland mansion, witch
       hut, ocean monument, shipwreck, ruined portal, mineshaft, nether fortress, bastion, end city...).
@@ -69,6 +69,15 @@ CHAT TELEPORT (Minecraft -> Chat Teleport)
   it). If you change its size (or "3D block pictures") while you're in the world, the
   picture shows again the next time you join: Gift Hype reopens the world once you've left. The box comes in a small resource pack Gift Hype gives Minecraft when you join your
   world (if Minecraft asks, say Yes). On a server of your own it's plain text above the hotbar.
+  More settings, in three sections under the box settings:
+    - Box look: a colour for every part of the box and each line of words, your own words ("TELEPORT IN",
+      "LOADING...", "BLOCKS AWAY"...; letters, numbers and ! . - '), and whether it shows the picture, the
+      name, the distance and the "Loading" box. These change in Minecraft straight away. "Back to the
+      standard look" undoes them.
+    - Timings and sounds: how long the result shows, whether the next countdown waits for the search,
+      the last seconds warning (colour, tick sound), the teleport sound and the portal particles.
+    - Search: how far round you it looks, structures and/or biomes far away (and which first), the
+      longest far search, how many places, how many of chat's picks to try, and the dimensions it works in.
   The stream overlay can show it too ("Timer on the stream overlay"). "Things chat can't pick" keeps
   anything out (e.g. lava). Same gifts as Block Delete Survival. "Try" adds a vote without TikTok;
   "Teleport now" ends the round straight away.

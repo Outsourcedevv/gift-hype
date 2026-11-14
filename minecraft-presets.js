@@ -165,6 +165,9 @@ export function makePresets({ mc, log }) {
     async function findFar(p, t, range) {
         const dim = p.dim.replace(/^minecraft:/, ''), d = t.far?.dims?.[dim];
         if (!d) return null;
+        // the settings (Chat Teleport's search): which kinds, which first, how long, how many places
+        const o = t.search || {}, useS = o.farStructures !== false, useB = o.farBiomes !== false;
+        const until = Date.now() + (o.farSeconds ?? 60) * 1000, tries = o.farTries ?? 3;
         const spots = [];
         const locate = async (kind, what, ox = p.x, oz = p.z) => {
             const reply = String(await mc(`execute in ${p.dim} positioned ${ox.toFixed(1)} ${p.y.toFixed(1)} ${oz.toFixed(1)} run locate ${kind} ${what}`).catch(e => e.message));
@@ -175,11 +178,10 @@ export function makePresets({ mc, log }) {
         };
         const names = kind => t.pack ? [`#gifthype:tp/${dim}/${t.far.key}`]
             : (kind === 'structure' ? d.structures.slice(0, 4) : d.biomes.slice(0, 3)).map(x => `minecraft:${x}`);
-        if (d.structures.length) for (const w of names('structure')) await locate('structure', w);
-        if (d.biomes.length) {
+        if (useS && d.structures.length) for (const w of names('structure')) await locate('structure', w);
+        if (useB && d.biomes.length) {
             for (const w of names('biome')) await locate('biome', w);
-            // nothing within Minecraft's 6,400: rings of points further out, nearest ring first (a minute at most)
-            const until = Date.now() + 60000;
+            // nothing within Minecraft's 6,400: rings of points further out, nearest ring first (till the time's up)
             for (let R = 12000; !spots.length && R - 6400 <= range && Date.now() < until; R += 12000) {
                 const n = Math.ceil(2 * Math.PI * R / 10000);
                 for (let i = 0; i < n && Date.now() < until; i++) {
@@ -188,8 +190,10 @@ export function makePresets({ mc, log }) {
                 }
             }
         }
-        spots.sort((a, b) => a.away - b.away);
-        for (const sp of spots.slice(0, 3)) {
+        const first = o.farOrder === 'structures' ? 'structure' : o.farOrder === 'biomes' ? 'biome' : null;
+        spots.sort((a, b) => (first ? (a.kind !== first) - (b.kind !== first) : 0) || a.away - b.away);
+        for (const sp of spots.slice(0, tries)) {
+            if (Date.now() > until) break;
             // biomes: where it starts is the edge, so look a little further in too
             const tries = sp.kind === 'biome' ? [0, 64] : [0];
             for (const extra of tries) {
@@ -234,7 +238,7 @@ export function makePresets({ mc, log }) {
             return { x, z, away: +(/\((\d+) blocks? away\)/.exec(reply)?.[1] || 0) };
         }
         // nearby first (the land that's loaded round you), then far away
-        const near = Math.min(range, 96);
+        const near = Math.min(range, t.search?.nearRange ?? 96);
         let hit = await findBlock(p, t.filter, near);
         if (!hit && range > near && t.far) hit = await findFar(p, t, range);
         if (!hit) throw new Error(t.far ? `none within ${range} blocks` : `none within ${near} blocks (and it isn't found in any particular biome or structure)`);
