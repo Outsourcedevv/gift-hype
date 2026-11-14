@@ -22,6 +22,7 @@ import { Rcon } from 'rcon-client';
 import { WebSocketServer } from 'ws';
 import { makePresets, MOBS, DELETE_BLOCKS, FILL_CHUNK, TELEPORT_TO, WHERE } from './minecraft-presets.js';
 import { makeChatTeleport, normalizeChatTeleport } from './chatteleport.js';
+import { hudPack, hudProps } from './hudpack.js';
 import { makeChunkChat, normalizeChunkChat } from './chunkchat.js';
 import { makeChatDelete, normalizeChatDelete } from './chatdelete.js';
 import { listWorlds, installPack, singleplayerCommands } from './singleplayer.js';
@@ -611,6 +612,10 @@ async function connectMinecraft() {
             // the Dropper world is made the first time, on your newest world's Minecraft version, but never
             // older than the one its pack is made for (the launcher's "Gift Hype" install gets that version)
             const opts = isDropper(g) ? { version: newWorldVersion(), props: DROPPER_PROPS, atLeast: DROPPER_MC } : {};
+            // the Chat Teleport box pack, from Gift Hype (block pictures from this world's Minecraft)
+            let mcVersion = opts.version; try { mcVersion = worldVersion(world) || mcVersion; } catch { }
+            const tpCfg = (g.modes || []).find(m => /chat teleport/i.test(m.name || ''))?.chatTeleport || normalizeChatTeleport({});
+            try { opts.props = [...(opts.props || []), ...hudProps(settings.port, tpCfg, mcVersion)]; } catch (e) { log(`Couldn't make the Chat Teleport box pack: ${e.message}`); }
             localServer.start(world, { eula: settings.mcEula, ...opts }).catch(e => { log(`Couldn't open the world: ${e.message}`); setStatus({ minecraft: 'world failed' }); });
             return;
         }
@@ -1310,6 +1315,12 @@ const server = http.createServer(async (req, res) => {
 
     if (STATIC[url.pathname]) return send(res, 200, fs.readFileSync(path.join(ROOT, 'public', STATIC[url.pathname])), 'text/html; charset=utf-8');
     if (url.pathname === '/icon.png') return send(res, 200, fs.readFileSync(path.join(ROOT, 'public', 'icon.png')), 'image/png');
+    // the resource pack the hidden server hands to Minecraft (Chat Teleport's on-screen timer box)
+    if (req.method === 'GET' && url.pathname === '/mc/gifthype-hud.zip') {
+        const p = hudPack();
+        res.writeHead(200, { 'Content-Type': 'application/zip', 'Content-Length': p.data.length });
+        return res.end(p.data);
+    }
     if (req.method === 'GET' && /^\/fonts\/[\w-]+\.ttf$/.test(url.pathname)) {
         const f = path.join(ROOT, 'public', url.pathname);
         if (fs.existsSync(f)) { res.writeHead(200, { 'Content-Type': 'font/ttf', 'Cache-Control': 'max-age=86400', 'Access-Control-Allow-Origin': '*' }); return res.end(fs.readFileSync(f)); }

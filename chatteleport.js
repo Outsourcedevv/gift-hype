@@ -14,6 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { blockGuesses, GROUPS } from './chatdelete.js';
+import { hudTitle } from './hudpack.js';
 
 const LISTS = JSON.parse(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), 'chatteleport-targets.json'), 'utf8'));
 const BLOCKS = new Set(LISTS.blocks);
@@ -169,26 +170,25 @@ export function normalizeChatTeleport(c = {}, onByDefault = false) {
         blocked: String(c.blocked ?? '').slice(0, 2000),
         showGame: c.showGame !== false,                 // the timer box in Minecraft (on)
         boxX: n(c.boxX, -100, 100, 0),                  // where the box is: left (-100) to right (100) of the middle of your screen
-        boxY: n(c.boxY, -100, 100, 35),                 // down (-100) to up (100)
-        boxSize: n(c.boxSize, 40, 250, 100),            // how big, in %
+        boxY: n(c.boxY, -100, 100, 40),                 // down (-100) to up (100)
+        boxSize: n(c.boxSize, 50, 250, 100),            // how big, in % (50, 75, 100, 125, 150, 200, 250)
         showOverlay: c.showOverlay === true,            // the timer on the stream overlay (off: add your own in LIVE Studio)
     };
 }
 
 const txt = (t, color, extra = '') => `{"text":${JSON.stringify(t)},"color":"${color}"${extra}}`;
 const BAR = 'gifthype:chatteleport';          // the old timer bar (removed if it's still there)
-// The timer box: a floating text box a few blocks in front of your eyes that follows your view. It only
-// says when you'll be teleported, never what to or how many votes. Where it sits and how big come from
-// the settings. In your own world Gift Hype's pack moves it every tick (smooth); on a server Gift Hype does.
-export const BOX_TAG = 'gh_tpbox', VIEW_TAG = 'gh_tpview';
-export const boxPos = cfg => ({ x: +(-cfg.boxX / 100 * 2.2).toFixed(2), y: +(cfg.boxY / 100 * 1.4 - 0.25).toFixed(2), d: 3 });
-const BOX_BG = 0xD0140A26 | 0;                // dark purple, a little see-through
+// The timer box: fixed on your screen, like the hotbar. In your own world (Gift Hype's hidden server) it's
+// a box drawn by Gift Hype's resource pack (hudpack.js), placed and sized from the settings; on a server
+// without the pack it's plain text above the hotbar. While it counts down it only says when (never what
+// to or how many votes); after a teleport it shows what you went to, its picture and how far away it was.
+export const BOX_TAG = 'gh_tpbox';           // the old floating box (removed if it's still there)
 
 // target() -> (promise of) { cfg, player } while Chat Teleport is the type playing (world open, you in it), else null.
 // dimOf(player) -> 'overworld' | 'the_nether' | 'the_end'. teleport(player, target, range) -> { away } or throws.
 export function makeChatTeleport({ mc, log, broadcast, target, dimOf, teleport }) {
     let round = null;           // { endsAt, total, votes: Map viewer -> {t, at}, last: {t, by} }
-    let busy = false, boxUp = false, boxFor = null, holdUntil = 0, follow = null;
+    let busy = false, boxUp = false, boxFor = null, boxPack = false, last = null, holdUntil = 0;
 
     const blockedSet = cfg => new Set(String(cfg.blocked).toLowerCase().split(/[\s,;]+/).map(s => s.replace(/^minecraft:/, '').replace(/^#/, '')).filter(Boolean));
     const isBlocked = (cfg, t) => { const b = blockedSet(cfg); return b.has(t.filter.replace(/^#?minecraft:/, '')) || b.has(t.label.toLowerCase().replace(/ /g, '_')); };
@@ -213,31 +213,28 @@ export function makeChatTeleport({ mc, log, broadcast, target, dimOf, teleport }
     const say = (cfg, d) => { if (cfg.showOverlay) broadcast('chunkchat', d); };
 
     const sel = p => /^\w{1,16}$/.test(p || '') ? `@a[name=${p},limit=1]` : '@p';
-    // the box: made in front of you, kept in front of you, its text changed each second
-    async function showBox(t, cfg, text) {
-        const s = sel(t.player), p = boxPos(cfg), sc = (0.9 * cfg.boxSize / 100).toFixed(2);
-        await mc(`data modify storage gifthype:tpbox pos set value {x:${p.x},y:${p.y},d:${p.d}}`).catch(() => {});
-        if (!boxUp || boxFor !== t.player) {
-            boxUp = true; boxFor = t.player;
-            await mc(`kill @e[type=minecraft:text_display,tag=${BOX_TAG}]`).catch(() => {});
-            await mc(`tag @a remove ${VIEW_TAG}`).catch(() => {});
-            await mc(`tag ${s} add ${VIEW_TAG}`).catch(() => {});
-            await mc(`execute at ${s} anchored eyes positioned ^${p.x} ^${p.y} ^${p.d} run summon minecraft:text_display ~ ~ ~ {Tags:["${BOX_TAG}"],billboard:"center",see_through:1b,shadow:1b,teleport_duration:2,line_width:220,alignment:"center",background:${BOX_BG},brightness:{sky:15,block:15},text:""}`).catch(() => {});
+    // the box: sent again every second (it stays up 1.5 s), so it goes away by itself if Gift Hype stops
+    async function showBox(t, cfg, what) {
+        const s = sel(t.player);
+        if (what) last = what; else what = last;
+        if (!what) return;
+        if (!boxUp || boxFor !== t.player || boxPack !== t.pack) {
+            if (boxUp) await hideBox();
+            boxUp = true; boxFor = t.player; boxPack = t.pack;
+            if (t.pack) { await mc(`title ${s} reset`).catch(() => {}); await mc(`title ${s} times 0 30 0`).catch(() => {}); }
         }
-        await mc(`data merge entity @e[type=minecraft:text_display,tag=${BOX_TAG},limit=1] {${text ? `text:${text},` : ''}transformation:{left_rotation:[0f,0f,0f,1f],right_rotation:[0f,0f,0f,1f],translation:[0f,0f,0f],scale:[${sc}f,${sc}f,${sc}f]}}`).catch(() => {});
-        // on a server there's no pack to move it: Gift Hype keeps it in front of you, 10 times a second
-        if (!t.pack && !follow) follow = setInterval(() => {
-            if (!boxUp) return;
-            const q = boxPos(cfg);
-            mc(`execute as @e[type=minecraft:text_display,tag=${BOX_TAG}] at ${sel(boxFor)} anchored eyes positioned ^${q.x} ^${q.y} ^${q.d} run tp @s ~ ~ ~`).catch(() => {});
-        }, 100);
-        if (t.pack && follow) { clearInterval(follow); follow = null; }
+        if (t.pack) await mc(`title ${s} title ${hudTitle(cfg, what)}`).catch(() => {});
+        else await mc(`title ${s} actionbar ${plain(what)}`).catch(() => {});
     }
     async function hideBox() {
-        if (follow) { clearInterval(follow); follow = null; }
-        if (boxUp) { boxUp = false; boxFor = null; await mc(`kill @e[type=minecraft:text_display,tag=${BOX_TAG}]`).catch(() => {}); }
+        if (!boxUp) return;
+        const s = sel(boxFor), pack = boxPack;
+        boxUp = false; boxFor = null; last = null;
+        await mc(pack ? `title ${s} clear` : `title ${s} actionbar ""`).catch(() => {});
     }
-    const countdown = left => `[${txt('TELEPORT IN\n', 'light_purple', ',"bold":true')},${txt(String(left), left <= 5 ? 'red' : 'white', ',"bold":true')}]`;
+    const plain = w => w.left != null ? `[${txt('TELEPORT IN ', 'aqua', ',"bold":true')},${txt(String(w.left), w.left <= 5 ? 'red' : 'white', ',"bold":true')}]`
+        : w.done ? `[${txt(w.target?.label || 'TELEPORTED', 'aqua', ',"bold":true')}${w.away ? ',' + txt(` - ${w.away} blocks away`, 'white') : ''}]`
+        : txt('NOTHING FOUND', 'red', ',"bold":true');
 
     let cleaned = false;
     async function tick() {
@@ -251,7 +248,7 @@ export function makeChatTeleport({ mc, log, broadcast, target, dimOf, teleport }
             const cfg = t.cfg;
             if (!round) newRound(cfg);
             const st = publicState(cfg);
-            if (cfg.showGame) { if (Date.now() >= holdUntil) await showBox(t, cfg, countdown(st.left)); else await showBox(t, cfg, null); }
+            if (cfg.showGame) { if (Date.now() >= holdUntil) await showBox(t, cfg, { left: st.left }); else await showBox(t, cfg, null); }
             else await hideBox();
             if (Date.now() < round.endsAt) { say(cfg, st); return; }
             await go(t, cfg);
@@ -265,12 +262,12 @@ export function makeChatTeleport({ mc, log, broadcast, target, dimOf, teleport }
         if (!list.length) { say(cfg, { ...publicState(cfg), done: { none: true } }); return; }
         const s = sel(t.player);
         const dim = await dimOf(t.player).catch(() => 'overworld');
-        const flash = async (text, color) => { if (cfg.showGame) { holdUntil = Date.now() + 2500; await showBox(t, cfg, `[${txt(text, color, ',"bold":true')}]`); } };
+        const flash = async what => { if (cfg.showGame) { holdUntil = Date.now() + 4000; await showBox(t, cfg, what); } };
         for (const c of list.slice(0, 4)) {
             if (c.t.dims && !c.t.dims.has(dim)) { log(`Chat Teleport: ${c.t.label} isn't in ${DIM_NAME[dim] || dim}`); continue; }
             try {
                 const r = await teleport(t.player, c.t, cfg.range);
-                await flash('TELEPORTED!', 'light_purple');
+                await flash({ done: true, target: c.t, away: r.away || 0 });
                 await mc(`execute at ${s} run playsound minecraft:entity.enderman.teleport master @a ~ ~ ~ 1 1`).catch(() => {});
                 await mc(`execute at ${s} run particle minecraft:portal ~ ~1 ~ 0.6 1 0.6 0.5 120 force`).catch(() => {});
                 log(`Chat Teleport: to ${c.t.label}${r.away ? ` (${r.away} blocks away)` : ''}`);
@@ -280,7 +277,7 @@ export function makeChatTeleport({ mc, log, broadcast, target, dimOf, teleport }
                 log(`Chat Teleport: no ${c.t.label} found (${e.message})`);
             }
         }
-        await flash('NOTHING FOUND', 'red');
+        await flash({ none: true });
         say(cfg, { ...publicState(cfg), done: { label: 'NOTHING FOUND', failed: true } });
     }
     setInterval(() => tick().catch(e => log(`Chat Teleport: ${e.message}`)), 1000);

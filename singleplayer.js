@@ -220,11 +220,7 @@ function packFiles(nukeSizes) {
         'scoreboard objectives add gh_jail dummy', 'scoreboard objectives add gh_js dummy', 'scoreboard objectives add gh_v dummy',
         'scoreboard players set #16 gh_v 16', 'scoreboard players set #20 gh_v 20', 'scoreboard players set #6 gh_v 6', 'scoreboard players set #4 gh_v 4',
     ]);
-    // Chat Teleport's timer box: kept a few blocks in front of your eyes (where: storage gifthype:tpbox pos)
-    fn('tpbox/follow', ['function gifthype:tpbox/move with storage gifthype:tpbox pos']);
-    fn('tpbox/move', ['$execute at @p[tag=gh_tpview] anchored eyes positioned ^$(x) ^$(y) ^$(d) run tp @s ~ ~ ~']);
     fn('tick', [
-        'execute as @e[type=minecraft:text_display,tag=gh_tpbox] run function gifthype:tpbox/follow',
         'execute as @e[type=minecraft:block_display,tag=gh_part] at @s run tp @s ~ ~-0.6 ~',
         'execute as @e[type=minecraft:block_display,tag=gh_nuke] at @s run function gifthype:nuke/fall',
         'execute as @e[type=minecraft:marker,tag=gh_boom] at @s run function gifthype:nuke/boom',
