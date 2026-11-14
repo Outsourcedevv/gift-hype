@@ -26,7 +26,7 @@ import { makeChatDelete, normalizeChatDelete } from './chatdelete.js';
 import { listWorlds, installPack, singleplayerCommands } from './singleplayer.js';
 import { makeLocalServer, setupLauncher, openLauncher, worldVersion } from './localserver.js';
 import { checkForUpdate, applyUpdate, localVersion } from './updater.js';
-import { DROPPER_WORLD, DROPPER_MC, DROPPER_PROPS, DROPPER_ACTIONS, LEVELS as DROPPER_LEVELS, installDropperPack, wheelAmounts, installDropperBuildPack, removeDropperBuildPack, dropperCommands, dropperAlertText, buildDropper, dropperBuilt, markDropperBuilt, dropperProgress } from './dropper.js';
+import { DROPPER_WORLD, DROPPER_MC, DROPPER_PROPS, DROPPER_ACTIONS, SECRET as DROPPER_LEVELS, installDropperPack, wheelAmounts, installDropperBuildPack, removeDropperBuildPack, dropperCommands, dropperAlertText, buildDropper, dropperBuilt, markDropperBuilt, dropperProgress } from './dropper.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const DATA = path.join(ROOT, 'data');
@@ -660,7 +660,7 @@ async function buildDropperWorld() {
     if (dropperBuilding) return;
     dropperBuilding = true;
     const start = dropperProgress() + 1;
-    log(start > 1 ? `Building the Dropper: carrying on from level ${start}...` : `Building the Dropper: ${DROPPER_LEVELS} levels (up to an hour, only the first time)...`);
+    log(start > 1 ? `Building the Dropper: carrying on from level ${start}...` : `Building the Dropper: ${DROPPER_LEVELS - 1} levels and a secret one (up to an hour, only the first time)...`);
     setStatus({ dropper: `building ${start - 1}/${DROPPER_LEVELS}` });
     try {
         // the building functions are a pack of their own, only in the world while it builds,

@@ -63,15 +63,31 @@ CHAT BLOCK DELETE (Minecraft -> Block Delete Survival)
   block in the Try box to test it without TikTok; "Stop all countdowns" cancels them.
 
 THE DROPPER (Minecraft -> Dropper)
-  100 dropper levels in 10 chapters (Dawn Gardens, Sunstone Halls, Tidal Vaults, Cherry Grove,
-  Frostpeak, Ember Depths, Verdant Wilds, Clockwork Foundry, Shadow Realm, Golden Ascent), each level
-  with its own name and design, slowly getting harder. Each level is a big shaft (up to 69 blocks
-  across) with a fall of 340 to 690 blocks. Gift Hype makes its own world for it ("Gift Hype Dropper
-  2", with a taller sky than normal worlds) and builds the levels the first time. That takes a while;
-  the Dropper type shows how far it is. If it stops (you close Gift Hype or switch type), it carries on
-  from the same level next time. Press Play Minecraft, then Play in the launcher.
-  ("Gift Hype Dropper", the first Dropper world with the shorter levels, isn't used any more. You can
-  delete it in Minecraft's Singleplayer list.)
+  100 dropper levels, every one a place: Flower Meadow, Candy Land, Picnic Party, Desert Tomb, Coral
+  Reef, Sky Temple, Jungle Temple, Mushroom Grove, Bee Hive, Ice Spikes, Winter Gifts, Crystal Cave,
+  Copper Works, Lava Forge, Nether Fortress, Haunted House, Night City, Neon Grid, Nightclub, Outer
+  Space, Gold Mine, Rainbow Road and the Royal Palace (level 100). Bright and friendly first, darker
+  and wilder later. Each is a huge shaft (73 to 109 blocks across) with a fall of 680 to 1380 blocks.
+  Its walls belong to the theme (candy-cane spirals, picnic checks, speakers, city windows, stars,
+  ice streaks, a rainbow spiral...), and its few big layers far apart are tiled to match, each with
+  a giant centrepiece filling the shaft wall to wall round the spot you drop through: a starburst, sun, spiral, target, flower,
+  donut, pizza, toadstool, snowflake, jack-o'-lantern, gear, gem, planet... Later on there are fake
+  spots with the same centrepiece. The landing floor matches too (checks, a dance floor, confetti),
+  with the pool in a centrepiece. The spots never line up: you steer the whole way down. A few
+  levels are much harder than the ones round them. On the bridge, "FAILS HERE" counts how many times
+  you've failed that level; entering a level shows its theme and name, and every 10 levels there's a
+  "LEVELS DONE!" banner. The levels climb as you go: level 1 starts at y=600 and
+  each level a little higher, up to y=1200 at level 100. Gift Hype makes its own world for it ("Gift Hype Dropper 4", reaching from y=-512 up to y=1535, on Minecraft 26.2) and builds the levels
+  the first time. That takes up to an hour; the Dropper type shows how far it is. If it stops (you
+  close Gift Hype or switch type), it carries on from the same level next time. Press Play Minecraft,
+  then Play in the launcher.
+  ("Gift Hype Dropper", "Gift Hype Dropper 2" and "Gift Hype Dropper 3", the older Dropper worlds,
+  aren't used any more. You can delete them in Minecraft's Singleplayer list.)
+  SECRET LEVEL 101: nothing shows it's there (the bar says LEVEL 100 / 100). Beat level 100 and
+  instead of the winners' platform you're taken to level 101, "Ascension", at y=1500: the hardest
+  level (black, purple and gold, 7 layers, an 850 block fall, a 1x1 pool). You get one try: touch
+  anything and you're back on level 100. Level-up gifts and the slot machine can't take you there or
+  move you on it. Land in its pool and you've beaten every level.
   Each level starts on a small bridge at the top: walk to the end and drop in. Land in the water at the
   bottom and you go straight to the next level; touch anything else and you start that level again.
   "LEVEL 07 / 100" is at the top of your screen, fails and punches ON/OFF at the bottom, and the reset
