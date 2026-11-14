@@ -157,6 +157,69 @@ export function makePresets({ mc, log }) {
         if (used) await mc(`execute in ${p.dim} run fill ${dest.join(' ')} ${dest[0] + 31} ${dest[1] + 31} ${dest[2] + 31} minecraft:air strict`).catch(() => {});
         return box && { x: box[0], y: box[1], z: box[2] };
     }
+    // Far away blocks: Minecraft finds the nearest biome or structure the block is found in (t.far, from
+    // chatteleport.js; with Gift Hype's pack that's one /locate of a tag), Gift Hype loads the land
+    // round it and looks there. Up to 3 places, nearest first. Returns { x, y, z } or null.
+    // Minecraft only looks for biomes 6,400 blocks out, so past that Gift Hype asks again from points in
+    // rings further out (nothing gets loaded for that: Minecraft knows biomes without loading the land).
+    async function findFar(p, t, range) {
+        const dim = p.dim.replace(/^minecraft:/, ''), d = t.far?.dims?.[dim];
+        if (!d) return null;
+        const spots = [];
+        const locate = async (kind, what, ox = p.x, oz = p.z) => {
+            const reply = String(await mc(`execute in ${p.dim} positioned ${ox.toFixed(1)} ${p.y.toFixed(1)} ${oz.toFixed(1)} run locate ${kind} ${what}`).catch(e => e.message));
+            const m = /at \[(-?\d+), (~|-?\d+), (-?\d+)\]/.exec(reply);
+            if (!m) return;
+            const x = +m[1], z = +m[3], away = Math.round(Math.hypot(x - p.x, z - p.z));
+            if (away <= range) spots.push({ x, y: m[2] === '~' ? null : +m[2], z, away, kind });
+        };
+        const names = kind => t.pack ? [`#gifthype:tp/${dim}/${t.far.key}`]
+            : (kind === 'structure' ? d.structures.slice(0, 4) : d.biomes.slice(0, 3)).map(x => `minecraft:${x}`);
+        if (d.structures.length) for (const w of names('structure')) await locate('structure', w);
+        if (d.biomes.length) {
+            for (const w of names('biome')) await locate('biome', w);
+            // nothing within Minecraft's 6,400: rings of points further out, nearest ring first (a minute at most)
+            const until = Date.now() + 60000;
+            for (let R = 12000; !spots.length && R - 6400 <= range && Date.now() < until; R += 12000) {
+                const n = Math.ceil(2 * Math.PI * R / 10000);
+                for (let i = 0; i < n && Date.now() < until; i++) {
+                    const a = i / n * 2 * Math.PI;
+                    for (const w of names('biome')) await locate('biome', w, p.x + Math.cos(a) * R, p.z + Math.sin(a) * R);
+                }
+            }
+        }
+        spots.sort((a, b) => a.away - b.away);
+        for (const sp of spots.slice(0, 3)) {
+            // biomes: where it starts is the edge, so look a little further in too
+            const tries = sp.kind === 'biome' ? [0, 64] : [0];
+            for (const extra of tries) {
+                const len = Math.hypot(sp.x - p.x, sp.z - p.z) || 1;
+                const cx = Math.round(sp.x + (sp.x - p.x) / len * extra), cz = Math.round(sp.z + (sp.z - p.z) / len * extra);
+                const hit = await searchAround(p, t.filter, cx, sp.y, cz, sp.kind === 'structure' ? 64 : 48);
+                if (hit) return hit;
+            }
+        }
+        return null;
+    }
+    // loads the land round x, z (forceload), looks for the block there, then lets it go again
+    async function searchAround(p, filter, x, y, z, r) {
+        const area = `${x - r} ${z - r} ${x + r} ${z + r}`;
+        await mc(`execute in ${p.dim} run forceload add ${area}`).catch(() => {});
+        try {
+            const corners = [[x - r, z - r], [x + r, z + r], [x - r, z + r], [x + r, z - r], [x, z]];
+            const until = Date.now() + 45000;
+            for (;;) {
+                let all = true;
+                for (const [cx, cz] of corners) if (!/passed/i.test(String(await mc(`execute in ${p.dim} if loaded ${cx} 0 ${cz}`).catch(() => '')))) { all = false; break; }
+                if (all) break;
+                if (Date.now() > until) return null;
+                await new Promise(res => setTimeout(res, 500));
+            }
+            return await findBlock({ ...p, x: x + 0.5, y: y ?? 64, z: z + 0.5 }, filter, r);
+        } finally {
+            await mc(`execute in ${p.dim} run forceload remove ${area}`).catch(() => {});
+        }
+    }
     // Teleports you to the nearest target (in your dimension). Returns where, or throws why not.
     async function teleportTo(player, t, range) {
         const p = await where({ player }), s = sel({ player });
@@ -170,8 +233,11 @@ export function makePresets({ mc, log }) {
             await makeRoom(s, p);
             return { x, z, away: +(/\((\d+) blocks? away\)/.exec(reply)?.[1] || 0) };
         }
-        const hit = await findBlock(p, t.filter, range);
-        if (!hit) throw new Error(`none within ${range} blocks`);
+        // nearby first (the land that's loaded round you), then far away
+        const near = Math.min(range, 96);
+        let hit = await findBlock(p, t.filter, near);
+        if (!hit && range > near && t.far) hit = await findFar(p, t, range);
+        if (!hit) throw new Error(t.far ? `none within ${range} blocks` : `none within ${near} blocks (and it isn't found in any particular biome or structure)`);
         // stand on it, with room to breathe round you
         await mc(`execute in ${p.dim} run tp ${s} ${hit.x + 0.5} ${hit.y + 1} ${hit.z + 0.5}`);
         await makeRoom(s, p);

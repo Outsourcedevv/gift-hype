@@ -39,8 +39,13 @@ CHAT TELEPORT (Minecraft -> Chat Teleport)
   Viewers type anything in Minecraft in your LIVE chat, and every 30 seconds you're teleported to the
   nearest one:
     - a block: every block there is (chest, diamonds, grass block, spawner, beacon, oak log...), and
-      groups like "logs" or "diamonds". The nearest one within 96 blocks (you can set up to 160), the
-      whole height of the world. You land standing on it. Nothing in the world is changed to find it.
+      groups like "logs" or "diamonds". First the land around you (96 blocks, the whole height of the
+      world); if it isn't there, Gift Hype asks Minecraft for the nearest biome or structure that block
+      is found in (cactus: deserts; bell: villages; spawner: mineshafts, fortresses...), loads it and
+      looks there: up to 50,000 blocks away ("Look for blocks up to"). Nothing is loaded ahead of
+      time: Minecraft knows where biomes and structures are without loading the land, so only the
+      spot it lands on is loaded. Further away takes longer. The box says "LOOKING..." meanwhile. You land standing on it. Nothing in the
+      world is changed to find it.
     - a structure: all 34 (village, trial chamber, ancient city, stronghold, woodland mansion, witch
       hut, ocean monument, shipwreck, ruined portal, mineshaft, nether fortress, bastion, end city...).
       Underground ones (trial chambers, ancient cities, strongholds, mineshafts) put you down in them.

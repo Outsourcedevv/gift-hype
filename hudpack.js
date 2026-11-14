@@ -141,8 +141,8 @@ function boxSheet(H) {        // left edge, middle slice, right edge, cut from t
 }
 function textSheet(y, H) { const s = sheet(CHARS.length, 1, 6, H); [...CHARS].forEach((c, i) => s.glyph(i, c, 0, y)); return s.png(); }
 function digitSheet(H) { const s = sheet(10, 1, DIGIT_PITCH, H); for (let d = 0; d < 10; d++) s.glyph(d, String(d), 0, DIGIT_Y, 2); return s.png(); }
-function iconSheet(icons, H) {   // icons: [16x16 RGBA]; cells are half-height (drawn at 2x), icon 2 rows down
-    const rows = Math.max(1, Math.ceil(icons.length / ICONS_PER_ROW)), s = sheet(ICONS_PER_ROW, rows, 16, H / 2);
+function iconSheet(icons, cellH) {   // icons: [16x16 RGBA], drawn at 2x, 2 rows down a cell cellH tall
+    const rows = Math.max(1, Math.ceil(icons.length / ICONS_PER_ROW)), s = sheet(ICONS_PER_ROW, rows, 16, cellH);
     icons.forEach((ic, n) => { for (let i = 0; i < 256; i++) if (ic[i * 4 + 3]) s.put(n, i % 16, ICON_Y / 2 + Math.floor(i / 16), [ic[i * 4], ic[i * 4 + 1], ic[i * 4 + 2], ic[i * 4 + 3]]); });
     return { png: s.png(), rows };
 }
@@ -156,7 +156,7 @@ const glyphAdvance = (widthPx, scale) => Math.floor(0.5 + widthPx * scale) + 1;
 export function hudSpot(cfg) {
     const near = (list, v) => list.reduce((b, x) => Math.abs(x - v) < Math.abs(b - v) ? x : b, list[0]);
     const size = near(SIZES, cfg.boxSize), y = near(HEIGHTS, cfg.boxY), s = size / 100;
-    const top = -y * 1.2 - BOX_H * s / 2;              // GUI pixels from the middle of the screen, + is down
+    const top = -y - BOX_H * s / 2;                    // GUI pixels from the middle of the screen, + is down
     // the title's top line is 40 GUI pixels above the middle and drawn at 4x: a glyph's top is (7 - ascent) * 4 below that
     let a = Math.round(7 - (top + 40) / 4), cell = CELLS[0];
     if (a > CELLS[0] * s / 4) cell = CELLS[1];
@@ -175,14 +175,19 @@ function space(units) {
 }
 
 // ---- the pack (built when the world opens: block pictures come from that Minecraft) ----
-let current = null;          // { data, sha1, id, iconFont, iconIndex: Map(blockId -> {n, ink}) }
+let current = null, lastMissing = null;
+// why the last "teleported" box had no picture (for the activity log), then forgets it
+export const hudMissing = () => { const m = lastMissing; lastMissing = null; return m; };
+// what the pack has, for the activity log when the world opens
+export const hudInfo = () => current && { pictures: current.iconIndex.size, size: current.iconSize, jar: current.jar };          // { data, sha1, id, iconFont, iconIndex: Map(blockId -> {n, ink}) }
 const built = new Map();
 export function hudPack() { return current || buildPack({}); }
 function buildPack({ cfg, version }) {
     const spot = cfg ? hudSpot(cfg) : null;
     let reader = null;
-    try { const jar = findClientJar(version); if (jar && spot) reader = makeIconReader(jar); } catch { reader = null; }
-    const key = `${spot?.font || ''}|${reader ? version || 'any' : 'none'}`;
+    let jarFile = null;
+    try { jarFile = findClientJar(version); if (jarFile && spot) reader = makeIconReader(jarFile); } catch { reader = null; }
+    const key = `${spot?.size || ''}|${reader ? version || 'any' : 'none'}`;
     if (built.has(key)) return built.get(key);
 
     const files = [];
@@ -194,9 +199,14 @@ function buildPack({ cfg, version }) {
         ROWS.forEach((y, r) => add(`assets/gifthype/textures/hud/text${r}_${h}.png`, textSheet(y, h)));
         add(`assets/gifthype/textures/hud/digits${h}.png`, digitSheet(h));
     }
-    // block pictures: only for the box's spot when the world opened (they're big; elsewhere it shows without)
+    // block pictures: for the box's size when the world opened, at every height (they're big; at another
+    // size it shows without until you join again)
     const iconIndex = new Map();
     let iconRows = 0;
+    const iconCells = new Set();
+    // a picture cell: 2 rows, the 16-row picture, then see-through rows so it can sit as high as the box
+    // (Minecraft wants ascent <= height); a whole number of rows that makes a whole-number height
+    const iconCell = p => { let c = Math.max(18, Math.ceil(2 * p.a / p.s)); while ((c * p.s / 2) % 1 || c * p.s / 2 < p.a) c++; return c; };
     if (reader) {
         const ids = new Set(JSON.parse(fs.readFileSync(path.join(ROOT, 'chatteleport-targets.json'), 'utf8')).blocks);
         for (const kind of ['structure', 'biome']) for (const n of ['village', 'trial_chambers', 'ancient_city', 'stronghold', 'fortress', 'bastion', 'mansion', 'monument', 'desert_pyramid', 'jungle', 'igloo', 'shipwreck', 'ruined_portal', 'end_city', 'mineshaft', 'outpost', 'trail_ruins', 'buried_treasure', 'ocean_ruin', 'swamp_hut', 'nether_fossil',
@@ -205,10 +215,12 @@ function buildPack({ cfg, version }) {
         }
         const icons = [];
         for (const id of ids) { const ic = reader.icon(id); if (ic) { iconIndex.set(id, { n: icons.length, ink: iconInk(ic) }); icons.push(ic); } }
-        if (icons.length) for (const h of CELLS) {
-            if (h !== spot.cell) continue;
-            const s = iconSheet(icons, h); iconRows = s.rows;
-            add(`assets/gifthype/textures/hud/icons${h}.png`, s.png);
+        if (icons.length) for (const y of HEIGHTS) {
+            const c = iconCell(hudSpot({ boxSize: spot.size, boxY: y }));
+            if (iconCells.has(c)) continue;
+            iconCells.add(c);
+            const s = iconSheet(icons, c); iconRows = s.rows;
+            add(`assets/gifthype/textures/hud/icons${c}.png`, s.png);
         }
     }
     const advances = {};
@@ -224,15 +236,18 @@ function buildPack({ cfg, version }) {
             ...ROWS.map((_, r) => bmp(`text${r}_${p.cell}`, [run(CH.text + r * 64, CHARS.length)])),
             bmp(`digits${p.cell}`, [run(CH.digit, 10)]),
         ];
-        if (iconIndex.size && spot && p.font === spot.font)
-            providers.push(bmp(`icons${p.cell}`, Array.from({ length: iconRows }, (_, r) => run(CH.icon + r * ICONS_PER_ROW, ICONS_PER_ROW))));
+        if (iconIndex.size && spot && size === spot.size) {
+            const c = iconCell(p);
+            providers.push({ type: 'bitmap', file: `gifthype:hud/icons${c}.png`, height: Math.round(c * p.s / 2), ascent: p.a,
+                chars: Array.from({ length: iconRows }, (_, r) => run(CH.icon + r * ICONS_PER_ROW, ICONS_PER_ROW)) });
+        }
         add(`assets/gifthype/font/tp/s${size}_y${y + 100}.json`, { providers });
     }
     const data = zip(files);
     const sha1 = crypto.createHash('sha1').update(data).digest('hex');
     const h = sha1.slice(0, 32);
     const id = `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-a${h.slice(17, 20)}-${h.slice(20, 32)}`;
-    const pack = { data, sha1, id, iconFont: iconIndex.size ? spot.font : null, iconIndex, reader };
+    const pack = { data, sha1, id, iconSize: iconIndex.size ? spot.size : null, iconIndex, reader, jar: reader ? path.basename(jarFile) : null };
     built.set(key, pack);
     return pack;
 }
@@ -246,7 +261,8 @@ export function hudProps(port, cfg, version) {
 }
 
 // The title text for the box. what: { left } for the countdown; { done: true, target, away } after a
-// teleport (target: Chat Teleport's { kind, filter, label }); { none: true } when nothing was found.
+// teleport (target: Chat Teleport's { kind, filter, label }); { looking: true } while it searches;
+// { none: true } when nothing was found.
 // The pieces are laid out left to right from the box's left edge, with one gap character before each to
 // put it exactly where it goes; the last gap centres it all where the settings put it.
 export function hudTitle(cfg, what) {
@@ -272,7 +288,8 @@ export function hudTitle(cfg, what) {
     } else if (what.done) {
         const pack = current;
         const block = pack?.reader && what.target ? iconBlockFor(what.target, pack.reader) : null;
-        const icon = block && pack.iconFont === p.font ? pack.iconIndex.get(block) : null;
+        const icon = block && pack.iconSize === p.size ? pack.iconIndex.get(block) : null;
+        if (block && !icon) lastMissing = pack.iconSize == null ? 'no-pictures' : pack.iconSize !== p.size ? 'other-size' : 'no-picture';
         let name = String(what.target?.label || 'TELEPORTED').toUpperCase().replace(/[^A-Z0-9 !.'-]/g, ' ').replace(/\s+/g, ' ').trim();
         if (name.length > 24) name = name.slice(0, 23).trim() + '.';
         const away = what.away ? `${what.away} BLOCK${what.away === 1 ? '' : 'S'} AWAY` : 'TELEPORTED!';
@@ -281,6 +298,8 @@ export function hudTitle(cfg, what) {
         if (icon) content.push(() => at(ICON_X, String.fromCharCode(CH.icon + icon.n), icon.ink, '#FFFFFF', 2 * u));
         content.push(() => write(name, x0, 'name', COL.name));
         content.push(() => write(away, x0, 'away', COL.away));
+    } else if (what.looking) {
+        content.push(() => write('LOOKING...', Math.round((W - inkWidth('LOOKING...')) / 2), 'mid', COL.label));
     } else {
         content.push(() => write('NOTHING FOUND', Math.round((W - inkWidth('NOTHING FOUND')) / 2), 'mid', COL.none));
     }

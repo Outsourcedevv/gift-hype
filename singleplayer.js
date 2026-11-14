@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { CHUNK_REPLACE } from './chunkchat.js';
+import { farTags } from './chatteleport.js';
 
 export const SAVES_DIR = path.join(process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'), '.minecraft', 'saves');
 
@@ -213,6 +214,9 @@ function packFiles(nukeSizes) {
         'data/minecraft/tags/function/load.json': JSON.stringify({ values: ['gifthype:load'] }),
         'data/minecraft/tags/function/tick.json': JSON.stringify({ values: ['gifthype:tick'] }),
     };
+    // Chat Teleport's far search: for each block, the biomes and structures it's found in (one /locate finds the nearest)
+    for (const t of farTags())
+        f[`data/gifthype/tags/worldgen/${t.kind}/${t.name}.json`] = JSON.stringify({ values: t.values.map(id => ({ id: `minecraft:${id}`, required: false })) });
     const fn = (name, lines) => { f[`data/gifthype/function/${name}.mcfunction`] = lines.join('\n') + '\n'; };
 
     fn('load', [

@@ -22,7 +22,7 @@ import { Rcon } from 'rcon-client';
 import { WebSocketServer } from 'ws';
 import { makePresets, MOBS, DELETE_BLOCKS, FILL_CHUNK, TELEPORT_TO, WHERE } from './minecraft-presets.js';
 import { makeChatTeleport, normalizeChatTeleport } from './chatteleport.js';
-import { hudPack, hudProps } from './hudpack.js';
+import { hudPack, hudProps, hudInfo } from './hudpack.js';
 import { makeChunkChat, normalizeChunkChat } from './chunkchat.js';
 import { makeChatDelete, normalizeChatDelete } from './chatdelete.js';
 import { listWorlds, installPack, singleplayerCommands } from './singleplayer.js';
@@ -615,7 +615,12 @@ async function connectMinecraft() {
             // the Chat Teleport box pack, from Gift Hype (block pictures from this world's Minecraft)
             let mcVersion = opts.version; try { mcVersion = worldVersion(world) || mcVersion; } catch { }
             const tpCfg = (g.modes || []).find(m => /chat teleport/i.test(m.name || ''))?.chatTeleport || normalizeChatTeleport({});
-            try { opts.props = [...(opts.props || []), ...hudProps(settings.port, tpCfg, mcVersion)]; } catch (e) { log(`Couldn't make the Chat Teleport box pack: ${e.message}`); }
+            try {
+                opts.props = [...(opts.props || []), ...hudProps(settings.port, tpCfg, mcVersion)];
+                const hi = hudInfo();
+                if (isChatTeleport(g)) log(hi?.pictures ? `Chat Teleport box: ${hi.pictures} block pictures (from ${hi.jar}), for box size ${hi.size}%`
+                    : "Chat Teleport box: no block pictures (Minecraft's game files weren't found in .minecraft/versions; play this version once in the launcher)");
+            } catch (e) { log(`Couldn't make the Chat Teleport box pack: ${e.message}`); }
             localServer.start(world, { eula: settings.mcEula, ...opts }).catch(e => { log(`Couldn't open the world: ${e.message}`); setStatus({ minecraft: 'world failed' }); });
             return;
         }

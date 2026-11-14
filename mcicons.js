@@ -7,7 +7,7 @@ import path from 'path';
 import zlib from 'zlib';
 
 // ---- read files out of a .jar (a zip) ----
-function openZip(file) {
+export function openZip(file) {
     const buf = fs.readFileSync(file);
     let e = buf.length - 22;
     while (e >= 0 && buf.readUInt32LE(e) !== 0x06054b50) e--;

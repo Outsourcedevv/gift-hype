@@ -1086,7 +1086,7 @@ const isChatTeleportMode = () => game?.connector === 'minecraft' && /chat telepo
 function renderChatTeleport() {
   $('chatTitle').textContent = 'Chat Teleport';
   const m = curMode();
-  m.chatTeleport ||= { on: true, seconds: 30, pick: 'most', range: 96, blocked: '', showGame: true, showOverlay: false, boxX: 0, boxY: 40, boxSize: 100 };
+  m.chatTeleport ||= { on: true, seconds: 30, pick: 'most', range: 50000, rangeV: 3, blocked: '', showGame: true, showOverlay: false, boxX: 0, boxY: 40, boxSize: 100 };
   m.chatTeleport.boxX ??= 0; m.chatTeleport.boxY ??= 40; m.chatTeleport.boxSize ??= 100;
   const c = m.chatTeleport;
   $('chatBox').innerHTML = `
@@ -1095,7 +1095,7 @@ function renderChatTeleport() {
     <div class="chatgrid" ${c.on ? '' : 'style="opacity:.55"'}>
       <label>Every (seconds)<input type="number" min="10" max="600" data-k="seconds" value="${c.seconds}"></label>
       <label>Which wins<select data-k="pick"><option value="most" ${c.pick === 'most' ? 'selected' : ''}>The one typed most (one vote each)</option><option value="last" ${c.pick === 'last' ? 'selected' : ''}>The last one typed</option></select></label>
-      <label>Look for blocks within (blocks)<input type="number" min="32" max="160" step="32" data-k="range" value="${c.range}"></label>
+      <label>Look for blocks up to (blocks away)<input type="number" min="32" max="50000" step="500" data-k="range" value="${c.range}"></label>
       <label class="wide">Things chat can't pick<input type="text" data-k="blocked" value="${esc(c.blocked)}" placeholder="e.g. lava, deep dark, end portal frame"></label>
       <label class="check wide" style="flex-direction:row"><input type="checkbox" data-k="showGame" ${c.showGame ? 'checked' : ''}> Box in Minecraft, fixed on your screen: "TELEPORT IN" and the seconds (never what or how many votes), then what you went to, its picture and how many blocks away. In your own world Minecraft gets a small Gift Hype pack for it; on a server it's text above the hotbar</label>
       <label>Box left / right<input type="range" min="-100" max="100" step="5" data-k="boxX" value="${c.boxX}"></label>

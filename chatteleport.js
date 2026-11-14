@@ -14,7 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { blockGuesses, GROUPS } from './chatdelete.js';
-import { hudTitle } from './hudpack.js';
+import { hudTitle, hudMissing } from './hudpack.js';
 
 const LISTS = JSON.parse(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), 'chatteleport-targets.json'), 'utf8'));
 const BLOCKS = new Set(LISTS.blocks);
@@ -45,6 +45,47 @@ const CAVE_BIOMES = new Set(['lush_caves', 'dripstone_caves', 'deep_dark', 'sulf
 
 const dimsOfStructure = id => id.startsWith('#') ? new Set((LISTS.structureGroups[id.slice(1)] || []).map(s => LISTS.structures[s])) : new Set([LISTS.structures[id]]);
 const LABELS = { fortress: 'NETHER FORTRESS', bastion_remnant: 'BASTION', mansion: 'WOODLAND MANSION', monument: 'OCEAN MONUMENT', swamp_hut: 'WITCH HUT', desert_pyramid: 'DESERT TEMPLE', jungle_pyramid: 'JUNGLE TEMPLE', pillager_outpost: 'PILLAGER OUTPOST', '#ruined_portal': 'RUINED PORTAL', '#ocean_ruin': 'OCEAN RUINS', '#shipwreck': 'SHIPWRECK', '#mineshaft': 'MINESHAFT', '#village': 'VILLAGE', mushroom_fields: 'MUSHROOM ISLAND', the_end: 'THE END', ocean_ruin_warm: 'WARM OCEAN RUINS', ocean_ruin_cold: 'COLD OCEAN RUINS', village_plains: 'PLAINS VILLAGE', village_desert: 'DESERT VILLAGE', village_savanna: 'SAVANNA VILLAGE', village_snowy: 'SNOWY VILLAGE', village_taiga: 'TAIGA VILLAGE', mineshaft_mesa: 'BADLANDS MINESHAFT', ruined_portal_nether: 'NETHER RUINED PORTAL', shipwreck_beached: 'BEACHED SHIPWRECK', '#beds': 'BED', '#doors': 'DOOR', '#all_signs': 'SIGN', '#flowers': 'FLOWERS', '#leaves': 'LEAVES', '#wool': 'WOOL', '#logs': 'LOGS' };
+// ----- far away blocks: the biomes and structures each block is found in (from Minecraft's own world
+// generation data, made by a script from the server's data and kept in chatteleport-targets.json) -----
+const HINTS = LISTS.hints || {};
+const BIOME_COMMON = 20;           // a block in more biomes than this is everywhere: nearby search finds it
+function hintBlocks(t) {           // the block ids a target means
+    const id = t.filter.replace(/^#?minecraft:/, '');
+    if (!t.filter.startsWith('#')) return HINTS[id] ? [id] : [];
+    const stem = id.replace(/^all_/, '').replace(/ies$/, 'y').replace(/(ches|shes|xes)$/, m => m.slice(0, -2)).replace(/s$/, '');
+    return Object.keys(HINTS).filter(b => b === stem || b.endsWith('_' + stem));
+}
+// { key, dims: { overworld: { biomes, structures }, ... } } or null
+export function farHints(t) {
+    if (t.kind !== 'block') return null;
+    const ids = hintBlocks(t);
+    if (!ids.length) return null;
+    const key = t.filter.startsWith('#') ? 'g_' + t.filter.replace(/^#minecraft:/, '') : ids[0];
+    const dims = {};
+    for (const dim of ['overworld', 'the_nether', 'the_end']) {
+        const biomes = new Set(), structures = new Set();
+        for (const b of ids) {
+            for (const x of HINTS[b].biomes || []) if (LISTS.biomes[x] === dim) biomes.add(x);
+            for (const x of HINTS[b].structures || []) if (LISTS.structures[x] === dim) structures.add(x);
+        }
+        const bl = biomes.size > BIOME_COMMON ? [] : [...biomes];
+        if (bl.length || structures.size) dims[dim] = { biomes: bl, structures: [...structures] };
+    }
+    return Object.keys(dims).length ? { key, dims } : null;
+}
+// every far-search tag for Gift Hype's pack: [{ kind: 'biome'|'structure', name, values }]
+export function farTags() {
+    const out = [];
+    const targets = [...Object.keys(HINTS).map(b => blockTarget(b)), ...[...new Set([...Object.values(GROUPS), ...Object.values(ORE_WORDS)])].map(g => blockTarget('#' + g))];
+    for (const t of targets) {
+        const h = farHints(t); if (!h) continue;
+        for (const [dim, d] of Object.entries(h.dims)) {
+            if (d.biomes.length) out.push({ kind: 'biome', name: `tp/${dim}/${h.key}`, values: d.biomes });
+            if (d.structures.length) out.push({ kind: 'structure', name: `tp/${dim}/${h.key}`, values: d.structures });
+        }
+    }
+    return out;
+}
 const nice = id => LABELS[id] || id.replace(/^#/, '').replace(/_/g, ' ').toUpperCase();
 
 // ----- the targets, made from a name: s:<structure or #group>, b:<biome>, k:<block or #tag> -----
@@ -166,7 +207,9 @@ export function normalizeChatTeleport(c = {}, onByDefault = false) {
         on: typeof c.on === 'boolean' ? c.on : onByDefault,
         seconds: n(c.seconds, 10, 600, 30),             // how often you're teleported
         pick: c.pick === 'last' ? 'last' : 'most',      // the last thing typed, or the one typed most
-        range: n(c.range, 32, 160, 96),                 // how far to look for blocks (structures and biomes: as far as Minecraft looks)
+        // how far to look for blocks: nearby first, then (far) in the biomes and structures they're found in.
+        // Settings from before 50,000 (rangeV) get the new default.
+        range: c.rangeV === 3 ? n(c.range, 32, 50000, 50000) : 50000, rangeV: 3,
         blocked: String(c.blocked ?? '').slice(0, 2000),
         showGame: c.showGame !== false,                 // the timer box in Minecraft (on)
         boxX: n(c.boxX, -100, 100, 0),                  // where the box is: left (-100) to right (100) of the middle of your screen
@@ -233,6 +276,7 @@ export function makeChatTeleport({ mc, log, broadcast, target, dimOf, teleport }
         await mc(pack ? `title ${s} clear` : `title ${s} actionbar ""`).catch(() => {});
     }
     const plain = w => w.left != null ? `[${txt('TELEPORT IN ', 'aqua', ',"bold":true')},${txt(String(w.left), w.left <= 5 ? 'red' : 'white', ',"bold":true')}]`
+        : w.looking ? txt('LOOKING...', 'aqua', ',"bold":true')
         : w.done ? `[${txt(w.target?.label || 'TELEPORTED', 'aqua', ',"bold":true')}${w.away ? ',' + txt(` - ${w.away} blocks away`, 'white') : ''}]`
         : txt('NOTHING FOUND', 'red', ',"bold":true');
 
@@ -263,11 +307,19 @@ export function makeChatTeleport({ mc, log, broadcast, target, dimOf, teleport }
         const s = sel(t.player);
         const dim = await dimOf(t.player).catch(() => 'overworld');
         const flash = async what => { if (cfg.showGame) { holdUntil = Date.now() + 4000; await showBox(t, cfg, what); } };
+        // while it looks (far searches take a few seconds), the box says so
+        let looking = null;
+        if (cfg.showGame) { await showBox(t, cfg, { looking: true }); looking = setInterval(() => showBox(t, cfg, null).catch(() => {}), 1000); }
+        try { await tryEach(); } finally { if (looking) clearInterval(looking); }
+        async function tryEach() {
         for (const c of list.slice(0, 4)) {
             if (c.t.dims && !c.t.dims.has(dim)) { log(`Chat Teleport: ${c.t.label} isn't in ${DIM_NAME[dim] || dim}`); continue; }
             try {
-                const r = await teleport(t.player, c.t, cfg.range);
+                const r = await teleport(t.player, { ...c.t, pack: t.pack, far: farHints(c.t) }, cfg.range);
                 await flash({ done: true, target: c.t, away: r.away || 0 });
+                const why = t.pack && cfg.showGame ? hudMissing() : null;
+                if (why) log(why === 'other-size' ? 'Chat Teleport: the box size changed since you joined, so the block picture shows next time you join the world'
+                    : why === 'no-pictures' ? "Chat Teleport: no block pictures (Minecraft's game files weren't found)" : `Chat Teleport: no picture for ${c.t.label}`);
                 await mc(`execute at ${s} run playsound minecraft:entity.enderman.teleport master @a ~ ~ ~ 1 1`).catch(() => {});
                 await mc(`execute at ${s} run particle minecraft:portal ~ ~1 ~ 0.6 1 0.6 0.5 120 force`).catch(() => {});
                 log(`Chat Teleport: to ${c.t.label}${r.away ? ` (${r.away} blocks away)` : ''}`);
@@ -279,6 +331,7 @@ export function makeChatTeleport({ mc, log, broadcast, target, dimOf, teleport }
         }
         await flash({ none: true });
         say(cfg, { ...publicState(cfg), done: { label: 'NOTHING FOUND', failed: true } });
+        }
     }
     setInterval(() => tick().catch(e => log(`Chat Teleport: ${e.message}`)), 1000);
 
