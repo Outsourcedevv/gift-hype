@@ -77,10 +77,13 @@ export function makeChunkChat({ mc, log, broadcast, target, fillChunk }) {
         broadcast('chunkchat', { on: false });
     }
 
+    let cleaned = false;
     async function tick() {
         if (busy) return;
         busy = true;
         try {
+            // a bar left over from before Gift Hype was restarted
+            if (!cleaned) { cleaned = true; await mc(`bossbar remove ${BAR}`).catch(() => { cleaned = false; }); }
             const t = await target();
             if (!t) { if (round || barUp) await hide(); return; }
             const cfg = t.cfg;

@@ -48,6 +48,9 @@ const DIAMOND_ARMOR = [['armor.head', 'diamond_helmet'], ['armor.chest', 'diamon
 export const DELETE_BLOCKS = Symbol('deleteBlocks');
 // Chunk Chat's filler: presets[FILL_CHUNK](player, block, filters)
 export const FILL_CHUNK = Symbol('fillChunk');
+// Chat Teleport: presets[TELEPORT_TO](player, target, range) and presets[WHERE](player)
+export const TELEPORT_TO = Symbol('teleportTo');
+export const WHERE = Symbol('where');
 
 export function makePresets({ mc, log }) {
     const sel = ctx => /^[\w]{1,16}$/.test(ctx.player) ? `@a[name=${ctx.player},limit=1]` : '@p';
@@ -56,7 +59,11 @@ export function makePresets({ mc, log }) {
         const s = sel(ctx);
         const pos = /\[(-?[\d.E-]+)d, (-?[\d.E-]+)d, (-?[\d.E-]+)d\]/.exec(await mc(`data get entity ${s} Pos`));
         if (!pos) throw new Error(`Couldn't find ${ctx.player} in the world`);
-        const dim = /"([\w:./-]+)"/.exec(await mc(`data get entity ${s} Dimension`))?.[1] || 'minecraft:overworld';
+        // which dimension you're in, asked of the game itself (works for players and any other entity)
+        let dim = null;
+        for (const d of ['minecraft:overworld', 'minecraft:the_nether', 'minecraft:the_end'])
+            if (/passed/i.test(String(await mc(`execute as ${s} at @s if dimension ${d}`).catch(() => '')))) { dim = d; break; }
+        dim ||= /"([\w:./-]+)"/.exec(await mc(`data get entity ${s} Dimension`))?.[1] || 'minecraft:overworld';
         const [minY, maxY] = dim === 'minecraft:overworld' ? [-64, 319] : [0, 255];
         return { s, x: +pos[1], y: +pos[2], z: +pos[3], dim, minY, maxY };
     }
@@ -99,6 +106,77 @@ export function makePresets({ mc, log }) {
 
     // Chunk Chat: every block in your chunk that matches one of the filters (from the bottom of the
     // world up) becomes `block`; air stays air. Leaves are placed so they never fall off.
+    // ----- Chat Teleport -----
+    // Lands you at x, z: on the ground, or (under) on the highest place you can stand below that height.
+    // Water isn't a place spreadplayers will put you, so there it's sea level (you swim).
+    // After a teleport: if your feet or head are inside a block (or lava), a pocket 3x3 and 2 high is
+    // cleared round you, so you can breathe and move (water's left alone: you don't get stuck in it).
+    async function makeRoom(s, p) {
+        for (const dy of [0, 1]) await mc(`execute in ${p.dim} at ${s} unless block ~ ~${dy} ~ #minecraft:air unless block ~ ~${dy} ~ minecraft:water run fill ~-1 ~ ~-1 ~1 ~1 ~1 minecraft:air`).catch(() => {});
+    }
+    async function landAt(s, p, x, z, under) {
+        if (p.dim === 'minecraft:the_nether' && under == null) under = 120;
+        const r = String(await mc(`execute in ${p.dim} run spreadplayers ${x} ${z} 0 1 ${under != null ? `under ${under} ` : ''}false ${s}`).catch(e => e.message));
+        if (/^Spread/i.test(r.trim())) return;
+        const y = under != null ? under : p.dim === 'minecraft:overworld' ? 64 : 80;
+        await mc(`execute in ${p.dim} run tp ${s} ${x + 0.5} ${y} ${z + 0.5}`);
+        if (p.dim !== 'minecraft:overworld') await mc(`effect give ${s} minecraft:slow_falling 15 0 true`);
+    }
+    // The nearest block matching filter (a block or #tag) within range blocks across (and the whole
+    // height): each 32-block box near you is copied, only the matching blocks, into a scratch space at
+    // the top of the world above you, and the count says if it's there. Nothing in the world changes;
+    // the scratch space is cleared after. The box with some is split until it's one block.
+    async function findBlock(p, filter, range) {
+        const px = Math.floor(p.x), py = Math.floor(p.y), pz = Math.floor(p.z), top = p.maxY - 33;
+        const dest = [px - 16, p.maxY - 31, pz - 16], R = Math.max(1, Math.ceil(range / 32));
+        const boxes = [];
+        for (let i = -R; i <= R; i++) for (let k = -R; k <= R; k++) for (let y = p.minY; y <= top; y += 32)
+            boxes.push([px - 16 + i * 32, y, pz - 16 + k * 32, px + 15 + i * 32, Math.min(top, y + 31), pz + 15 + k * 32]);
+        const off = (v, a, b) => v < a ? a - v : v > b ? v - b : 0;
+        const dist = b => Math.hypot(off(px, b[0], b[3]), off(py, b[1], b[4]), off(pz, b[2], b[5]));
+        const count = async b => {
+            const r = String(await mc(`execute in ${p.dim} run clone ${b[0]} ${b[1]} ${b[2]} ${b[3]} ${b[4]} ${b[5]} ${dest.join(' ')} strict filtered ${filter}`).catch(e => e.message));
+            const m = /cloned (\d+)/i.exec(r);
+            return m ? +m[1] : 0;
+        };
+        let box = null, used = false;
+        boxes.sort((a, b) => dist(a) - dist(b));
+        for (const b of boxes) { if (await count(b) > 0) { box = b; used = true; break; } }
+        if (box) for (;;) {
+            const half = (a, b) => a === b ? [[a, b]] : [[a, a + Math.floor((b - a) / 2)], [a + Math.floor((b - a) / 2) + 1, b]];
+            const subs = [];
+            for (const [x1, x2] of half(box[0], box[3])) for (const [y1, y2] of half(box[1], box[4])) for (const [z1, z2] of half(box[2], box[5])) subs.push([x1, y1, z1, x2, y2, z2]);
+            if (subs.length === 1) break;
+            subs.sort((a, b) => dist(a) - dist(b));
+            let next = null;
+            for (const s of subs) if (await count(s) > 0) { next = s; break; }
+            if (!next) break;
+            box = next;
+        }
+        if (used) await mc(`execute in ${p.dim} run fill ${dest.join(' ')} ${dest[0] + 31} ${dest[1] + 31} ${dest[2] + 31} minecraft:air strict`).catch(() => {});
+        return box && { x: box[0], y: box[1], z: box[2] };
+    }
+    // Teleports you to the nearest target (in your dimension). Returns where, or throws why not.
+    async function teleportTo(player, t, range) {
+        const p = await where({ player }), s = sel({ player });
+        const at = `execute in ${p.dim} positioned ${p.x.toFixed(1)} ${p.y.toFixed(1)} ${p.z.toFixed(1)}`;
+        if (t.kind === 'structure' || t.kind === 'biome') {
+            const reply = String(await mc(`${at} run locate ${t.kind} ${t.filter}`).catch(e => e.message));
+            const m = /at \[(-?\d+), (~|-?\d+), (-?\d+)\]/.exec(reply);
+            if (!m) throw new Error(/could not find/i.test(reply) ? 'none near you' : reply.trim().slice(0, 160));
+            const x = +m[1], z = +m[3], y = m[2] === '~' ? null : +m[2];
+            await landAt(s, p, x, z, t.under ?? (t.cave && y != null ? y + 3 : null));
+            await makeRoom(s, p);
+            return { x, z, away: +(/\((\d+) blocks? away\)/.exec(reply)?.[1] || 0) };
+        }
+        const hit = await findBlock(p, t.filter, range);
+        if (!hit) throw new Error(`none within ${range} blocks`);
+        // stand on it, with room to breathe round you
+        await mc(`execute in ${p.dim} run tp ${s} ${hit.x + 0.5} ${hit.y + 1} ${hit.z + 0.5}`);
+        await makeRoom(s, p);
+        return { x: hit.x, y: hit.y, z: hit.z, away: Math.round(Math.hypot(hit.x - p.x, hit.y - p.y, hit.z - p.z)) };
+    }
+
     async function fillChunk(player, block, filters) {
         const p = await where({ player });
         const x1 = Math.floor(p.x / 16) * 16, z1 = Math.floor(p.z / 16) * 16, x2 = x1 + 15, z2 = z1 + 15;
@@ -237,6 +315,8 @@ export function makePresets({ mc, log }) {
     return {
         [DELETE_BLOCKS]: deleteBlocks,
         [FILL_CHUNK]: fillChunk,
+        [TELEPORT_TO]: teleportTo,
+        [WHERE]: player => where({ player }),
         nuke: async (a, ctx, times) => { for (let i = 0; i < Math.min(times, 3); i++) await nuke(ctx, clamp(a.size, 16, 64, 40)); },
         jail: (a, ctx, times) => jail(ctx, Math.min(3600, clamp(a.seconds, 1, 3600, 30) * times)),
         cobwebChunk: (a, ctx) => chunk(ctx, 'minecraft:cobweb', 'COBWEB CHUNK', 'white'),

@@ -24,7 +24,7 @@ export function normalizeChatDelete(c = {}, onByDefault = false) {
 }
 
 // Plural words for groups of blocks (Minecraft's own block tags)
-const GROUPS = {
+export const GROUPS = {
     logs: 'logs', wood: 'logs', leaves: 'leaves', planks: 'planks', wool: 'wool', carpets: 'wool_carpets', carpet: 'wool_carpets',
     flowers: 'flowers', saplings: 'saplings', sand: 'sand', slabs: 'slabs', stairs: 'stairs', doors: 'doors', trapdoors: 'trapdoors',
     beds: 'beds', fences: 'fences', walls: 'walls', terracotta: 'terracotta', candles: 'candles', ice: 'ice', rails: 'rails',

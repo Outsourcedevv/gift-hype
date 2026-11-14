@@ -675,7 +675,7 @@ const coverHtml = g => g.cover
   ? `<img src="/cover/${encodeURIComponent(g.id)}?v=${g.cover}" alt="" onerror="this.outerHTML='<div class=blank>'+this.dataset.name+'</div>'" data-name="${esc(esc(g.name))}">`
   : `<div class="blank">${esc(g.name)}</div>`;
 // A type's cover: its own picture, or the built-in one for Dropper / Block Delete / Parkour
-const TYPE_ART = [[/dropper/i, '/img/type-dropper.svg'], [/block delete/i, '/img/type-blockdelete.svg'], [/chunk chat/i, '/img/type-chunkchat.svg'], [/parkour/i, '/img/type-parkour.svg']];
+const TYPE_ART = [[/dropper/i, '/img/type-dropper.svg'], [/block delete/i, '/img/type-blockdelete.svg'], [/chunk chat/i, '/img/type-chunkchat.svg'], [/chat teleport/i, '/img/type-chatteleport.svg'], [/parkour/i, '/img/type-parkour.svg']];
 const typeCoverHtml = m => {
   if (m.cover) return `<img src="/cover/${encodeURIComponent(game.id)}?mode=${encodeURIComponent(m.id)}&v=${encodeURIComponent(m.cover)}" alt="">`;
   const art = TYPE_ART.find(([re]) => re.test(m.name || ''));
@@ -1021,7 +1021,7 @@ function addActionOptions() {
   if (!usable.length) return '';
   if (game.connector !== 'minecraft') return usable.map(([k, t]) => `<option value="${k}">${t.label}</option>`).join('');
   // the ready-made actions (nuke, jail, chunks, kits...) belong to Block Delete only
-  const blockDelete = /block delete|chunk chat/i.test(curMode().name || ''), dropper = isDropperMode();
+  const blockDelete = /block delete|chunk chat|chat teleport/i.test(curMode().name || ''), dropper = isDropperMode();
   const DROPPER = ['punch', 'punchToggle', 'levelUp', 'levelDown', 'levelWheel', 'jail', 'resetTimer', 'saveReset'];
   const mcOpts = blockDelete ? usable.filter(([k, t]) => t.conn === 'minecraft' && k !== 'command' && (k === 'jail' || !DROPPER.includes(k)))
     : dropper ? DROPPER.map(k => [k, ACTION_TYPES[k]]) : [];
@@ -1081,6 +1081,51 @@ function renderChunkChat() {
 }
 
 // ----- Chat block delete (Minecraft types other than the Dropper) -----
+const isChatTeleportMode = () => game?.connector === 'minecraft' && /chat teleport/i.test(curMode().name || '');
+// ----- Chat Teleport: on a timer, to the nearest block, structure or biome chat picked -----
+function renderChatTeleport() {
+  $('chatTitle').textContent = 'Chat Teleport';
+  const m = curMode();
+  m.chatTeleport ||= { on: true, seconds: 30, pick: 'most', range: 96, blocked: '', showGame: true, showOverlay: false };
+  const c = m.chatTeleport;
+  $('chatBox').innerHTML = `
+    <label class="check"><input type="checkbox" data-k="on" ${c.on ? 'checked' : ''}> Chat picks where you're teleported</label>
+    <p class="hint" style="margin-top:6px">Viewers type anything in Minecraft in the LIVE chat: a block (<b>chest</b>, <b>diamonds</b>, <b>grass block</b>, <b>spawner</b>...), a structure (<b>village</b>, <b>trial chamber</b>, <b>ancient city</b>, <b>stronghold</b>, <b>nether fortress</b>, <b>end city</b>...) or a biome (<b>cherry grove</b>, <b>deep dark</b>, <b>ice spikes</b>, <b>crimson forest</b>...). When the timer runs out you're teleported to the nearest one. Only things in the dimension you're in count (a nether fortress can't be picked in the Overworld). If what won isn't near you, the next one is tried. Every block, structure and biome in Minecraft 26.2 works.</p>
+    <div class="chatgrid" ${c.on ? '' : 'style="opacity:.55"'}>
+      <label>Every (seconds)<input type="number" min="10" max="600" data-k="seconds" value="${c.seconds}"></label>
+      <label>Which wins<select data-k="pick"><option value="most" ${c.pick === 'most' ? 'selected' : ''}>The one typed most (one vote each)</option><option value="last" ${c.pick === 'last' ? 'selected' : ''}>The last one typed</option></select></label>
+      <label>Look for blocks within (blocks)<input type="number" min="32" max="160" step="32" data-k="range" value="${c.range}"></label>
+      <label class="wide">Things chat can't pick<input type="text" data-k="blocked" value="${esc(c.blocked)}" placeholder="e.g. lava, deep dark, end portal frame"></label>
+      <label class="check wide" style="flex-direction:row"><input type="checkbox" data-k="showGame" ${c.showGame ? 'checked' : ''}> Timer in Minecraft: a bar at the top saying where you're going and when, and the place's name when you land</label>
+      <label class="check wide" style="flex-direction:row"><input type="checkbox" data-k="showOverlay" ${c.showOverlay ? 'checked' : ''}> Timer on the stream overlay too (leave it off to add your own in TikTok LIVE Studio)</label>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <input type="text" id="tpTry" placeholder="Try it: e.g. village, chest, cherry grove" style="flex:1;min-width:180px">
+      <button class="small" id="tpTryGo">Try</button>
+      <button class="small ghost" id="tpNow">Teleport now</button>
+    </div>`;
+  $('chatBox').querySelectorAll('[data-k]').forEach(el => {
+    el.onchange = () => {
+      const k = el.dataset.k;
+      c[k] = el.type === 'checkbox' ? el.checked : el.type === 'number' ? +el.value : el.value;
+      queueSave();
+      if (k === 'on') renderChatTeleport();
+    };
+  });
+  const tryIt = async () => {
+    const text = $('tpTry').value.trim();
+    if (!text) return;
+    try {
+      await flushSave();
+      const r = await api('/api/chatteleport/try', { text });
+      toast(`${r.pick === 'last' ? 'Next' : '1 vote'}: ${r.label} (${r.kind})`);
+      $('tpTry').value = '';
+    } catch (e) { toast(e.message, true); }
+  };
+  $('tpTryGo').onclick = tryIt;
+  $('tpTry').onkeydown = e => { if (e.key === 'Enter') tryIt(); };
+  $('tpNow').onclick = async () => { try { await flushSave(); await api('/api/chatteleport/now', {}); toast('Teleporting…'); } catch (e) { toast(e.message, true); } };
+}
 const isChunkChatMode = () => game?.connector === 'minecraft' && /chunk chat/i.test(curMode().name || '');
 function renderChat() {
   const sec = $('chatSec');
@@ -1088,6 +1133,7 @@ function renderChat() {
   sec.hidden = !on;
   if (!on) return;
   if (isChunkChatMode()) return renderChunkChat();
+  if (isChatTeleportMode()) return renderChatTeleport();
   $('chatTitle').textContent = 'Chat block delete';
   const m = curMode();
   m.chat ||= { on: false, seconds: 30, chunks: 1, cooldown: 20, max: 5, blocked: '' };

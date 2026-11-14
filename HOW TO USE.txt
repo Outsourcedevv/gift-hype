@@ -31,9 +31,36 @@ GAMES
   is in front) or Sounds only (just sounds and stream popups).
 
 MINECRAFT'S TYPES
-  Click Minecraft on the Games screen and you pick a type: Dropper, Block Delete Survival, Chunk Chat
-  or Parkour Paradise, each with its own cover and its own gifts. The one marked LIVE is where gifts
-  go. On a type's page, "Change cover" changes that type's picture.
+  Click Minecraft on the Games screen and you pick a type: Dropper, Block Delete Survival, Chunk Chat,
+  Chat Teleport or Parkour Paradise, each with its own cover and its own gifts. The one marked LIVE is
+  where gifts go. On a type's page, "Change cover" changes that type's picture.
+
+CHAT TELEPORT (Minecraft -> Chat Teleport)
+  Viewers type anything in Minecraft in your LIVE chat, and every 30 seconds you're teleported to the
+  nearest one:
+    - a block: every block there is (chest, diamonds, grass block, spawner, beacon, oak log...), and
+      groups like "logs" or "diamonds". The nearest one within 96 blocks (you can set up to 160), the
+      whole height of the world. You land standing on it. Nothing in the world is changed to find it.
+    - a structure: all 34 (village, trial chamber, ancient city, stronghold, woodland mansion, witch
+      hut, ocean monument, shipwreck, ruined portal, mineshaft, nether fortress, bastion, end city...).
+      Underground ones (trial chambers, ancient cities, strongholds, mineshafts) put you down in them.
+    - a biome: all 65 (cherry grove, deep dark, ice spikes, mushroom island, crimson forest, end
+      highlands...). Cave biomes put you in the cave.
+  Names don't have to be exact: typos ("spawnr", "vilage", "trail chamber"), part of a name
+  ("crafting", "enchanting"), words in any order ("warm ocean ruin"), split words ("strong hold") and
+  ore words ("diamond", "iron" = that ore) all work. Everyday chat ("lol", "gg", "hello") and gift
+  names ("rose", "hearts", "galaxy") are ignored.
+  If you'd land inside blocks (buried ores, rock, lava), a pocket 3 wide and 2 high is cleared round
+  you so you can breathe and move.
+  You're never sent to another dimension: only things in the dimension you're in count. In the
+  Overworld nobody can pick a nether fortress or the End; in the Nether, a village or a cherry grove
+  is refused. Blocks are always looked for in the dimension you're in.
+  The thing typed MOST wins (one vote per viewer each round), or the LAST one typed. If it isn't near
+  you, the next one is tried. A purple bar at the top of Minecraft says where you're going and the
+  seconds left, and the place's name shows when you land (untick "Timer in Minecraft" to hide it).
+  The stream overlay can show it too ("Timer on the stream overlay"). "Things chat can't pick" keeps
+  anything out (e.g. lava). Same gifts as Block Delete Survival. "Try" adds a vote without TikTok;
+  "Teleport now" ends the round straight away.
 
 CHUNK CHAT (Minecraft -> Chunk Chat)
   Viewers type blocks in your LIVE chat (stone, diamond block, oak leaves, water...). Every 30 seconds

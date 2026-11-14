@@ -284,13 +284,13 @@ function showChunkChat(s) {
     ccShowDone = Date.now() + 4000;
     const d = s.done;
     box.innerHTML = d.none ? `<div class="cc done"><div class="block none">Nobody picked a block</div><div class="by">type a block in chat!</div></div>`
-      : `<div class="cc done"><div class="tag">YOUR CHUNK IS NOW</div><div class="block${d.label.length > 14 ? ' long' : ''}">${esc(d.label)}</div><div class="by">${d.failed ? "it didn't work this time" : d.by ? `picked by ${esc(d.by)}` : d.votes ? `${d.votes} vote${d.votes > 1 ? 's' : ''}` : ''}</div></div>`;
+      : `<div class="cc done"><div class="tag">${esc(s.doneTag || 'YOUR CHUNK IS NOW')}</div><div class="block${d.label.length > 14 ? ' long' : ''}">${esc(d.label)}</div><div class="by">${d.failed ? "it didn't work this time" : d.by ? `picked by ${esc(d.by)}` : d.votes ? `${d.votes} vote${d.votes > 1 ? 's' : ''}` : ''}</div></div>`;
     return;
   }
   if (Date.now() < ccShowDone) return;          // keep the result up for a moment
   let el = box.querySelector('.cc:not(.done)');
   if (!el) {
-    box.innerHTML = `<div class="cc"><div class="head"><span class="tag">NEXT CHUNK</span><span class="num"></span></div><div class="block"></div><div class="by"></div><div class="bar"><i style="width:100%"></i></div><div class="top"></div></div>`;
+    box.innerHTML = `<div class="cc"><div class="head"><span class="tag">${esc(s.tag || 'NEXT CHUNK')}</span><span class="num"></span></div><div class="block"></div><div class="by"></div><div class="bar"><i style="width:100%"></i></div><div class="top"></div></div>`;
     el = box.firstChild;
   }
   el.querySelector('.num').textContent = s.left + 's';

@@ -20,7 +20,8 @@ import { fileURLToPath } from 'node:url';
 import { TikTokLiveConnection, WebcastEvent } from 'tiktok-live-connector';
 import { Rcon } from 'rcon-client';
 import { WebSocketServer } from 'ws';
-import { makePresets, MOBS, DELETE_BLOCKS, FILL_CHUNK } from './minecraft-presets.js';
+import { makePresets, MOBS, DELETE_BLOCKS, FILL_CHUNK, TELEPORT_TO, WHERE } from './minecraft-presets.js';
+import { makeChatTeleport, normalizeChatTeleport } from './chatteleport.js';
 import { makeChunkChat, normalizeChunkChat } from './chunkchat.js';
 import { makeChatDelete, normalizeChatDelete } from './chatdelete.js';
 import { listWorlds, installPack, singleplayerCommands } from './singleplayer.js';
@@ -124,6 +125,8 @@ function normalizeModes(g) {
         chat: normalizeChatDelete(m.chat, /block delete/i.test(m.name || '')),
         // Chunk Chat (chunkchat.js): on by itself for Chunk Chat types
         chunkChat: normalizeChunkChat(m.chunkChat, /chunk chat/i.test(m.name || '')),
+        // Chat Teleport (chatteleport.js): on by itself for Chat Teleport types
+        chatTeleport: normalizeChatTeleport(m.chatTeleport, /chat teleport/i.test(m.name || '')),
     }));
     return { modes, mode: modes.some(m => m.id === g.mode) ? g.mode : modes[0].id };
 }
@@ -182,6 +185,7 @@ const minecraftModes = (parkourRules = PARKOUR_RULES) => [
     { id: newId(), name: 'Parkour Paradise', rules: parkourRules },
     { id: newId(), name: 'Dropper', rules: DROPPER_RULES },
     { id: newId(), name: 'Chunk Chat', rules: BLOCK_DELETE_RULES },
+    { id: newId(), name: 'Chat Teleport', rules: BLOCK_DELETE_RULES },
 ];
 const isDropper = g => g?.connector === 'minecraft' && /dropper/i.test(currentMode(g)?.name || '');
 // the world gifts go to: the Dropper has its own, the other types use the world you picked
@@ -276,6 +280,15 @@ if (!settings.chunkChat) {
         saveGame(g);
     }
     settings.chunkChat = true; saveSettings();
+}
+if (!settings.chatTeleport) {
+    // the Chat Teleport type is added to Minecraft, with Block Delete's gifts
+    for (const g of Object.values(games)) {
+        if (g.connector !== 'minecraft' || !/minecraft/i.test(g.name) || g.modes.some(m => /chat teleport/i.test(m.name))) continue;
+        g.modes.push({ id: newId(), name: 'Chat Teleport', rules: normalizeRules(BLOCK_DELETE_RULES), chatTeleport: normalizeChatTeleport({}, true) });
+        saveGame(g);
+    }
+    settings.chatTeleport = true; saveSettings();
 }
 if (!settings.covers) {
     for (const g of Object.values(games)) if (g.connector === 'minecraft' && /minecraft/i.test(g.name) && !g.cover) { g.cover = MINECRAFT_COVER; saveGame(g); }
@@ -755,12 +768,27 @@ const chatDelete = makeChatDelete({
         const g = activeGame();
         if (!g || g.connector !== 'minecraft' || isDropper(g) || !rcon) return null;
         const cfg = currentMode(g).chat;
-        return cfg?.on && !isChunkChat(g) ? { cfg, player: g.minecraft.player || await onlinePlayer(g) } : null;
+        return cfg?.on && !isChunkChat(g) && !isChatTeleport(g) ? { cfg, player: g.minecraft.player || await onlinePlayer(g) } : null;
     },
     deleteBlocks: (player, filter, chunks) => PRESETS[DELETE_BLOCKS](player, filter, chunks),
 });
 // Chunk Chat (chunkchat.js): on a timer, the chunk you're in turns into the block chat picked.
 const isChunkChat = g => g?.connector === 'minecraft' && /chunk chat/i.test(currentMode(g)?.name || '');
+// Chat Teleport (chatteleport.js): on a timer, you're teleported to the nearest block, structure or biome chat picked.
+const isChatTeleport = g => g?.connector === 'minecraft' && /chat teleport/i.test(currentMode(g)?.name || '');
+const chatTeleport = makeChatTeleport({
+    mc, log, broadcast,
+    target: async () => {
+        const g = activeGame();
+        if (!isChatTeleport(g) || !rcon) return null;
+        const cfg = currentMode(g).chatTeleport;
+        if (!cfg?.on) return null;
+        const player = g.minecraft.player || await onlinePlayer(g);
+        return player ? { cfg, player } : null;            // the timer waits while nobody's in the world
+    },
+    dimOf: async player => (await PRESETS[WHERE](player)).dim.replace(/^minecraft:/, ''),
+    teleport: (player, t, range) => PRESETS[TELEPORT_TO](player, t, range),
+});
 // On a server (no Gift Hype pack) these are the blocks that get turned: the ground, trees, water...
 const CHUNK_FILTERS_SERVER = ['#minecraft:base_stone_overworld', '#minecraft:dirt', '#minecraft:sand', 'minecraft:gravel', 'minecraft:sandstone', 'minecraft:red_sandstone',
     '#minecraft:terracotta', '#minecraft:logs', '#minecraft:leaves', 'minecraft:water', 'minecraft:lava', '#minecraft:coal_ores', '#minecraft:iron_ores', '#minecraft:copper_ores',
@@ -787,6 +815,7 @@ function onChat(data) {
     if (text.length > 60) return;
     const by = data.user?.nickname || data.user?.uniqueId || 'someone';
     if (isChunkChat(activeGame())) chunkChat.onChat(text, by).catch(e => log(`Chunk Chat: ${e.message}`));
+    else if (isChatTeleport(activeGame())) chatTeleport.onChat(text, by).catch(e => log(`Chat Teleport: ${e.message}`));
     else chatDelete.onChat(text, by).catch(e => log(`Chat block delete: ${e.message}`));
 }
 
@@ -1056,7 +1085,7 @@ const routes = {
             throw new Error(`The update didn't work: ${e.message}`);
         }
     },
-    'GET /api/overlay-state': async () => ({ settings: overlaySettings(), reset: resetPublic(), chatdel: chatDelete.list(), chunkchat: await chunkChat.state() }),
+    'GET /api/overlay-state': async () => ({ settings: overlaySettings(), reset: resetPublic(), chatdel: chatDelete.list(), chunkchat: isChatTeleport(activeGame()) ? await chatTeleport.state() : await chunkChat.state() }),
     // Chunk Chat: try a block as if it was typed in chat, or change the chunk now
     'POST /api/chunkchat/try': async b => {
         const r = await chunkChat.onChat(String(b.text || ''), 'You (test)');
@@ -1064,6 +1093,13 @@ const routes = {
         return r;
     },
     'POST /api/chunkchat/now': async () => { await chunkChat.skip(); return { ok: true }; },
+    // Chat Teleport: try something as if it was typed in chat, or teleport now
+    'POST /api/chatteleport/try': async b => {
+        const r = await chatTeleport.onChat(String(b.text || ''), 'You (test)');
+        if (!r.ok) throw new Error(r.why);
+        return r;
+    },
+    'POST /api/chatteleport/now': async () => { await chatTeleport.skip(); return { ok: true }; },
     // Chat block delete: try a block name as if it was typed in chat, or stop every countdown
     'POST /api/chatdel/try': async b => {
         const r = await chatDelete.onChat(String(b.text || ''), 'You (test)', { test: true });
