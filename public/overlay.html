@@ -283,7 +283,9 @@ function popup(e) {
 const playing = new Set(), looping = new Map();
 function playSound(file, volume, opts = {}) {
   if (playing.size >= 6) { const a = [...playing].find(x => !x.loop) || playing.values().next().value; a.pause(); playing.delete(a); }
-  const a = new Audio('/sounds/' + file.split('/').map(encodeURIComponent).join('/'));
+  const a = new Audio('/sounds/' + file.split('/').map(encodeURIComponent).join('/') + (opts.start > 0 ? '#t=' + opts.start : ''));
+  // and if the browser didn't start there by itself, it jumps there once it knows the sound
+  if (opts.start > 0) a.addEventListener('loadedmetadata', () => { if (a.currentTime < opts.start - 0.05) a.currentTime = opts.start; }, { once: true });
   a.volume = Math.max(0, Math.min(1, volume));
   playing.add(a);
   a.onended = a.onerror = () => playing.delete(a);

@@ -156,6 +156,11 @@ function realSound(sound) {
     return m ? `builtin/${OLD_SOUND_NAMES[m[1]] || m[1]}.mp3` : sound || null;
 }
 
+function soundPart(r) {
+    const num = v => Number.isFinite(+v) && +v > 0 ? Math.min(600, +v) : 0;
+    const start = num(r.soundStart), end = num(r.soundEnd) || (num(r.soundLen) ? start + num(r.soundLen) : 0);
+    return { soundStart: +start.toFixed(2), soundEnd: end > start + 0.05 ? +end.toFixed(2) : 0 };
+}
 function normalizeRules(rules) {
     return (Array.isArray(rules) ? rules : []).map(r => ({
         id: r.id || newId(),
@@ -164,7 +169,9 @@ function normalizeRules(rules) {
         coins: r.coins ?? null,
         sound: realSound(r.sound),
         volume: Number.isFinite(+r.volume) ? Math.max(0, Math.min(1, +r.volume)) : 1,
-        soundLen: Number.isFinite(+r.soundLen) ? Math.max(0, Math.min(120, +r.soundLen)) : 0,   // seconds the sound plays (0 = all of it)
+        // the part of the sound that plays: from soundStart to soundEnd seconds (0 = to its end).
+        // (2.3.0 had a length instead: it becomes the end.)
+        ...soundPart(r),
         alert: r.alert !== false,
         label: String(r.label || ''),
         perCount: r.perCount !== false,
@@ -1159,8 +1166,11 @@ async function handleGift(giftName, count, from, image, coins) {
     const dropper = isDropper(game), resetEvent = dropper ? dropperResetGift(game, rule, from) : null;
     // a reset's sound plays on (looping) for the whole countdown, until it's saved or runs out
     const soundFile = pickSound(rule.sound);
-    // how long it plays: the gift's own length, else the longest any sound may play (0 = all of it)
-    if (soundFile) broadcast('play', { file: soundFile, volume: rule.volume * settings.masterVolume, ...(resetEvent === 'started' ? { id: 'reset', loopFor: dropperReset.total } : { len: rule.soundLen || settings.soundMax || 0 }) });
+    // the part that plays: the gift's own cut (not for random sounds: each is a different file), and the
+    // longest any sound may play when it has no end of its own (0 = all of it)
+    const cut = !/^random:/.test(rule.sound || ''), start = cut ? rule.soundStart : 0;
+    const len = cut && rule.soundEnd ? rule.soundEnd - start : settings.soundMax || 0;
+    if (soundFile) broadcast('play', { file: soundFile, volume: rule.volume * settings.masterVolume, ...(resetEvent === 'started' ? { id: 'reset', loopFor: dropperReset.total } : { start, len }) });
     if (rule.alert && (from === 'TEST' || entry.coins == null || entry.coins * count >= settings.overlay.popMinCoins)) broadcast('alert', { ...entry, label: rule.label, ...(dropper ? { dropper: true, action: dropperAlertText(rule, count).what, actionColor: dropperAlertText(rule, count).color } : {}) });
 
     const ctx = { player: game.minecraft.player || await onlinePlayer(game) || '@p', from, gift: giftName, count, perCount: rule.perCount, image: entry.image };
@@ -1619,7 +1629,17 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && url.pathname.startsWith('/sounds/')) {
         const p = soundFilePath(decodeURIComponent(url.pathname.slice('/sounds/'.length)));
         if (!p) return send(res, 404, { error: 'Not found' });
-        return send(res, 200, fs.readFileSync(p), SOUND_TYPES[path.extname(p).toLowerCase()]);
+        // parts of the file too (Range), so a sound can start partway through (a gift's cut)
+        const buf = fs.readFileSync(p), head = { 'Content-Type': SOUND_TYPES[path.extname(p).toLowerCase()], 'Accept-Ranges': 'bytes', 'Cache-Control': 'no-store' };
+        const m = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');
+        if (m && (m[1] !== '' || m[2] !== '')) {
+            const start = m[1] === '' ? Math.max(0, buf.length - +m[2]) : +m[1], end = m[1] !== '' && m[2] !== '' ? Math.min(+m[2], buf.length - 1) : buf.length - 1;
+            if (start >= buf.length || start > end) { res.writeHead(416, { 'Content-Range': `bytes */${buf.length}` }); return res.end(); }
+            res.writeHead(206, { ...head, 'Content-Range': `bytes ${start}-${end}/${buf.length}`, 'Content-Length': end - start + 1 });
+            return res.end(buf.subarray(start, end + 1));
+        }
+        res.writeHead(200, { ...head, 'Content-Length': buf.length });
+        return res.end(buf);
     }
 
     // Upload a sound: raw file in the body, its name in ?name=

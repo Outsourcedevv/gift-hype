@@ -351,7 +351,13 @@ svg.i { width: 14px; height: 14px; flex: none; vertical-align: -2px; }
 .rule-sound { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding-left: 62px; }
 @media (max-width: 760px) { .rule-sound { padding-left: 0; } }
 .rule-sound select { min-width: 170px; }
-.rule-sound .lenin { width: 74px; padding: 6px 8px; }
+.rule-sound .cutbtn.on { border-color: color-mix(in srgb, var(--main) 55%, transparent); color: var(--main-text); background: color-mix(in srgb, var(--main) 12%, transparent); font-variant-numeric: tabular-nums; }
+.wave { position: relative; height: 150px; border-radius: 14px; overflow: hidden; border: 1px solid var(--line); background: color-mix(in srgb, var(--text) 3%, var(--panel)); touch-action: none; cursor: ew-resize; }
+.wave canvas { width: 100%; height: 100%; display: block; }
+.wave .loading { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 14px; }
+.cutrow { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+.cutrow input[type=number] { width: 92px; }
+.cutrow .pill b { color: var(--text); font-variant-numeric: tabular-nums; }
 .vol { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
 .vol input { width: 90px; }
 .acts { display: flex; flex-direction: column; gap: 8px; padding-left: 62px; }
@@ -748,7 +754,7 @@ body.corners-soft section { border-radius: 8px; }
         </select>
       </label>
       <label class="field" style="margin-top:14px">Longest a gift's sound plays (seconds)
-        <div class="row"><input type="number" id="soundMax" min="0" max="120" step="0.5" placeholder="no limit" style="width:140px"><span class="hint" style="margin:0">Empty = the whole sound. A gift's own <b>length</b> wins over this.</span></div>
+        <div class="row"><input type="number" id="soundMax" min="0" max="120" step="0.5" placeholder="no limit" style="width:140px"><span class="hint" style="margin:0">Empty = the whole sound. Only for gifts whose sound has no end of its own (✂ Cut).</span></div>
       </label>
       <div class="row" style="margin-top:14px"><label class="check"><input type="checkbox" id="autoConnect"> Connect to TikTok by itself when the app opens</label></div>
       <details style="margin-top:14px" id="eulerBox">
@@ -832,6 +838,26 @@ body.corners-soft section { border-radius: 8px; }
   <div class="dlg-body"><div class="jlist" id="jumpList" role="listbox"></div></div>
 </dialog>
 
+<dialog id="cutDlg" style="width:min(780px,94vw)">
+  <div class="dlg-head"><h3>Cut the sound</h3><span class="pill" id="cutName" style="text-transform:capitalize"></span>
+    <button class="ghost" style="margin-left:auto" id="cutClose" aria-label="Close"><svg class="i" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button></div>
+  <div class="dlg-body">
+    <p class="hint" style="margin:0 0 12px">Drag the two handles (or type the times) to pick the part that plays. The start and the end outside them are cut out. Click in the middle to play from there.</p>
+    <div class="wave" id="cutWave"><canvas id="cutCanvas"></canvas><div class="loading" id="cutLoading">Loading the sound…</div></div>
+    <div class="cutrow">
+      <label class="vol">Start <input type="number" id="cutStart" min="0" step="0.1"> s</label>
+      <label class="vol">End <input type="number" id="cutEnd" min="0" step="0.1"> s</label>
+      <span class="pill">Plays <b id="cutLen"></b> of <b id="cutDur"></b></span>
+    </div>
+    <div class="cutrow">
+      <button class="small primary" id="cutPlay">▶ Play the part</button>
+      <button class="small" id="cutStop">Stop</button>
+      <button class="small ghost" id="cutAll">Whole sound</button>
+    </div>
+    <div class="toolbar"><button id="cutCancel" style="margin-left:auto">Cancel</button><button class="primary" id="cutSave">Save</button></div>
+  </div>
+</dialog>
+
 <dialog id="sndDlg">
   <div class="dlg-head"><h3>Pick a sound</h3><input type="search" id="pickQ" placeholder="Search sounds…" autocomplete="off" aria-label="Search sounds">
     <button class="ghost" id="pickClose" aria-label="Close"><svg class="i" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button></div>
@@ -881,7 +907,9 @@ function playSound(file, volume = 1, opts = {}) {
   file = resolveSound(file);
   if (!file) return null;
   if (playing.size >= 6) { const oldest = [...playing].find(x => !x.loop) || playing.values().next().value; oldest.pause(); playing.delete(oldest); oldest.onended?.(); }
-  const a = new Audio('/sounds/' + file.split('/').map(encodeURIComponent).join('/'));
+  const a = new Audio('/sounds/' + file.split('/').map(encodeURIComponent).join('/') + (opts.start > 0 ? '#t=' + opts.start : ''));
+  // and if the browser didn't start there by itself, it jumps there once it knows the sound
+  if (opts.start > 0) a.addEventListener('loadedmetadata', () => { if (a.currentTime < opts.start - 0.05) a.currentTime = opts.start; }, { once: true });
   a.volume = Math.max(0, Math.min(1, volume));
   a._file = file;
   playing.add(a);
@@ -2122,7 +2150,7 @@ function renderRules() {
         <button class="small" data-prev aria-label="Play sound" ${r.sound ? '' : 'disabled'}>${IC.play}</button>
         <label class="small ghost" style="cursor:pointer"><input type="file" accept=".mp3,.wav,.ogg,.m4a,audio/*" data-upsound hidden><span class="pill" style="text-decoration:underline">upload…</span></label>
         <label class="vol">vol <input type="range" min="0" max="1" step="0.05" value="${r.volume}" data-f="volume"></label>
-        <label class="vol" title="How many seconds the sound plays, then it fades out. Empty = the whole sound${settings.soundMax ? ` (or ${settings.soundMax} s, the longest set in Settings)` : ''}.">length <input type="number" min="0" max="120" step="0.5" value="${r.soundLen || ''}" placeholder="${settings.soundMax ? settings.soundMax + ' s' : 'full'}" data-f="soundLen" class="lenin"> s</label>
+        <button class="small cutbtn ${partText(r) ? 'on' : ''}" data-cut title="Pick the part of the sound that plays (cut out the start or the end)" ${r.sound && !/^random:/.test(r.sound) ? '' : 'disabled'}>✂ ${partText(r) || 'Cut'}</button>
         <label class="check"><input type="checkbox" data-f="alert" ${r.alert ? 'checked' : ''}> Pop up on stream</label>
         <label class="check" title="A streak of 5 does the actions 5 times"><input type="checkbox" data-f="perCount" ${r.perCount ? 'checked' : ''}> Once per gift in a streak</label>
       </div>
@@ -2148,10 +2176,13 @@ function renderRules() {
         queueSave();
       });
     });
-    el.querySelector('[data-prev]').onclick = () => playSound(r.sound, r.volume * settings.masterVolume, { len: r.soundLen || settings.soundMax || 0 });
+    el.querySelector('[data-prev]').onclick = () => playSound(r.sound, r.volume * settings.masterVolume, partOpts(r));
+    el.querySelector('[data-cut]').onclick = () => openCut(r);
     el.querySelector('[data-pick]').onclick = () => openSoundPicker(r.sound, f => {
+      // another sound: its cut starts again (the old times were for the old sound)
+      if (f !== r.sound) { r.soundStart = 0; r.soundEnd = 0; }
       r.sound = f; queueSave(); renderRules();
-      if (f) playSound(f, r.volume * settings.masterVolume, { len: r.soundLen || settings.soundMax || 0 });
+      if (f) playSound(f, r.volume * settings.masterVolume, partOpts(r));
     });
     el.querySelector('[data-upsound]').onchange = async e => {
       const file = await uploadFiles([...e.target.files]);
@@ -2200,6 +2231,127 @@ $('addAny').onclick = () => {
   if (R().some(r => r.gift === '*')) return toast('This game already has "Any other gift"');
   addRule('*');
 };
+
+// ----- The part of a gift's sound that plays (cut out the start or the end) -----
+const secs = t => (Math.round(t * 10) / 10).toFixed(1) + ' s';
+const partText = r => !r.sound || /^random:/.test(r.sound) || (!r.soundStart && !r.soundEnd) ? '' : `${secs(r.soundStart || 0)} – ${r.soundEnd ? secs(r.soundEnd) : 'end'}`;
+const partOpts = r => {
+  if (!r.sound || /^random:/.test(r.sound)) return { len: settings.soundMax || 0 };
+  const start = r.soundStart || 0;
+  return { start, len: r.soundEnd ? r.soundEnd - start : settings.soundMax || 0 };
+};
+let cut = null;   // { r, start, end, dur, peaks, audio }
+async function openCut(r) {
+  if (!r.sound || /^random:/.test(r.sound)) return;
+  cut = { r, start: r.soundStart || 0, end: r.soundEnd || 0, dur: 0, peaks: null, audio: null };
+  $('cutName').textContent = soundName(r.sound);
+  $('cutLoading').hidden = false; $('cutLoading').textContent = 'Loading the sound…';
+  $('cutDlg').showModal();
+  drawCut();
+  try {
+    const buf = await (await fetch('/sounds/' + r.sound.split('/').map(encodeURIComponent).join('/'))).arrayBuffer();
+    const ac = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(1, 44100, 44100);
+    const au = await ac.decodeAudioData(buf);
+    if (!cut || cut.r !== r) return;
+    // the loudest point in each of 600 slices, for the waveform
+    const ch = au.getChannelData(0), N = 600, step = Math.max(1, Math.floor(ch.length / N)), peaks = new Float32Array(N);
+    for (let i = 0; i < N; i++) { let m = 0; for (let j = i * step, e = Math.min(ch.length, j + step); j < e; j += 4) m = Math.max(m, Math.abs(ch[j])); peaks[i] = m; }
+    const top = Math.max(0.01, ...peaks);
+    cut.peaks = peaks.map(v => v / top); cut.dur = au.duration;
+    if (!cut.end || cut.end > cut.dur) cut.end = cut.dur;
+    cut.start = Math.min(cut.start, Math.max(0, cut.end - 0.1));
+    $('cutLoading').hidden = true;
+  } catch { $('cutLoading').textContent = "Couldn't load that sound"; }
+  fillCut();
+}
+function fillCut() {
+  if (!cut) return;
+  if (document.activeElement !== $('cutStart')) $('cutStart').value = cut.start.toFixed(1);
+  if (document.activeElement !== $('cutEnd')) $('cutEnd').value = cut.end.toFixed(1);
+  $('cutStart').max = $('cutEnd').max = cut.dur.toFixed(1);
+  $('cutLen').textContent = secs(Math.max(0, cut.end - cut.start));
+  $('cutDur').textContent = secs(cut.dur);
+  drawCut();
+}
+function drawCut() {
+  const c = $('cutCanvas'), dpr = devicePixelRatio || 1, W = c.clientWidth, H = c.clientHeight;
+  if (!W) return;
+  c.width = W * dpr; c.height = H * dpr;
+  const g = c.getContext('2d'); g.scale(dpr, dpr); g.clearRect(0, 0, W, H);
+  if (!cut || !cut.peaks) return;
+  const css = getComputedStyle(document.documentElement), main = css.getPropertyValue('--main').trim() || '#8b6cff', hot = css.getPropertyValue('--hot').trim() || '#22d3ee', mut = css.getPropertyValue('--muted').trim() || '#888';
+  const x = t => t / cut.dur * W, xs = x(cut.start), xe = x(cut.end);
+  // the part that plays
+  g.fillStyle = main; g.globalAlpha = 0.14; g.fillRect(xs, 0, xe - xs, H); g.globalAlpha = 1;
+  const n = cut.peaks.length, bw = W / n;
+  for (let i = 0; i < n; i++) {
+    const px = i * bw, h = Math.max(1.5, cut.peaks[i] * (H - 28)), inside = px + bw / 2 >= xs && px + bw / 2 <= xe;
+    g.fillStyle = inside ? main : mut; g.globalAlpha = inside ? 1 : 0.35;
+    g.fillRect(px, (H - h) / 2, Math.max(1, bw - 0.6), h);
+  }
+  g.globalAlpha = 1;
+  // the handles
+  for (const hx of [xs, xe]) {
+    g.fillStyle = '#fff'; g.fillRect(hx - 1.5, 0, 3, H);
+    g.beginPath(); g.roundRect ? g.roundRect(hx - 7, H / 2 - 18, 14, 36, 6) : g.rect(hx - 7, H / 2 - 18, 14, 36); g.fill();
+    g.fillStyle = main; g.fillRect(hx - 2, H / 2 - 8, 1.5, 16); g.fillRect(hx + 0.5, H / 2 - 8, 1.5, 16);
+  }
+  // times
+  g.font = '600 11px Inter, sans-serif'; g.fillStyle = '#fff';
+  // beside its handle: the start's on its left, the end's on its right (inside when there's no room)
+  g.textAlign = xs > 44 ? 'right' : 'left'; g.fillText(secs(cut.start), xs > 44 ? xs - 10 : xs + 10, 14);
+  g.textAlign = xe < W - 44 ? 'left' : 'right'; g.fillText(secs(cut.end), xe < W - 44 ? xe + 10 : xe - 10, H - 6);
+  // where it's playing
+  if (cut.audio && !cut.audio.paused) { g.fillStyle = hot; g.fillRect(x(cut.audio.currentTime) - 1, 0, 2, H); }
+}
+// drag a handle (the nearer one); a click between them plays from there
+let cutDrag = null;
+$('cutWave').onpointerdown = e => {
+  if (!cut?.peaks) return;
+  const r = $('cutWave').getBoundingClientRect(), t = (e.clientX - r.left) / r.width * cut.dur, px = t / cut.dur * r.width;
+  const ds = Math.abs(px - cut.start / cut.dur * r.width), de = Math.abs(px - cut.end / cut.dur * r.width);
+  if (Math.min(ds, de) > 14 && t > cut.start && t < cut.end) { playCut(t); return; }
+  cutDrag = ds <= de ? 'start' : 'end';
+  $('cutWave').setPointerCapture(e.pointerId);
+  $('cutWave').onpointermove(e);
+};
+$('cutWave').onpointermove = e => {
+  if (!cutDrag) return;
+  const r = $('cutWave').getBoundingClientRect(), t = Math.max(0, Math.min(cut.dur, (e.clientX - r.left) / r.width * cut.dur));
+  if (cutDrag === 'start') cut.start = Math.min(t, cut.end - 0.1); else cut.end = Math.max(t, cut.start + 0.1);
+  fillCut();
+};
+$('cutWave').onpointerup = $('cutWave').onpointercancel = () => { if (cutDrag) { cutDrag = null; playCut(); } };
+$('cutStart').oninput = () => { cut.start = Math.max(0, Math.min(+$('cutStart').value || 0, cut.end - 0.1)); fillCut(); };
+$('cutEnd').oninput = () => { cut.end = Math.min(cut.dur, Math.max(+$('cutEnd').value || 0, cut.start + 0.1)); fillCut(); };
+$('cutStart').onchange = $('cutEnd').onchange = () => { $('cutStart').blur(); fillCut(); };
+function stopCut() { if (cut?.audio) { cut.audio.pause(); cut.audio = null; } drawCut(); }
+function playCut(from) {
+  if (!cut?.dur) return;
+  stopCut();
+  const a = cut.audio = new Audio('/sounds/' + cut.r.sound.split('/').map(encodeURIComponent).join('/') + '#t=' + (from ?? cut.start));
+  const at = from ?? cut.start;
+  a.addEventListener('loadedmetadata', () => { if (a.currentTime < at - 0.05) a.currentTime = at; }, { once: true });
+  a.volume = Math.max(0, Math.min(1, cut.r.volume * settings.masterVolume));
+  a.play().catch(() => {});
+  const tick = () => { if (cut?.audio !== a) return; if (a.currentTime >= cut.end || a.ended) { a.pause(); cut.audio = null; drawCut(); return; } drawCut(); requestAnimationFrame(tick); };
+  requestAnimationFrame(tick);
+}
+$('cutPlay').onclick = () => playCut();
+$('cutStop').onclick = stopCut;
+$('cutAll').onclick = () => { if (!cut?.dur) return; cut.start = 0; cut.end = cut.dur; fillCut(); };
+const closeCut = () => { stopCut(); cut = null; $('cutDlg').close(); };
+$('cutClose').onclick = $('cutCancel').onclick = closeCut;
+$('cutDlg').addEventListener('close', () => { stopCut(); cut = null; });
+$('cutSave').onclick = () => {
+  if (!cut?.dur) return closeCut();
+  const r = cut.r;
+  r.soundStart = cut.start < 0.05 ? 0 : +cut.start.toFixed(2);
+  r.soundEnd = cut.end > cut.dur - 0.05 ? 0 : +cut.end.toFixed(2);
+  closeCut(); renderRules(); queueSave();
+  toast(partText(r) ? `This gift plays ${partText(r)}` : 'This gift plays the whole sound');
+};
+addEventListener('resize', () => { if ($('cutDlg').open) drawCut(); });
 
 // ----- Saving -----
 let saveTimer = null;
