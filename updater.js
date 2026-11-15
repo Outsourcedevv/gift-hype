@@ -28,14 +28,27 @@ export function newer(a, b) {
     return false;
 }
 
+// The exact commit that's on main right now. GitHub's file addresses for "main" can be a few minutes old
+// (they're cached), so the version is read from that exact commit instead, which is never out of date.
+// null if GitHub's API can't be reached (then the cached address is used).
+async function mainCommit() {
+    try {
+        const r = await fetch(`https://api.github.com/repos/${REPO}/commits/${BRANCH}`, { headers: { 'User-Agent': 'GiftHype-updater', Accept: 'application/vnd.github.sha', 'Cache-Control': 'no-cache' } });
+        const sha = r.ok ? (await r.text()).trim() : '';
+        return /^[0-9a-f]{40}$/.test(sha) ? sha : null;
+    } catch { return null; }
+}
+
 export async function latestVersion() {
-    const r = await fetch(`https://raw.githubusercontent.com/${REPO}/${BRANCH}/package.json?t=${Date.now()}`, { headers: { 'User-Agent': 'GiftHype-updater', 'Cache-Control': 'no-cache' } });
+    const sha = await mainCommit();
+    const url = sha ? `https://raw.githubusercontent.com/${REPO}/${sha}/package.json` : `https://raw.githubusercontent.com/${REPO}/${BRANCH}/package.json?t=${Date.now()}`;
+    const r = await fetch(url, { headers: { 'User-Agent': 'GiftHype-updater', 'Cache-Control': 'no-cache' } });
     if (!r.ok) throw new Error(`GitHub answered ${r.status}`);
-    return (await r.json()).version;
+    return { version: (await r.json()).version, sha };
 }
 
 export async function checkForUpdate(root) {
-    const current = localVersion(root), latest = await latestVersion();
+    const current = localVersion(root), { version: latest } = await latestVersion();
     return { current, latest, available: !isDevCopy(root) && newer(latest, current), devCopy: isDevCopy(root) };
 }
 
@@ -47,7 +60,9 @@ export async function applyUpdate(root, log = () => {}) {
     fs.mkdirSync(work, { recursive: true });
     try {
         log('Downloading the update...');
-        const r = await fetch(`https://codeload.github.com/${REPO}/zip/refs/heads/${BRANCH}`, { headers: { 'User-Agent': 'GiftHype-updater' } });
+        // the exact commit on main (so it's the newest, not a cached older one)
+        const sha = await mainCommit();
+        const r = await fetch(`https://codeload.github.com/${REPO}/zip/${sha || `refs/heads/${BRANCH}`}`, { headers: { 'User-Agent': 'GiftHype-updater' } });
         if (!r.ok) throw new Error(`GitHub answered ${r.status}`);
         const zip = path.join(work, 'update.zip');
         fs.writeFileSync(zip, Buffer.from(await r.arrayBuffer()));
