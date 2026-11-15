@@ -214,6 +214,10 @@ LOOK & SETTINGS
   Layout: text size, corners (round / a little round / square), compact, the Live gifts column, animations.
 
 BOXES ON THE OVERLAY (Stream overlay tab)
+  "Size of everything" makes every box bigger at once (200% is good for TikTok, where people watch on
+  phones) and keeps it sharp. Don't make the overlay bigger in TikTok LIVE Studio instead: that stretches
+  it and makes it blurry. Popups never cover the gift list: they move to its open side, or the list
+  fades while they show when there's no room.
   Every box (gift popups, gift list, timer, block delete list, reset countdown) can be shown or hidden
   on your stream, and has its own Width, Height and Size. Auto = the box's own size. You can also drag
   a box's side handles in the overlay editor: the right one for width, the bottom one for height, the

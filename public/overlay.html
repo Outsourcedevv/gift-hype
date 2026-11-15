@@ -270,9 +270,10 @@ function applySettings() {
   if (typeof drawMenu === 'function') try { drawMenu(); } catch { }
   document.body.className = o.position + (location.search.includes('preview') ? ' preview' : '') + (EDITING ? ' editing' : '')
     + ` anim-${o.popAnim || 'bounce'} pst-${o.popStyle || 'dark'}` + (o.popWiggle === false ? ' no-wiggle' : '');
-  document.getElementById('slots').style.transform = `translate(-50%, -50%) scale(${o.scale})`;
+  document.getElementById('slots').style.transform = `translate(-50%, -50%) scale(${(o.scale || 1) * zoomOf()})`;
   applyPlaces();
   fitStage();
+  avoidMenu();
 }
 
 const MAX = 4;
@@ -291,6 +292,7 @@ function burst(e) {
   el.className = 'burst';
   el.innerHTML = burstHtml(e);
   stack.prepend(el);
+  avoidMenu();
   setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 400); }, e.dropper ? 3600 : (settings.overlay.popSeconds || 4.5) * 1000);
 }
 function popHtml(e) {
@@ -298,6 +300,28 @@ function popHtml(e) {
   return `${o.popImage !== false ? `<div class="img">${e.image ? `<img src="${pic(e.image)}" alt="">` : ''}</div>` : ''}
     <div><div class="who">${o.showSender ? `<b>${esc(e.from)}</b> ${esc(word)} ` : ''}${e.count > 1 && o.popCount !== false ? `<span class="n">${e.count}×</span> ` : ''}${esc(e.gift)}</div>
     ${e.label ? `<div class="did">${esc(e.label)}</div>` : ''}</div>`;
+}
+// Popups never cover the gift list: if they would, the popups move sideways to the open side of the list
+// (measured from their places, not their animations); with no room for that, the list fades while they show.
+let awayTimer = null;
+function avoidMenu() {
+  const st = document.getElementById('stage'), stack = document.getElementById('stack'), m = document.getElementById('menu');
+  stack.style.marginLeft = '0px';
+  if (EDITING || !m.classList.contains('on') || m.classList.contains('boxhidden') || !stack.children.length) return;
+  const sr = st.getBoundingClientRect(), k = sr.width / st.offsetWidth, r = stack.getBoundingClientRect(), f = r.width / stack.offsetWidth;
+  let a = null;
+  for (const c of stack.children) {
+    const l = r.left + c.offsetLeft * f, t = r.top + c.offsetTop * f, R = l + c.offsetWidth * f, B = t + c.offsetHeight * f;
+    a = a ? { l: Math.min(a.l, l), t: Math.min(a.t, t), r: Math.max(a.r, R), b: Math.max(a.b, B) } : { l, t, r: R, b: B };
+  }
+  const b = m.getBoundingClientRect();
+  if (!(a.l < b.right && b.left < a.r && a.t < b.bottom && b.top < a.b)) return;
+  const gap = 18 * k, listLeft = (b.left + b.right) / 2 < (sr.left + sr.right) / 2;
+  const d = listLeft ? b.right + gap - a.l : b.left - gap - a.r;
+  if (a.l + d >= sr.left && a.r + d <= sr.right) { stack.style.marginLeft = d / k + 'px'; return; }
+  m.classList.add('away');
+  clearTimeout(awayTimer);
+  awayTimer = setTimeout(() => m.classList.remove('away'), ((settings.overlay.popSeconds || 4.5) + 0.5) * 1000);
 }
 function popup(e) {
   if (e.dropper || settings.overlay.popType === 'burst') return burst(e);
@@ -308,6 +332,7 @@ function popup(e) {
   stack.prepend(el);
   const o = settings.overlay;
   while (stack.querySelectorAll('.pop:not(.demo)').length > (o.popMax || MAX)) [...stack.querySelectorAll('.pop:not(.demo)')].pop().remove();
+  avoidMenu();
   setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 400); }, (o.popSeconds || 4.5) * 1000);
 }
 
@@ -501,6 +526,8 @@ const PLACE = {
   chatdel: { id: 'chatDel', label: 'Block delete list', def: { x: 98, y: 40 } },
   reset: { id: 'resetBox', label: 'Reset countdown', def: { x: 2, y: 4 } },
 };
+// "Size of everything" (the app's Stream overlay tab): every box bigger or smaller at once, drawn sharp at that size
+const zoomOf = () => Math.max(0.5, Math.min(3, ((settings.overlay && settings.overlay.zoom) || 100) / 100));
 function placeOf(k) {
   const o = (settings && settings.overlay) || {};
   const p = (o.place || {})[k] || {};
@@ -516,7 +543,7 @@ function applyPlaces() {
     const e = document.getElementById(PLACE[k].id), p = placeOf(k);
     if (!e) continue;
     Object.assign(e.style, { position: 'fixed', left: p.x + '%', top: p.y + '%', right: 'auto', bottom: 'auto',
-      transformOrigin: `${p.x}% ${p.y}%`, transform: `translate(${-p.x}%, ${-p.y}%) scale(${p.s})` });
+      transformOrigin: `${p.x}% ${p.y}%`, transform: `translate(${-p.x}%, ${-p.y}%) scale(${p.s * zoomOf()})` });
     // popups low on the screen stack upwards (newest at the bottom), so they stay on screen
     if (k === 'popups') { e.style.flexDirection = p.y > 60 ? 'column-reverse' : 'column'; e.style.width = Math.max(760, p.w || 0) + 'px'; }
     if (p.w) e.style.setProperty('--bw', p.w + 'px'); else e.style.removeProperty('--bw');
@@ -580,8 +607,9 @@ function setupEditor() {
       if (start.side) {
         // the box's own width or height (the box is drawn at its size, so undo that for the real pixels)
         const pb = PANEL[k] ? document.querySelector(PANEL[k]) : null, pr = pb ? pb.getBoundingClientRect() : r;
-        if (start.side === 'ew') set({ ...p, w: Math.max(120, Math.min(1900, (start.w0 ??= (p.w || pr.width / p.s)) + dx / p.s)) });
-        else set({ ...p, h: Math.max(30, Math.min(1000, (start.h0 ??= (p.h || pr.height / p.s)) + dy / p.s)) });
+        const k = p.s * zoomOf();
+        if (start.side === 'ew') set({ ...p, w: Math.max(120, Math.min(1900, (start.w0 ??= (p.w || pr.width / k)) + dx / k)) });
+        else set({ ...p, h: Math.max(30, Math.min(1000, (start.h0 ??= (p.h || pr.height / k)) + dy / k)) });
       } else if (start.resize) {
         const s = Math.max(0.3, Math.min(3, p.s * (r.width + dx) / r.width));
         set({ ...p, s });
