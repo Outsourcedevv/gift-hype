@@ -1,4 +1,4 @@
-// The Dropper: a 100-level dropper that Gift Hype builds in its own world ("Gift Hype Dropper").
+// The Dropper: a 100-level dropper that Unbound builds in its own world ("Gift Hype Dropper", the name of its folder).
 //
 // Each level is a shaft in the sky. You stand on a ledge at the top, step off, and steer through
 // layers of obstacles as you fall. Land in the water at the bottom and you're teleported straight
@@ -15,7 +15,7 @@
 // first obstacles can be right under the ledge.
 //
 // The game itself (levels, landing in water, jail, the reset countdown, punches) runs from a
-// data pack in the world, so it works the same however the world is opened. Gift Hype sends the
+// data pack in the world, so it works the same however the world is opened. Unbound sends the
 // gift actions as function calls.
 
 import fs from 'node:fs';
@@ -631,7 +631,7 @@ function fairLevel(n) {
 // Those numbers are saved (data/dropper-levels.json), so the levels are only designed once per build.
 const INFO_FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), 'data', 'dropper-levels.json');
 const infoCache = new Map();
-// A copy comes with Gift Hype (dropper-levels.json next to this file), so a new install doesn't
+// A copy comes with Unbound (dropper-levels.json next to this file), so a new install doesn't
 // spend a minute or two designing every level before the world can open.
 for (const file of [INFO_FILE, path.join(path.dirname(fileURLToPath(import.meta.url)), 'dropper-levels.json')]) {
     try { const f = JSON.parse(fs.readFileSync(file, 'utf8')); if (f.build === DROPPER_BUILD && f.levels?.length === SECRET) { for (const i of f.levels) infoCache.set(i.n, i); break; } } catch { }
@@ -1081,7 +1081,7 @@ const TALL_OVERWORLD = {
 };
 function packFiles() {
     const f = {
-        'pack.mcmeta': JSON.stringify({ pack: { description: 'Gift Hype Dropper: 100 levels', min_format: 94, max_format: 999 } }, null, 2),
+        'pack.mcmeta': JSON.stringify({ pack: { description: 'Unbound Dropper: 100 levels', min_format: 94, max_format: 999 } }, null, 2),
         'data/minecraft/tags/function/load.json': J({ values: ['dropper:load'] }),
         'data/minecraft/tags/function/tick.json': J({ values: ['dropper:tick'] }),
     };
@@ -1347,7 +1347,7 @@ function packFiles() {
     return f;
 }
 function buildPackFiles(from, to) {
-    const f = { 'pack.mcmeta': JSON.stringify({ pack: { description: 'Gift Hype Dropper: building the levels', min_format: 94, max_format: 999 } }, null, 2) };
+    const f = { 'pack.mcmeta': JSON.stringify({ pack: { description: 'Unbound Dropper: building the levels', min_format: 94, max_format: 999 } }, null, 2) };
     if (from === 1) f['data/dropper/function/build/extra.mcfunction'] = extraCommands().join('\n') + '\n';
     for (const L of levelRange(from, to)) levelParts(L).forEach((p, i) => { f[`data/dropper/function/build/${L.n}_${i + 1}.mcfunction`] = p.join('\n') + '\n'; });
     return f;

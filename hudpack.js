@@ -1,4 +1,4 @@
-// Chat Teleport's on-screen box: a small resource pack that Gift Hype's hidden server hands to your game.
+// Chat Teleport's on-screen box: a small resource pack that Unbound's hidden server hands to your game.
 // Minecraft can only put text in fixed places (title, action bar, boss bar), so the box is made of font
 // glyphs: the box picture (designed in Figma: public/img/hud-box.png), pixel letters and numbers, and
 // pictures of blocks taken from your own Minecraft. Each size/height setting is its own font (bitmap
@@ -99,7 +99,7 @@ const FONT = {
 const CHARS = Object.keys(FONT).join('');
 
 // The box's colours and words come from Chat Teleport's settings (normalizeChatTeleport); these are the
-// defaults (the Figma design: Gift Hype's navy, sky blue and orange on a light card)
+// defaults (the Figma design: Unbound's navy, sky blue and orange on a light card)
 export const BOX_DEFAULTS = {
     colFill: '#F4F8FC', colBorder: '#13304A', colStripe: '#4DB3EE', colShade: '#D5E0EA',
     colLabel: '#1474B4', colDigits: '#E8542A', colWarn: '#DC2626', colName: '#13304A', colAway: '#1474B4', colNone: '#DC2626', colLoading: '#1474B4',
@@ -235,7 +235,7 @@ function buildPack({ cfg, version }) {
 
     const files = [];
     const add = (name, data) => files.push({ name, data: Buffer.isBuffer(data) ? data : Buffer.from(typeof data === 'string' ? data : JSON.stringify(data)) });
-    add('pack.mcmeta', { pack: { description: 'Gift Hype: the Chat Teleport box', pack_format: 15, supported_formats: [15, 999], min_format: 15, max_format: 999 } });
+    add('pack.mcmeta', { pack: { description: 'Unbound: the Chat Teleport box', pack_format: 15, supported_formats: [15, 999], min_format: 15, max_format: 999 } });
     try { add('pack.png', fs.readFileSync(path.join(ROOT, 'public', 'icon.png'))); } catch { }
     for (const h of CELLS) {
         add(`assets/gifthype/textures/hud/boxedge${h}.png`, boxEdgeSheet(h));
@@ -304,12 +304,12 @@ function buildPack({ cfg, version }) {
     return pack;
 }
 
-// server.properties lines for the hidden server (Gift Hype serves the pack on its own port). cfg: Chat
+// server.properties lines for the hidden server (Unbound serves the pack on its own port). cfg: Chat
 // Teleport's settings (where the box goes), version: the world's Minecraft (for the block pictures).
 export function hudProps(port, cfg, version) {
     current = buildPack({ cfg, version });
     return [`resource-pack=http://127.0.0.1:${port}/mc/gifthype-hud.zip`, `resource-pack-sha1=${current.sha1}`, `resource-pack-id=${current.id}`,
-        'require-resource-pack=false', 'resource-pack-prompt={"text":"Gift Hype: the Chat Teleport box"}'];
+        'require-resource-pack=false', 'resource-pack-prompt={"text":"Unbound: the Chat Teleport box"}'];
 }
 
 // The title text for the box. what: { left } for the countdown; { done: true, target, away } after a

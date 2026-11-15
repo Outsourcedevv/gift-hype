@@ -1,4 +1,4 @@
-// Singleplayer worlds have no RCON, so for them Gift Hype:
+// Singleplayer worlds have no RCON, so for them Unbound:
 //  1. puts a small data pack ("gifthype") into the world that does the big actions from inside the
 //     game (nuke, jail, chunk fills, kits, End teleport), and
 //  2. types a short command into Minecraft's chat for each gift, like  /function gifthype:nuke {size:40}
@@ -208,7 +208,7 @@ function blast() {
 function packFiles(nukeSizes) {
     const sizes = [...new Set([40, ...nukeSizes])].sort((a, b) => a - b);
     const f = {
-        'pack.mcmeta': JSON.stringify({ pack: { description: 'Gift Hype: TikTok gift actions', min_format: 94, max_format: 999 } }, null, 2),
+        'pack.mcmeta': JSON.stringify({ pack: { description: 'Unbound: TikTok gift actions', min_format: 94, max_format: 999 } }, null, 2),
         // Chunk Chat: the blocks that get turned (not required, so a world on an older version still loads it)
         'data/gifthype/tags/block/chunk_chat.json': JSON.stringify({ values: CHUNK_REPLACE.map(id => ({ id: `minecraft:${id}`, required: false })) }),
         'data/minecraft/tags/function/load.json': JSON.stringify({ values: ['gifthype:load'] }),

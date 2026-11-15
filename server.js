@@ -1,4 +1,4 @@
-// Gift Hype: TikTok LIVE gifts play sounds and make things happen in your games.
+// Unbound: TikTok LIVE gifts play sounds and make things happen in your games.
 //
 // Each "game" has its own gift list. A gift can play a sound, pop up on the stream overlay, and
 // do things in the game, through one of these:
@@ -83,6 +83,39 @@ function normalizeMenu(o = {}) {
     };
 }
 Object.assign(settings.overlay, normalizeMenu(settings.overlay));
+// The gift popups on the overlay: how long, how many, how they look and move
+function normalizePop(o = {}) {
+    const num = (v, lo, hi, def) => Number.isFinite(+v) && v !== '' && v !== null ? Math.max(lo, Math.min(hi, +v)) : def;
+    const col = (v, def) => /^#[0-9a-f]{6}$/i.test(String(v)) ? String(v) : def;
+    return {
+        popSeconds: num(o.popSeconds, 1, 20, 4.5),                      // how long each one stays
+        popMax: Math.round(num(o.popMax, 1, 8, 4)),                     // how many at once
+        popAnim: ['bounce', 'slide', 'zoom', 'fade', 'spin', 'none'].includes(o.popAnim) ? o.popAnim : 'bounce',
+        popStyle: ['dark', 'light', 'glass', 'neon', 'minecraft'].includes(o.popStyle) ? o.popStyle : 'dark',
+        popImage: o.popImage !== false, popWiggle: o.popWiggle !== false, popCount: o.popCount !== false,
+        popColors: o.popColors === true,                                // own colours instead of the theme's
+        popBorder: col(o.popBorder, '#4DB3EE'), popName: col(o.popName, '#4DB3EE'), popText: col(o.popText, '#FFFFFF'), popDoes: col(o.popDoes, '#FF6A3D'),
+        popWord: String(o.popWord ?? 'sent').slice(0, 20),             // "<name> sent Rose"
+        popMinCoins: Math.round(num(o.popMinCoins, 0, 1e6, 0)),         // gifts cheaper than this don't pop up
+    };
+}
+Object.assign(settings.overlay, normalizePop(settings.overlay));
+// How the app itself looks: the custom theme's colours, text size, and the layout
+const THEME_IDS = ['unbound', 'sky', 'blaze', 'punk', 'egyptian', 'mint', 'grape', 'mono', 'custom'];
+function normalizeLook(l = {}) {
+    const col = (v, def) => /^#[0-9a-f]{6}$/i.test(String(v)) ? String(v) : def;
+    const num = (v, lo, hi, def) => Number.isFinite(+v) && v !== '' && v !== null ? Math.max(lo, Math.min(hi, +v)) : def;
+    return {
+        main: col(l.main, '#7c4dff'), hot: col(l.hot, '#ff2d75'), base: l.base === 'light' ? 'light' : 'dark',
+        textSize: num(l.textSize, 80, 130, 100),                        // percent
+        compact: l.compact === true,                                    // less space between things
+        side: l.side !== false,                                         // the Live gifts column on the right
+        corners: ['round', 'soft', 'square'].includes(l.corners) ? l.corners : 'round',
+        motion: l.motion !== false,                                     // hover and pop animations
+    };
+}
+settings.look = normalizeLook(settings.look);
+if (!THEME_IDS.includes(settings.theme)) settings.theme = 'unbound';
 const saveSettings = () => writeJson(SETTINGS_PATH, settings);
 
 const newId = () => crypto.randomBytes(5).toString('hex');
@@ -331,40 +364,130 @@ const activeGame = () => games[settings.activeGame] || null;
 
 // ---------- Real sound clips (from MyInstants) ----------
 // The starter sounds are the real meme clips. They aren't stored in this app's files: each PC
-// downloads them the first time Gift Hype opens, into sounds/builtin.
+// downloads them the first time Unbound opens, into sounds/builtin.
 const MYINSTANTS = 'https://www.myinstants.com';
-const SOUND_PACK = {
-    'fahh': 'fahhh_KcgAXfs.mp3',
-    'vine-boom': 'vine-boom.mp3',
-    'bruh': 'movie_1.mp3',
-    'airhorn': 'airhorn.mp3',
-    'sad-trombone': 'sadtrombone.swf.mp3',
-    'lets-go': 'lets-go-meme_m93gdas.mp3',
-    'oh-no': 'oh-no_h28Tjuw.mp3',
-    'sheesh': 'sheesh-mpl-echo-ph.mp3',
-    'nooo': 'charles-leclerc-scream-noooo.mp3',
-    'cha-ching': 's1_c5-online-audio-converter.mp3',
-    'ding': 'ding-sound-effect_2.mp3',
-    'record-scratch': 'record-scratch-clean.mp3',
-    'wrong-buzzer': 'wrong-answer-buzzer.mp3',
-    'explosion': 'explosion-meme_dTCfAHs.mp3',
-    'drumroll': 'drum-roll-gaming-sound-effect-hd.mp3',
-    'level-up': 'levelup.mp3',
-    'boing': 'cartoon-boing_7vRWDlc.mp3',
-    'whoosh': 'transition-whoosh.mp3',
-    'emotional-damage': 'emotional-damage-meme.mp3',
-    'rizz': 'rizz-sound-effect.mp3',
-    'taco-bell-bong': 'taco-bell-bong-sfx.mp3',
-    'metal-pipe': 'metal-pipe-falling-sound-effect.mp3',
-    'windows-error': 'erro.mp3',
-    'among-us': 'among-us-role-reveal-sound.mp3',
-    'anime-wow': 'anime-wow-sound-effect.mp3',
-    'bonk': 'bonk_7zPAD7C.mp3',
-    'oof': 'roblox-death-sound_1.mp3',
-    'i-need-a-hero': 'i-need-a-hero.mp3',
-    'dababy-lets-go': 'lets-go-sound-effect.mp3',
-    'here-comes-the-money': 'here-comes-the-money.mp3',
+// [name, the clip on MyInstants, group]. Groups are shown in the app in the order of SOUND_GROUPS.
+const SOUND_GROUPS = {
+    edits: 'Edit audios & songs', brainrot: 'Brainrot', memes: 'Memes & reactions', drama: 'Endings & drama',
+    game: 'Game sounds', minecraft: 'Minecraft', pings: 'Phone & PC', custom: 'Yours',
 };
+const SOUND_LIST = [
+    ['where-have-you-been-edit', 'rihanna-where-have-you-been-best-volume.mp3', 'edits'],
+    ['where-have-you-been-all-my-life', 'where-have-you-been-all-my-life_dUZAqHJ.mp3', 'edits'],
+    ['i-need-a-hero', 'i-need-a-hero.mp3', 'edits'],
+    ['here-comes-the-money', 'here-comes-the-money.mp3', 'edits'],
+    ['sigma-boy', 'sigma-boy.mp3', 'edits'],
+    ['chipi-chipi-chapa-chapa', 'chipi-chipi-chapa-chapa.mp3', 'edits'],
+    ['spiderman-meme', 'spiderman-meme-song.mp3', 'edits'],
+    ['can-you-feel-my-heart', 'can-you-feel-my-heart.mp3', 'edits'],
+    ['after-dark', 'after-dark.mp3', 'edits'],
+    ['another-love', 'another-love.mp3', 'edits'],
+    ['money-so-big', 'money-so-big.mp3', 'edits'],
+    ['chill-guy', 'chill-guy.mp3', 'edits'],
+    ['sahara', 'sahara.mp3', 'edits'],
+    ['murder-in-my-mind', 'murder-in-my-mind.mp3', 'edits'],
+    ['matrix-phonk', 'matrix-phonk.mp3', 'edits'],
+    ['golden', 'kpop-demon-hunters-golden.mp3', 'edits'],
+    ['rat-dance', 'rat-dance-music.mp3', 'edits'],
+    ['rizz', 'rizz-sound-effect.mp3', 'brainrot'],
+    ['tung-tung-tung-sahur', 'tung-tung-tung-tung-sahur.mp3', 'brainrot'],
+    ['tralalero-tralala', 'tralalero-tralala-meme_R8mqoQo.mp3', 'brainrot'],
+    ['bombardiro-crocodilo', 'bombardiro-crocodilo-short_tTRuHCY.mp3', 'brainrot'],
+    ['six-seven', 'six-seven_okPwnRN.mp3', 'brainrot'],
+    ['brr-brr-patapim', 'brr-brr-patapim.mp3', 'brainrot'],
+    ['ballerina-cappuccina', 'ballerina-cappuccina.mp3', 'brainrot'],
+    ['skibidi-toilet', 'skibidi-toilet.mp3', 'brainrot'],
+    ['erm-what-the-sigma', 'erm-what-the-sigma_su7GnzC.mp3', 'brainrot'],
+    ['nah-id-win', 'nah-id-win.mp3', 'brainrot'],
+    ['domain-expansion', 'domain-expansion-sukuna.mp3', 'brainrot'],
+    ['mewing-bye-bye', 'bye-bye-mewing_fMVssQz.mp3', 'brainrot'],
+    ['lobotomy', 'lobotomy-sound-effect.mp3', 'brainrot'],
+    ['low-taper-fade', 'low-taper-fade.mp3', 'brainrot'],
+    ['very-demure', 'very-demure_eEA6TVW.mp3', 'brainrot'],
+    ['fahh', 'fahhh_KcgAXfs.mp3', 'memes'],
+    ['vine-boom', 'vine-boom.mp3', 'memes'],
+    ['bruh', 'movie_1.mp3', 'memes'],
+    ['lets-go', 'lets-go-meme_m93gdas.mp3', 'memes'],
+    ['oh-no', 'oh-no_h28Tjuw.mp3', 'memes'],
+    ['sheesh', 'sheesh-mpl-echo-ph.mp3', 'memes'],
+    ['nooo', 'charles-leclerc-scream-noooo.mp3', 'memes'],
+    ['emotional-damage', 'emotional-damage-meme.mp3', 'memes'],
+    ['taco-bell-bong', 'taco-bell-bong-sfx.mp3', 'memes'],
+    ['metal-pipe', 'metal-pipe-falling-sound-effect.mp3', 'memes'],
+    ['among-us', 'among-us-role-reveal-sound.mp3', 'memes'],
+    ['anime-wow', 'anime-wow-sound-effect.mp3', 'memes'],
+    ['dababy-lets-go', 'lets-go-sound-effect.mp3', 'memes'],
+    ['aughhh', 'aughhhh-tiktok.mp3', 'memes'],
+    ['huh-cat', 'huh-cat-meme.mp3', 'memes'],
+    ['john-cena', 'and-his-name-is-john-cena.mp3', 'memes'],
+    ['fbi-open-up', 'fbi-open-up-sfx.mp3', 'memes'],
+    ['oh-hell-nah', 'omg-bruh-oh-hell-nah.mp3', 'memes'],
+    ['bombastic-side-eye', 'bombastic-side-eye.mp3', 'memes'],
+    ['yippee', 'yippee.mp3', 'memes'],
+    ['he-he-he-ha', 'he-he-he-ha-clash-royale.mp3', 'memes'],
+    ['oh-my-god-wow', 'omgwow.mp3', 'memes'],
+    ['goofy-laugh', 'goofy-ahh-laugh-meme.mp3', 'memes'],
+    ['nerd', 'nerd-emoji-sound.mp3', 'memes'],
+    ['fart-reverb', 'fart-with-reverb.mp3', 'memes'],
+    ['snore', 'snore-mimimimimimi.mp3', 'memes'],
+    ['hello-there', 'obi-wan-hello-there.mp3', 'memes'],
+    ['anime-ahh', 'anime-ahh.mp3', 'memes'],
+    ['oh-no-no-no-laugh', 'oh-no-no-no-no-laugh.mp3', 'memes'],
+    ['tuco-get-out', 'tuco-get-out.mp3', 'memes'],
+    ['wait-a-minute', 'wait-a-minute-who-are-you.mp3', 'memes'],
+    ['skill-issue', 'skill-issue-halo-announcer.mp3', 'memes'],
+    ['what-the-hell', 'what-the-hell-meme-sound-effect.mp3', 'memes'],
+    ['galaxy-brain', 'galaxy-brain-meme.mp3', 'memes'],
+    ['i-got-this-fahh', 'i-got-this-fahh.mp3', 'memes'],
+    ['sad-trombone', 'sadtrombone.swf.mp3', 'drama'],
+    ['record-scratch', 'record-scratch-clean.mp3', 'drama'],
+    ['drumroll', 'drum-roll-gaming-sound-effect-hd.mp3', 'drama'],
+    ['spongebob-fail', 'spongebob-fail.mp3', 'drama'],
+    ['to-be-continued', 'untitled_1071.mp3', 'drama'],
+    ['directed-by-robert-b-weide', 'directed-by-robert-b_voI2Z4T.mp3', 'drama'],
+    ['dun-dun-dun', 'dun-dun-dun-sound-effect-brass_8nFBccR.mp3', 'drama'],
+    ['suspense', 'sudden-suspense-sound-effect.mp3', 'drama'],
+    ['spongebob-2000-years-later', 'spongebob-2000-years-later-2019-download-link.mp3', 'drama'],
+    ['jumpscare', 'five-nights-at-freddys-full-scream-sound_2.mp3', 'drama'],
+    ['bass-drop', 'bass-boosted-drop.mp3', 'drama'],
+    ['airhorn', 'airhorn.mp3', 'game'],
+    ['cha-ching', 's1_c5-online-audio-converter.mp3', 'game'],
+    ['ding', 'ding-sound-effect_2.mp3', 'game'],
+    ['wrong-buzzer', 'wrong-answer-buzzer.mp3', 'game'],
+    ['explosion', 'explosion-meme_dTCfAHs.mp3', 'game'],
+    ['level-up', 'levelup.mp3', 'game'],
+    ['boing', 'cartoon-boing_7vRWDlc.mp3', 'game'],
+    ['whoosh', 'transition-whoosh.mp3', 'game'],
+    ['bonk', 'bonk_7zPAD7C.mp3', 'game'],
+    ['oof', 'roblox-death-sound_1.mp3', 'game'],
+    ['wasted', 'gta-v-wasted-death-sound.mp3', 'game'],
+    ['mission-passed', 'gta-san-andreas-mission-complete-sound-hq.mp3', 'game'],
+    ['hitmarker', 'mlg-hitmarker-sound.mp3', 'game'],
+    ['goofy-car-horn', 'goofy-ahh-car-horn.mp3', 'game'],
+    ['mario-coin', 'mario_coin_sound.mp3', 'game'],
+    ['punch', 'punch-gaming-sound-effect-hd_RzlG1GE.mp3', 'game'],
+    ['slap', 'slap-sound-effect-no-copyright.mp3', 'game'],
+    ['bone-crack', 'bone-crack-meme.mp3', 'game'],
+    ['fnaf-yay', 'crowd_small_chil_ec049202_9klCwI6.mp3', 'game'],
+    ['tony-hawk', 'tony-hawk-special-trick-sound-effect.mp3', 'game'],
+    ['chicken-jockey', 'chicken-jockey.mp3', 'minecraft'],
+    ['villager', 'minecraft-villager-sound-effect.mp3', 'minecraft'],
+    ['minecraft-hurt', 'classic_hurt.mp3', 'minecraft'],
+    ['creeper', 'creeper.mp3', 'minecraft'],
+    ['tnt', 'minecraft-explode1.mp3', 'minecraft'],
+    ['minecraft-xp', 'orb.mp3', 'minecraft'],
+    ['ender-dragon', 'ender-dragon.mp3', 'minecraft'],
+    ['windows-error', 'erro.mp3', 'pings'],
+    ['discord', 'discord-notification.mp3', 'pings'],
+    ['apple-pay', 'applepay.mp3', 'pings'],
+    ['windows-xp', 'windows-xp-startup.mp3', 'pings'],
+];
+const SOUND_PACK = Object.fromEntries(SOUND_LIST.map(([name, clip]) => [name, clip]));
+const SOUND_GROUP_OF = Object.fromEntries(SOUND_LIST.map(([name, , group]) => [name, group]));
+// names that read better than the file name
+const SOUND_NICE = { 'where-have-you-been-edit': 'where have you been (edit)', 'six-seven': '6 7 (six seven)', 'fbi-open-up': 'FBI open up', 'dababy-lets-go': 'DaBaby lets go',
+    'directed-by-robert-b-weide': 'directed by Robert B. Weide', 'oh-no-no-no-laugh': 'oh no no no (laugh)', 'wait-a-minute': 'wait a minute, who are you', 'golden': 'golden (KPop Demon Hunters)',
+    'fnaf-yay': 'FNAF yay', 'tnt': 'TNT', 'windows-xp': 'Windows XP', 'he-he-he-ha': 'he he he ha', 'minecraft-xp': 'Minecraft XP' };
 const BUILTIN_SOUNDS = path.join(SOUNDS_DIR, 'builtin');
 const isMp3 = b => b.length > 512 && (b.subarray(0, 3).toString() === 'ID3' || (b[0] === 0xff && (b[1] & 0xe0) === 0xe0));
 const isClipPath = p => /^\/media\/sounds\/[\w.%()-]+\.mp3$/i.test(p) && !p.includes('..');
@@ -378,19 +501,27 @@ async function fetchClip(clipPath) {
     return buf;
 }
 
-async function getSoundPack() {
+let packBusy = null;
+function getSoundPack() { return packBusy ||= fetchSoundPack().finally(() => { packBusy = null; }); }
+async function fetchSoundPack() {
     fs.mkdirSync(BUILTIN_SOUNDS, { recursive: true });
     // made-up sounds from older versions
     for (const f of fs.readdirSync(BUILTIN_SOUNDS)) if (f.endsWith('.wav')) fs.rmSync(path.join(BUILTIN_SOUNDS, f), { force: true });
     const missing = Object.entries(SOUND_PACK).filter(([name]) => !fs.existsSync(path.join(BUILTIN_SOUNDS, `${name}.mp3`)));
-    if (!missing.length) return;
+    if (!missing.length) return { got: 0, missing: 0 };
     log(`Getting ${missing.length} starter sounds...`);
-    let got = 0;
-    for (const [name, clip] of missing) {
-        try { fs.writeFileSync(path.join(BUILTIN_SOUNDS, `${name}.mp3`), await fetchClip(`/media/sounds/${clip}`)); got++; } catch { }
-    }
-    log(got === missing.length ? 'Starter sounds ready.' : `Got ${got} of ${missing.length} starter sounds. The rest will be tried next time Gift Hype opens.`);
+    let got = 0, i = 0;
+    // a few at a time, so the new ones arrive quickly without hammering the site
+    const worker = async () => {
+        while (i < missing.length) {
+            const [name, clip] = missing[i++];
+            try { fs.writeFileSync(path.join(BUILTIN_SOUNDS, `${name}.mp3`), await fetchClip(`/media/sounds/${clip}`)); got++; } catch { }
+        }
+    };
+    await Promise.all(Array.from({ length: 6 }, worker));
+    log(got === missing.length ? 'Starter sounds ready.' : `Got ${got} of ${missing.length} starter sounds. The rest will be tried next time Unbound opens.`);
     broadcast('sounds', listSounds());
+    return { got, missing: missing.length - got };
 }
 
 const unescapeHtml = t => t.replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16))).replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(+d))
@@ -409,16 +540,31 @@ async function searchClips(q) {
 }
 
 function listSounds() {
-    const out = [];
+    const out = [], favs = new Set(settings.soundFavs || []), names = settings.soundNames || {};
     for (const kind of ['builtin', 'custom']) {
         const dir = path.join(SOUNDS_DIR, kind);
         if (!fs.existsSync(dir)) continue;
-        for (const f of fs.readdirSync(dir).sort()) {
-            if (!SOUND_TYPES[path.extname(f).toLowerCase()]) continue;
-            out.push({ file: `${kind}/${f}`, name: path.basename(f, path.extname(f)).replace(/[-_]+/g, ' '), custom: kind === 'custom' });
+        const files = fs.readdirSync(dir).filter(f => SOUND_TYPES[path.extname(f).toLowerCase()]);
+        // the pack in its own order (newest favourites first), then anything else, A to Z
+        const at = f => { const k = Object.keys(SOUND_PACK).indexOf(path.basename(f, path.extname(f))); return kind === 'builtin' && k >= 0 ? k : 1e6; };
+        files.sort((a, b) => at(a) - at(b) || a.localeCompare(b));
+        for (const f of files) {
+            const file = `${kind}/${f}`, base = path.basename(f, path.extname(f));
+            out.push({ file, name: names[file] || (kind === 'builtin' && SOUND_NICE[base]) || base.replace(/[-_]+/g, ' '), custom: kind === 'custom',
+                group: kind === 'custom' ? 'custom' : SOUND_GROUP_OF[base] || 'memes', fav: favs.has(file) });
         }
     }
     return out;
+}
+const soundGroups = () => Object.entries(SOUND_GROUPS).map(([id, name]) => ({ id, name }));
+
+// A gift's sound can be one file, or a random pick: "random:all", "random:favs" or "random:<group>"
+function pickSound(sound) {
+    const m = /^random:([\w-]+)$/.exec(sound || '');
+    if (!m) return sound;
+    const all = listSounds(), pool = m[1] === 'all' ? all : m[1] === 'favs' ? all.filter(s => s.fav) : all.filter(s => s.group === m[1]);
+    const list = pool.length ? pool : all;
+    return list.length ? list[Math.floor(Math.random() * list.length)].file : null;
 }
 
 // Only files directly inside sounds/builtin or sounds/custom.
@@ -450,7 +596,7 @@ function findLiveStudio() {
 
 const clients = new Set();
 const OVERLAY_EVENTS = new Set(['alert', 'play', 'stopSound', 'reset', 'wheel', 'chatdel', 'chunkchat', 'settings', 'state', 'menu']);
-const overlaySettings = () => ({ overlay: settings.overlay, theme: settings.theme, soundsIn: settings.soundsIn });
+const overlaySettings = () => ({ overlay: settings.overlay, theme: settings.theme, look: settings.look, soundsIn: settings.soundsIn });
 function broadcast(event, data) {
     const msg = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
     let small = null;
@@ -625,7 +771,7 @@ const localServer = makeLocalServer({
     },
 });
 
-// Singleplayer: keep the Gift Hype data pack in the world up to date (with a crater for each nuke size).
+// Singleplayer: keep the Unbound data pack in the world up to date (with a crater for each nuke size).
 let packNeedsReload = false;
 function nukeSizes(g) {
     return g.modes.flatMap(m => m.rules.flatMap(r => r.actions.filter(a => a.type === 'nuke').map(a => Math.max(16, Math.min(64, Math.round(+a.size || 40))))));
@@ -639,7 +785,7 @@ function syncPack(g) {
     }
     if (!g.minecraft.world) return 'no world picked';
     try {
-        if (installPack(g.minecraft.world, nukeSizes(g))) { packNeedsReload = true; log(`Gift Hype pack put into "${g.minecraft.world}".`); }
+        if (installPack(g.minecraft.world, nukeSizes(g))) { packNeedsReload = true; log(`Unbound pack put into "${g.minecraft.world}".`); }
         return 'singleplayer';
     } catch (e) { log(`Couldn't put the pack into the world: ${e.message}`); return 'world not found'; }
 }
@@ -657,10 +803,10 @@ async function connectMinecraft() {
             await disconnectMinecraft();
             rconFor = null;
             // the Dropper world is made the first time on the Minecraft version its pack is written for
-            // (DROPPER_MC; the launcher's "Gift Hype" install plays it). Not your newest world's version: a
+            // (DROPPER_MC; the launcher's "Unbound" install plays it). Not your newest world's version: a
             // newer Minecraft can change the pack's file formats (26.3 did) and then the world won't open.
             const opts = isDropper(g) ? { version: DROPPER_MC, props: DROPPER_PROPS, atLeast: DROPPER_MC } : {};
-            // the Chat Teleport box pack, from Gift Hype (block pictures from this world's Minecraft)
+            // the Chat Teleport box pack, from Unbound (block pictures from this world's Minecraft)
             let mcVersion = opts.version; try { mcVersion = worldVersion(world) || mcVersion; } catch { }
             const tpCfg = (isChatTeleport(g) ? currentMode(g).chatTeleport : (g.modes || []).find(m => /chat teleport/i.test(m.name || ''))?.chatTeleport) || normalizeChatTeleport({});
             try {
@@ -744,7 +890,7 @@ async function buildDropperWorld() {
         removeDropperBuildPack();
         await mc('reload').catch(() => {});
         setStatus({ dropper: 'ready' });
-        log('The Dropper is built. Join Gift Hype in Minecraft to play.');
+        log('The Dropper is built. Join Unbound in Minecraft to play.');
     } catch (e) {
         setStatus({ dropper: 'build stopped' });
         log(`The Dropper build stopped (${e.message}). It starts again next time the world opens.`);
@@ -864,7 +1010,7 @@ setInterval(async () => {
     } catch (e) { log(`Couldn't reopen the world: ${e.message}`); }
     finally { hudReopening = false; }
 }, 15000);
-// On a server (no Gift Hype pack) these are the blocks that get turned: the ground, trees, water...
+// On a server (no Unbound pack) these are the blocks that get turned: the ground, trees, water...
 const CHUNK_FILTERS_SERVER = ['#minecraft:base_stone_overworld', '#minecraft:dirt', '#minecraft:sand', 'minecraft:gravel', 'minecraft:sandstone', 'minecraft:red_sandstone',
     '#minecraft:terracotta', '#minecraft:logs', '#minecraft:leaves', 'minecraft:water', 'minecraft:lava', '#minecraft:coal_ores', '#minecraft:iron_ores', '#minecraft:copper_ores',
     '#minecraft:gold_ores', '#minecraft:redstone_ores', '#minecraft:lapis_ores', '#minecraft:diamond_ores', '#minecraft:emerald_ores', 'minecraft:clay', 'minecraft:snow_block',
@@ -917,7 +1063,7 @@ async function runAction(game, a, ctx) {
         return;
     }
     if (game.connector === 'minecraft' && game.minecraft.single && PRESETS[a.type]) {
-        // your world: the Gift Hype data pack does it, run as you
+        // your world: the Unbound data pack does it, run as you
         if (!rcon) return log('Your world is not open yet.');
         if (packNeedsReload) { packNeedsReload = false; await mc('reload'); }
         const who = /^\w{1,16}$/.test(ctx.player) ? `@a[name=${ctx.player},limit=1]` : '@a[limit=1]';
@@ -1011,8 +1157,9 @@ async function handleGift(giftName, count, from, image, coins) {
 
     const dropper = isDropper(game), resetEvent = dropper ? dropperResetGift(game, rule, from) : null;
     // a reset's sound plays on (looping) for the whole countdown, until it's saved or runs out
-    if (rule.sound) broadcast('play', { file: rule.sound, volume: rule.volume * settings.masterVolume, ...(resetEvent === 'started' ? { id: 'reset', loopFor: dropperReset.total } : {}) });
-    if (rule.alert) broadcast('alert', { ...entry, label: rule.label, ...(dropper ? { dropper: true, action: dropperAlertText(rule, count).what, actionColor: dropperAlertText(rule, count).color } : {}) });
+    const soundFile = pickSound(rule.sound);
+    if (soundFile) broadcast('play', { file: soundFile, volume: rule.volume * settings.masterVolume, ...(resetEvent === 'started' ? { id: 'reset', loopFor: dropperReset.total } : {}) });
+    if (rule.alert && (from === 'TEST' || entry.coins == null || entry.coins * count >= settings.overlay.popMinCoins)) broadcast('alert', { ...entry, label: rule.label, ...(dropper ? { dropper: true, action: dropperAlertText(rule, count).what, actionColor: dropperAlertText(rule, count).color } : {}) });
 
     const ctx = { player: game.minecraft.player || await onlinePlayer(game) || '@p', from, gift: giftName, count, perCount: rule.perCount, image: entry.image };
     try {
@@ -1117,6 +1264,7 @@ const publicState = () => ({
     games: Object.values(games).map(g => ({ id: g.id, name: g.name, cover: coverVersion(g), connector: g.connector, gifts: rulesOf(g).length, mode: g.modes.length > 1 ? currentMode(g).name : '' })),
     game: activeGame(),
     sounds: listSounds(),
+    soundGroups: soundGroups(),
     status, feed, log: recentLog.slice(-80),
     reset: resetPublic(),
     version: localVersion(ROOT),
@@ -1150,7 +1298,7 @@ const routes = {
         setStatus({ update: { ...(status.update || {}), state: 'updating' } });
         try {
             const v = await applyUpdate(ROOT, log);
-            log(`Updated to version ${v}. Restarting Gift Hype...`);
+            log(`Updated to version ${v}. Restarting Unbound...`);
             setStatus({ update: { current: v, latest: v, available: false, state: 'restarting' } });
             setTimeout(restartAfterUpdate, 800);
             return { ok: true, version: v };
@@ -1191,7 +1339,8 @@ const routes = {
         if (['app', 'overlay'].includes(b.soundsIn)) settings.soundsIn = b.soundsIn;
         if (typeof b.autoConnect === 'boolean') settings.autoConnect = b.autoConnect;
         if (typeof b.mcEula === 'boolean' && b.mcEula !== settings.mcEula) { settings.mcEula = b.mcEula; setTimeout(connectMinecraft, 50); }
-        if (['sky', 'blaze', 'punk', 'egyptian'].includes(b.theme)) settings.theme = b.theme;
+        if (THEME_IDS.includes(b.theme)) settings.theme = b.theme;
+        if (b.look && typeof b.look === 'object') settings.look = normalizeLook({ ...settings.look, ...b.look });
         if (b.overlay && typeof b.overlay === 'object') {
             const o = settings.overlay;
             if (['top', 'middle', 'bottom'].includes(b.overlay.position)) o.position = b.overlay.position;
@@ -1209,6 +1358,8 @@ const routes = {
                     else if (p && typeof p === 'object') o.place[k] = { x: n(p.x, 0, 100, 50), y: n(p.y, 0, 100, 50), s: n(p.s, 0.3, 3, 1) };
                 }
             }
+            const popKeys = Object.keys(b.overlay).filter(k => k.startsWith('pop'));
+            if (popKeys.length) Object.assign(o, normalizePop({ ...o, ...Object.fromEntries(popKeys.map(k => [k, b.overlay[k]])) }));
             if (menuKeys.length) { const m = normalizeMenu({ ...o, ...Object.fromEntries(menuKeys.map(k => [k, b.overlay[k]])) }); for (const k of Object.keys(m)) o[k] = m[k]; }
         }
         saveSettings();
@@ -1280,7 +1431,36 @@ const routes = {
         const p = soundFilePath(b.file);
         if (!p || !String(b.file).startsWith('custom/')) throw new Error('Only your own sounds can be deleted');
         fs.rmSync(p);
+        settings.soundFavs = (settings.soundFavs || []).filter(f => f !== b.file);
+        if (settings.soundNames) delete settings.soundNames[b.file];
+        saveSettings();
         broadcast('sounds', listSounds());
+        return { ok: true };
+    },
+    'POST /api/sounds/fav': b => {
+        const favs = new Set(settings.soundFavs || []);
+        if (!soundFilePath(b.file)) throw new Error('No such sound');
+        if (b.on) favs.add(b.file); else favs.delete(b.file);
+        settings.soundFavs = [...favs];
+        saveSettings();
+        broadcast('sounds', listSounds());
+        return { ok: true };
+    },
+    // a name of your own for any sound (empty = its file name again)
+    'POST /api/sounds/rename': b => {
+        if (!soundFilePath(b.file)) throw new Error('No such sound');
+        const names = { ...(settings.soundNames || {}) }, name = String(b.name || '').trim().slice(0, 50);
+        if (name) names[b.file] = name; else delete names[b.file];
+        settings.soundNames = names;
+        saveSettings();
+        broadcast('sounds', listSounds());
+        return { ok: true };
+    },
+    'POST /api/sounds/refetch': async () => getSoundPack(),
+    // a made-up gift, so the popup's look can be tried without a game or a gift rule
+    'POST /api/overlay/test-popup': () => {
+        const rose = findGift('Rose');
+        broadcast('alert', { time: Date.now(), gift: 'Rose', count: 3, from: 'a viewer', image: rose?.image || null, coins: 1, label: 'This is how a gift pops up' });
         return { ok: true };
     },
     'GET /api/minecraft/worlds': () => listWorlds(),
@@ -1321,9 +1501,9 @@ const routes = {
         }
         let quick = true;
         try { setupLauncher(worldVersion(worldOf(g))); }
-        catch (e) { quick = false; log(`Couldn't add "Gift Hype" to the launcher (${e.message}). In Minecraft: Multiplayer, then Gift Hype.`); }
+        catch (e) { quick = false; log(`Couldn't add "Unbound" to the launcher (${e.message}). In Minecraft: Multiplayer, then Unbound.`); }
         openLauncher();
-        log(quick ? 'Minecraft launcher opened: press Play on "Gift Hype" and you go straight into your world.' : 'Minecraft launcher opened: play Minecraft, then Multiplayer, then Gift Hype.');
+        log(quick ? 'Minecraft launcher opened: press Play on "Unbound" and you go straight into your world.' : 'Minecraft launcher opened: play Minecraft, then Multiplayer, then Unbound.');
         return { ok: true, quick };
     },
     'POST /api/minecraft/restart-world': async () => { await disconnectMinecraft(); await localServer.stop(); rconFor = null; connectMinecraft(); return { ok: true }; },
@@ -1540,7 +1720,7 @@ const server = http.createServer(async (req, res) => {
 
 // ---------- App window ----------
 
-// After an update: close the world and the window, and start Gift Hype again (the new version)
+// After an update: close the world and the window, and start Unbound again (the new version)
 let updating = false, appWindow = null;
 async function restartAfterUpdate() {
     if (localServer.running()) { log('Saving your world...'); await localServer.stop(); }
@@ -1577,26 +1757,35 @@ function openWindow() {
 server.on('error', async e => {
     if (e.code !== 'EADDRINUSE') throw e;
     // Already running: just show its window.
-    console.log('Gift Hype is already running, opening its window.');
+    console.log('Unbound is already running, opening its window.');
     openWindow();
     setTimeout(() => process.exit(0), 1500);
 });
 
 server.listen(settings.port, '127.0.0.1', () => {
-    log(`Gift Hype is running: ${appUrl()}   Overlay for OBS / TikTok LIVE Studio: http://${OVERLAY_HOST}:${settings.port}/overlay`);
+    log(`Unbound is running: ${appUrl()}   Overlay for OBS / TikTok LIVE Studio: http://${OVERLAY_HOST}:${settings.port}/overlay`);
     // The overlay's address (and "localhost") also mean this PC's IPv6 address, ::1, which browsers and
     // TikTok LIVE Studio often try first: answer there too, or the overlay loads but never gets a gift.
     // Still this PC only. Skipped quietly if the PC has IPv6 turned off.
     const server6 = http.createServer(server.listeners('request')[0]);
     server6.on('error', () => {});
     server6.listen(settings.port, '::1');
+    // Gift Hype is now Unbound: the new look once, and the desktop icon gets the new name (Windows)
+    if (settings.brand !== 'unbound') {
+        settings.brand = 'unbound';
+        settings.theme = 'unbound';
+        saveSettings();
+        if (process.platform === 'win32' && !NO_OPEN) {
+            try { spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(ROOT, 'make-shortcut.ps1')], { stdio: 'ignore', windowsHide: true, detached: true }).unref(); } catch { }
+        }
+    }
     startGameSocket();
     connectMinecraft();
     getSoundPack().catch(e => log(`Starter sounds: ${e.message}`));
     if (settings.autoConnect && settings.tiktokUsername) connectTikTok(settings.tiktokUsername);
     const win = appWindow = openWindow();
     // Is there a newer version? A little after opening, then every 15 minutes while it's open (an
-    // update published while Gift Hype is running shows up without restarting it). Said once per version.
+    // update published while Unbound is running shows up without restarting it). Said once per version.
     let toldAbout = null;
     const lookForUpdate = () => checkForUpdate(ROOT).then(u => {
         setStatus({ update: u });
@@ -1606,7 +1795,7 @@ server.listen(settings.port, '127.0.0.1', () => {
     setInterval(lookForUpdate, 15 * 60 * 1000);
     // Close the app when its window is closed.
     win?.on('exit', async () => {
-        log('Window closed, Gift Hype is stopping.');
+        log('Window closed, Unbound is stopping.');
         if (localServer.running()) { log('Saving your world...'); await localServer.stop(); }
         setTimeout(() => process.exit(0), 300);
     });

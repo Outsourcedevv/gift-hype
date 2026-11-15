@@ -3,18 +3,47 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Gift Hype</title>
-<script>try { const t = localStorage.getItem('gh-theme'); if (t && t !== 'sky') document.documentElement.dataset.theme = t; } catch {}</script>
+<title>Unbound</title>
+<script>
+// The custom colour theme: the page's colours worked out from two picked colours and dark / light
+window.customVars = l => {
+  const lum = h => { const n = parseInt(h.slice(1), 16), c = [n >> 16, n >> 8 & 255, n & 255].map(v => { v /= 255; return v <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; }); return .2126 * c[0] + .7152 * c[1] + .0722 * c[2]; };
+  const dark = l.base !== 'light', on = h => lum(h) > .4 ? '#111111' : '#ffffff', txt = h => `color-mix(in srgb, ${h} ${dark ? '72%, white' : '72%, black'})`;
+  const base = dark
+    ? { bg: '#0f1117', header: '#0b0d12', panel: '#171a23', 'panel-2': '#1e2230', line: '#2c3142', text: '#eef0f6', muted: '#9aa1b5', well: '#1b1f2b', 'code-bg': '#0b0d12', 'code-text': '#dfe3ee', green: '#4ade80', amber: '#fbbf24', red: '#f87171', shadow: 'rgba(0,0,0,.5)' }
+    : { bg: '#f2f3f7', header: '#ffffff', panel: '#ffffff', 'panel-2': '#f6f7fa', line: '#dcdfe8', text: '#171a26', muted: '#646b80', well: '#e8eaf0', 'code-bg': '#f6f7fa', 'code-text': '#171a26', green: '#16a34a', amber: '#b7791f', red: '#dc2626', shadow: 'rgba(20,30,60,.16)' };
+  return { ...base, main: l.main, 'on-main': on(l.main), 'main-text': txt(l.main), hot: l.hot, 'on-hot': on(l.hot), 'hot-text': txt(l.hot), _scheme: dark ? 'dark' : 'light' };
+};
+window.paintTheme = (theme, look) => {
+  const r = document.documentElement;
+  for (const k of Object.keys(window.customVars({ main: '#000000', hot: '#000000' }))) r.style.removeProperty('--' + k);
+  r.style.removeProperty('color-scheme');
+  if (theme && theme !== 'unbound') r.dataset.theme = theme; else delete r.dataset.theme;
+  if (theme === 'custom' && look) { const v = window.customVars(look); for (const [k, x] of Object.entries(v)) if (k[0] !== '_') r.style.setProperty('--' + k, x); r.style.setProperty('color-scheme', v._scheme); }
+};
+try { paintTheme(localStorage.getItem('gh-theme') || 'unbound', JSON.parse(localStorage.getItem('gh-look') || 'null')); } catch {}
+</script>
 <link rel="icon" href="/icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <style>
 /* Colour themes. Each one is: main colour, second colour (backgrounds), and one eye-catcher
    colour for the things to look at first (Connect, LIVE, alerts). */
+:root { --grad: var(--hot); --on-grad: var(--on-hot); }
+/* 0. Unbound (the standard): deep night, electric violet, cyan */
 :root {
-  --radius: 10px;
-  font-family: 'Space Grotesk', system-ui, sans-serif;
-  /* 1. Sky: sky blue, cloudy white, amber red */
+  --radius: 16px;
+  font-family: 'Inter', system-ui, sans-serif;
+  --main: #8b6cff; --on-main: #ffffff; --main-text: #b9a8ff;
+  --hot: #22d3ee; --on-hot: #04232a; --hot-text: #67e8f9;
+  --bg: #07070c; --header: #0a0a12; --panel: #101019; --panel-2: #161622; --line: rgba(255, 255, 255, .085);
+  --text: #f3f2fb; --muted: #8f8da8; --well: #14141f; --code-bg: #0b0b12; --code-text: #d9d6f0;
+  --green: #4ade80; --amber: #fbbf24; --red: #fb7185; --shadow: rgba(0, 0, 0, .55);
+  color-scheme: dark;
+}
+:root:not([data-theme]) { --grad: linear-gradient(120deg, #8b6cff 0%, #5d8bff 55%, #22d3ee 100%); --on-grad: #ffffff; }
+/* 1. Sky: sky blue, cloudy white, amber red */
+:root[data-theme=sky] {
   --main: #4db3ee; --on-main: #05263d; --main-text: #1474b4;
   --hot: #e8542a; --on-hot: #ffffff; --hot-text: #c8441c;
   --bg: #edf2f7; --header: #ffffff; --panel: #ffffff; --panel-2: #f3f7fb; --line: #d5e0ea;
@@ -49,7 +78,109 @@
   --green: #4ade80; --amber: #fbbf24; --red: #ff8a7a; --shadow: rgba(0, 0, 0, .45);
   color-scheme: dark;
 }
+/* 5. Mint: emerald, soft white, pink */
+:root[data-theme=mint] {
+  --main: #10b981; --on-main: #022c1e; --main-text: #047857;
+  --hot: #ec4899; --on-hot: #ffffff; --hot-text: #be185d;
+  --bg: #effaf5; --header: #ffffff; --panel: #ffffff; --panel-2: #f2fbf7; --line: #cfeadf;
+  --text: #0f2a20; --muted: #557566; --well: #e1f4ec; --code-bg: #f2fbf7; --code-text: #0f2a20;
+  --green: #16a34a; --amber: #b7791f; --red: #dc2626; --shadow: rgba(10, 80, 50, .16);
+  color-scheme: light;
+}
+/* 6. Grape: violet, midnight, yellow */
+:root[data-theme=grape] {
+  --main: #8b5cf6; --on-main: #ffffff; --main-text: #c4b5fd;
+  --hot: #facc15; --on-hot: #2a2000; --hot-text: #fde047;
+  --bg: #130d24; --header: #0e091b; --panel: #1c1433; --panel-2: #251b42; --line: #362a5c;
+  --text: #f1edff; --muted: #a99fcb; --well: #211839; --code-bg: #0e091b; --code-text: #e4ddff;
+  --green: #4ade80; --amber: #fbbf24; --red: #f87171; --shadow: rgba(0, 0, 0, .5);
+  color-scheme: dark;
+}
+/* 7. Mono: graphite, white, red */
+:root[data-theme=mono] {
+  --main: #e5e7eb; --on-main: #111111; --main-text: #f3f4f6;
+  --hot: #ef4444; --on-hot: #ffffff; --hot-text: #f87171;
+  --bg: #0b0b0c; --header: #000000; --panel: #161618; --panel-2: #1e1e21; --line: #2e2e33;
+  --text: #f5f5f5; --muted: #9b9ba3; --well: #1a1a1d; --code-bg: #000000; --code-text: #e5e5e5;
+  --green: #4ade80; --amber: #fbbf24; --red: #f87171; --shadow: rgba(0, 0, 0, .6);
+  color-scheme: dark;
+}
 :root { --accent: var(--main); --pink: var(--hot); }
+/* Pages (tabs under the header) */
+.tabs { order: 10; flex-basis: 100%; display: flex; gap: 4px; margin: 2px -6px -12px; overflow-x: auto; scrollbar-width: none; }
+.tabs button { display: inline-flex; align-items: center; gap: 8px; border: 0; border-bottom: 3px solid transparent; border-radius: 0; background: none; padding: 10px 14px 9px; color: var(--muted); font-weight: 500; }
+.tabs button:hover { color: var(--text); }
+.tabs button[aria-selected=true] { color: var(--main-text); border-bottom-color: var(--main); font-weight: 700; }
+.tabs button svg.i { width: 16px; height: 16px; }
+.tabs .count { font-size: 11px; background: var(--well); border-radius: 999px; padding: 1px 7px; color: var(--muted); font-weight: 700; }
+.tabs .count:empty { display: none; }
+kbd { font-family: 'JetBrains Mono', monospace; font-size: 10px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; padding: 1px 5px; color: var(--muted); background: var(--panel-2); font-weight: 400; }
+.jump { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); min-width: 220px; background: var(--panel-2); }
+.jump span { flex: 1; text-align: left; }
+@media (max-width: 1250px) { .jump { min-width: 0; } .jump span, .jump kbd { display: none; } }
+.page[hidden] { display: none !important; }
+/* the sound board */
+.sbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.sbar input[type=search] { flex: 1; min-width: 220px; }
+.gchips { display: flex; gap: 6px; flex-wrap: wrap; margin: 12px 0; }
+.gchips button { border-radius: 999px; padding: 5px 12px; font-size: 13px; }
+.gchips button[aria-checked=true] { background: var(--main); color: var(--on-main); border-color: var(--main); font-weight: 700; }
+.gchips button small { opacity: .7; margin-left: 4px; }
+.board { display: grid; grid-template-columns: repeat(auto-fill, minmax(215px, 1fr)); gap: 8px; }
+.board.list { grid-template-columns: 1fr; gap: 2px; }
+.board .ghd { grid-column: 1 / -1; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin: 10px 0 2px; }
+.board .ghd:first-child { margin-top: 0; }
+.tile { position: relative; display: flex; align-items: center; gap: 6px; padding: 0; border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2); min-width: 0; transition: border-color .15s, transform .1s; }
+.tile:hover { border-color: var(--main); }
+.tile.playing { border-color: var(--hot); box-shadow: 0 0 0 2px color-mix(in srgb, var(--hot) 35%, transparent); }
+.tile .tp { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; border: 0; background: none; padding: 10px 4px 10px 10px; text-align: left; white-space: nowrap; overflow: hidden; }
+.tile .tp span { overflow: hidden; text-overflow: ellipsis; text-transform: capitalize; font-size: 14px; }
+.tile .tp svg { color: var(--main-text); }
+.tile:active { transform: scale(.98); }
+.tile .tb { border: 0; background: none; padding: 6px 5px; color: var(--muted); font-size: 14px; line-height: 1; }
+.tile .tb:hover { color: var(--text); }
+.tile .tb.on { color: var(--amber); }
+.tile .tb.hov { display: none; }
+.tile:hover .tb.hov, .tile:focus-within .tb.hov { display: block; }
+@media (hover: none) { .tile .tb.hov { display: block; } }
+.tile .tb.use { color: var(--main-text); font-weight: 700; font-size: 13px; padding-right: 10px; }
+.tile.cur { border-color: var(--main); background: color-mix(in srgb, var(--main) 14%, var(--panel-2)); }
+.board.list .tile { border-color: transparent; background: none; }
+.board.list .tile:hover { background: var(--panel-2); border-color: var(--line); }
+.board.list .tile .tp { padding: 6px 4px 6px 8px; }
+.board .tile .mine { font-size: 10px; color: var(--main-text); border: 1px solid var(--main-text); border-radius: 4px; padding: 0 4px; text-transform: uppercase; flex: none; }
+.quick { display: grid; grid-template-columns: 1fr; gap: 4px; margin-top: 12px; max-height: 420px; overflow-y: auto; }
+.quick .tile .tp { padding: 8px 6px 8px 8px; }
+.quick .tile .tp span { font-size: 13px; }
+.quick .tile .tb.hov { display: block; }
+.quick .tile .tb:not(.on) { opacity: .5; }
+.keys { display: grid; grid-template-columns: max-content 1fr; gap: 10px 18px; align-items: center; font-size: 14px; }
+.keys span { color: var(--muted); }
+.rule-sound .pickbtn { max-width: 260px; overflow: hidden; text-overflow: ellipsis; text-transform: capitalize; }
+/* find anything */
+.jumpdlg { width: min(640px, 94vw); margin-top: 10vh; }
+.jumpdlg .dlg-head input { border: 0; background: none; font-size: 17px; outline: none; }
+.jumpdlg .dlg-head input:focus { outline: none; }
+.jlist { display: flex; flex-direction: column; gap: 2px; }
+.jlist button { display: flex; align-items: center; gap: 10px; border: 0; background: none; text-align: left; padding: 9px 10px; border-radius: 8px; white-space: normal; }
+.jlist button .k { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; min-width: 74px; }
+.jlist button.on { background: color-mix(in srgb, var(--main) 18%, var(--panel)); }
+.jlist button small { color: var(--muted); margin-left: auto; }
+/* layout settings */
+body.no-side main { grid-template-columns: minmax(0, 1fr); }
+body.no-side #side { display: none; }
+body.compact main { gap: 12px; padding: 12px; }
+body.compact .col { gap: 12px; }
+body.compact section { padding: 12px; }
+body.compact .rule { padding: 8px; gap: 6px; }
+body.compact .rules { gap: 8px; }
+body.compact h2 { margin-bottom: 8px; }
+body.compact .covers { gap: 14px; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+body.corners-soft { --radius: 5px; }
+body.corners-soft button, body.corners-soft input, body.corners-soft select, body.corners-soft .rule, body.corners-soft .tile, body.corners-soft .art { border-radius: 4px; }
+body.corners-square { --radius: 0px; }
+body.corners-square button, body.corners-square input, body.corners-square select, body.corners-square .rule, body.corners-square .tile, body.corners-square .art, body.corners-square .chip, body.corners-square dialog { border-radius: 0 !important; }
+body.no-motion *, body.no-motion *::before, body.no-motion *::after { animation: none !important; transition: none !important; }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 body { margin: 0; background: var(--bg); color: var(--text); font-size: 15px; }
@@ -87,7 +218,7 @@ section { background: var(--panel); border: 1px solid var(--line); border-radius
 h2 { margin: 0 0 14px; font-size: 13px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); font-weight: 500; display: flex; align-items: center; gap: 10px; }
 h2 .right { margin-left: auto; text-transform: none; letter-spacing: 0; }
 label.field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--muted); }
-input[type=text], input[type=number], input[type=password], select, textarea {
+input[type=text], input[type=search], input[type=number], input[type=password], select, textarea {
   background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; min-width: 0;
 }
 textarea { resize: vertical; font-family: 'JetBrains Mono', monospace; font-size: 13px; }
@@ -285,25 +416,138 @@ dialog::backdrop { background: rgba(0,0,0,.5); }
 .sw i:first-child { margin-left: 0; }
 .sw i:last-child { width: 12px; height: 12px; align-self: center; }
 .toast.err { border-color: var(--red); color: var(--red); }
+
+/* ===================== The modern look (on top of every colour theme) ===================== */
+body { font-size: 14.5px; letter-spacing: -.006em; -webkit-font-smoothing: antialiased; background:
+  radial-gradient(1000px 560px at 6% -10%, color-mix(in srgb, var(--main) 20%, transparent), transparent 70%),
+  radial-gradient(820px 480px at 102% -8%, color-mix(in srgb, var(--hot) 12%, transparent), transparent 70%), var(--bg);
+  background-attachment: fixed; }
+h1, .lib-head h1, .ghead .gtitle, .dlg-head h3, .brand { font-family: 'Sora', 'Inter', sans-serif; }
+header { background: color-mix(in srgb, var(--header) 70%, transparent); backdrop-filter: blur(18px) saturate(1.5); -webkit-backdrop-filter: blur(18px) saturate(1.5); padding: 12px 24px 0; gap: 14px; }
+.brand { gap: 10px; font-size: 20px; font-weight: 700; letter-spacing: -.03em; }
+.brand svg { width: 32px; height: 32px; flex: none; filter: drop-shadow(0 6px 18px color-mix(in srgb, var(--main) 50%, transparent)); }
+.brand .wm { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.brand .live { font-family: 'Inter', sans-serif; font-size: 10px; font-weight: 700; letter-spacing: .16em; padding: 3px 7px; border-radius: 6px; color: var(--hot-text);
+  background: color-mix(in srgb, var(--hot) 14%, transparent); border: 1px solid color-mix(in srgb, var(--hot) 32%, transparent); }
+.tabs { margin: 6px 0 0; padding: 0 0 10px; gap: 4px; }
+.tabs button { border: 1px solid transparent; border-radius: 11px; padding: 8px 14px; font-weight: 500; }
+.tabs button:hover { background: color-mix(in srgb, var(--text) 6%, transparent); }
+.tabs button[aria-selected=true] { color: var(--text); font-weight: 600; background: color-mix(in srgb, var(--main) 16%, transparent);
+  border-color: color-mix(in srgb, var(--main) 38%, transparent); box-shadow: 0 0 26px -8px color-mix(in srgb, var(--main) 70%, transparent); }
+.tabs button[aria-selected=true] svg { color: var(--main-text); }
+.tabs .count { background: color-mix(in srgb, var(--text) 8%, transparent); }
+main { padding: 24px; gap: 24px; }
+.col { gap: 22px; }
+section { background: color-mix(in srgb, var(--panel) 86%, transparent); border: 1px solid var(--line); border-radius: 20px; padding: 22px;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 5%, transparent), 0 24px 60px -36px var(--shadow); }
+h2 { font-size: 15px; font-weight: 600; text-transform: none; letter-spacing: -.01em; color: var(--text); margin-bottom: 16px; }
+.board .ghd { text-transform: none; letter-spacing: 0; font-size: 13px; font-weight: 600; color: var(--muted); }
+button { border-radius: 11px; padding: 9px 15px; font-weight: 500; border-color: var(--line); background: color-mix(in srgb, var(--text) 5%, var(--panel));
+  transition: background .15s, border-color .15s, box-shadow .2s, transform .08s, filter .15s; }
+button:hover { border-color: color-mix(in srgb, var(--text) 22%, transparent); background: color-mix(in srgb, var(--text) 9%, var(--panel)); }
+button:active { transform: translateY(1px); }
+button.primary { background: var(--main); color: var(--on-main); border-color: transparent; box-shadow: 0 10px 24px -12px var(--main); }
+button.primary:hover { background: var(--main); filter: brightness(1.12); }
+button.hot, button.pink { background: var(--grad); color: var(--on-grad); border-color: transparent; font-weight: 600;
+  box-shadow: 0 12px 28px -12px color-mix(in srgb, var(--hot) 85%, transparent), inset 0 1px 0 rgba(255, 255, 255, .25); }
+button.hot:hover, button.pink:hover { background: var(--grad); filter: brightness(1.1) saturate(1.1); }
+button.ghost { background: transparent; }
+button.ghost:hover { background: color-mix(in srgb, var(--text) 7%, transparent); }
+button.small { padding: 6px 11px; border-radius: 9px; font-size: 13px; }
+button.danger { color: var(--red); }
+input[type=text], input[type=search], input[type=number], input[type=password], select, textarea {
+  border-radius: 11px; padding: 10px 12px; border-color: var(--line); background: color-mix(in srgb, var(--text) 4%, var(--panel)); transition: border-color .15s, box-shadow .15s; }
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--main); box-shadow: 0 0 0 4px color-mix(in srgb, var(--main) 22%, transparent); }
+input[type=color] { border-radius: 10px !important; }
+.chip { padding: 7px 13px; background: color-mix(in srgb, var(--text) 5%, transparent); border-color: var(--line); backdrop-filter: blur(8px); }
+.jump { border-radius: 12px; background: color-mix(in srgb, var(--text) 5%, transparent); }
+.jump:hover { background: color-mix(in srgb, var(--text) 9%, transparent); }
+.seg { border-radius: 13px; padding: 3px; gap: 3px; border-color: var(--line); background: color-mix(in srgb, var(--text) 4%, var(--panel)); }
+.seg button { border: 0; border-radius: 10px; background: transparent; }
+.seg button + button { border-left: 0; }
+.seg button:hover { background: color-mix(in srgb, var(--text) 7%, transparent); }
+.seg button[aria-checked=true] { background: var(--main); color: var(--on-main); box-shadow: 0 6px 18px -8px var(--main); }
+.gchips button { border-radius: 999px; background: color-mix(in srgb, var(--text) 4%, transparent); }
+.gchips button[aria-checked=true] { box-shadow: 0 6px 18px -9px var(--main); }
+.lib-head { margin: 6px 0 22px; }
+.lib-head h1 { font-size: 32px; letter-spacing: -.035em; font-weight: 700; }
+.art { border-radius: 18px; border-color: var(--line); }
+.cover-card:hover .art { transform: translateY(-6px) scale(1.015); border-color: color-mix(in srgb, var(--main) 70%, transparent);
+  box-shadow: 0 26px 50px -22px color-mix(in srgb, var(--main) 70%, transparent); }
+.cover-card.on .art { border-color: var(--hot); box-shadow: 0 0 0 1px var(--hot), 0 18px 46px -20px var(--hot); }
+.badge { background: var(--grad); color: var(--on-grad); border-radius: 999px; padding: 4px 10px; top: 12px; left: 12px; box-shadow: 0 6px 16px -6px var(--hot); }
+.badge::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: currentColor; margin-right: 6px; vertical-align: 1px; animation: blink 1.4s ease-in-out infinite; }
+@keyframes blink { 50% { opacity: .25; } }
+.add-card .art { border: 2px dashed color-mix(in srgb, var(--text) 16%, transparent); }
+.add-card:hover .art { border-color: var(--main); background: color-mix(in srgb, var(--main) 7%, transparent); }
+.hero .art { border-radius: 16px; }
+.play-btn { border-radius: 14px; padding: 13px 30px; }
+.rule { border-radius: 16px; padding: 14px; background: color-mix(in srgb, var(--text) 3%, var(--panel)); border-color: var(--line); transition: border-color .15s; }
+.rule:hover { border-color: color-mix(in srgb, var(--text) 16%, transparent); }
+.gimg { border-radius: 12px; background: color-mix(in srgb, var(--text) 6%, transparent); }
+.feed .item { border-radius: 13px; padding: 9px; background: color-mix(in srgb, var(--text) 4%, var(--panel)); }
+.tile { border-radius: 12px; background: color-mix(in srgb, var(--text) 4%, var(--panel)); border-color: var(--line); }
+.tile:hover { border-color: color-mix(in srgb, var(--main) 60%, transparent); box-shadow: 0 10px 26px -16px var(--main); }
+.tile.playing { border-color: var(--hot); box-shadow: 0 0 0 3px color-mix(in srgb, var(--hot) 28%, transparent), 0 10px 30px -12px var(--hot); }
+.board.list .tile, .board.list .tile:hover { box-shadow: none; }
+.theme { border-radius: 13px; padding: 11px 12px; }
+.theme[aria-checked=true] { background: color-mix(in srgb, var(--main) 12%, var(--panel)); }
+.tpgroup, .drop { border-radius: 16px; }
+.drop { border-color: color-mix(in srgb, var(--text) 16%, transparent); background: color-mix(in srgb, var(--text) 2%, transparent); transition: border-color .15s, background .15s; }
+.drop:hover, .drop.over { border-color: var(--main); background: color-mix(in srgb, var(--main) 7%, transparent); }
+.hint code, code, kbd { border-radius: 6px; border-color: var(--line); background: color-mix(in srgb, var(--text) 6%, transparent); }
+dialog { border-radius: 22px; border-color: var(--line); background: color-mix(in srgb, var(--panel) 95%, transparent); box-shadow: 0 40px 120px -30px rgba(0, 0, 0, .7); }
+dialog[open] { animation: dlgIn .18s ease-out; }
+@keyframes dlgIn { from { opacity: 0; transform: translateY(8px) scale(.985); } }
+dialog::backdrop { background: rgba(4, 4, 10, .55); backdrop-filter: blur(6px); }
+.dlg-head { border-bottom-color: var(--line); padding: 16px 20px; }
+.jlist button { border-radius: 10px; }
+.jlist button.on { background: color-mix(in srgb, var(--main) 18%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--main) 35%, transparent); }
+.toast { border-radius: 999px; padding: 11px 20px; background: color-mix(in srgb, var(--panel) 88%, transparent); backdrop-filter: blur(16px); box-shadow: 0 18px 44px -14px var(--shadow); bottom: 26px; }
+.toast.show { border-radius: 16px; }
+.upd { background: var(--grad); color: var(--on-grad); }
+.upd .hot { background: rgba(0, 0, 0, .25); color: #fff; box-shadow: none; }
+.page { animation: pageIn .28s cubic-bezier(.2, .8, .2, 1); }
+@keyframes pageIn { from { opacity: 0; transform: translateY(8px); } }
+.dot.on { box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 25%, transparent), 0 0 10px var(--green); }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--text) 16%, transparent); border-radius: 99px; border: 3px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background-color: color-mix(in srgb, var(--text) 28%, transparent); }
+::-webkit-scrollbar-track { background: transparent; }
+::selection { background: color-mix(in srgb, var(--main) 40%, transparent); }
+body.compact section { padding: 14px; border-radius: 16px; }
+.jumpdlg .dlg-head input, .jumpdlg .dlg-head input:focus { border: 0; background: none; box-shadow: none; padding-left: 4px; }
+body.corners-square section, body.corners-square .badge, body.corners-square .seg, body.corners-square .seg button, body.corners-square .toast { border-radius: 0 !important; }
+body.corners-soft section { border-radius: 8px; }
 </style>
 </head>
 <body>
 <div id="updBar" class="upd" hidden><span id="updText"></span><button class="small hot" id="updNow">Update now</button></div>
 <header>
-  <div class="brand"><img src="/icon.png" alt=""><div><span>GIFT</span> HYPE · <em>LIVE</em></div></div>
+  <div class="brand"><svg viewBox="0 0 100 100" aria-hidden="true"><defs><linearGradient id="lg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#7c5cff"/><stop offset="1" stop-color="#22d3ee"/></linearGradient></defs>
+    <rect x="2" y="2" width="96" height="96" rx="24" fill="url(#lg)"/><path d="M33 31V56a17 17 0 0 0 34 0V20M53 30L67 16L81 30" fill="none" stroke="#fff" stroke-width="11.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <span class="wm">Unbound</span><span class="live">LIVE</span></div>
   <div class="connect">
     <div class="at"><input type="text" id="ttUser" placeholder="your TikTok name" aria-label="TikTok username" autocomplete="off"></div>
     <button class="hot" id="ttBtn">Connect</button>
   </div>
+  <button class="jump" id="jumpBtn" title="Find any game, sound or setting (Ctrl + K)"><svg class="i" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/></svg><span>Find anything…</span><kbd>Ctrl K</kbd></button>
   <div class="chips">
     <div class="chip"><span class="dot" id="ttDot"></span><span id="ttText">TikTok offline</span></div>
     <div class="chip"><span class="dot idle" id="gmDot"></span><span id="gmText">No game link</span></div>
   </div>
   <p class="tterr" id="ttErr"></p>
+  <nav class="tabs" id="tabs" aria-label="Pages" role="tablist">
+    <button data-page="games" role="tab" title="Alt + 1"><svg class="i" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="4" width="13" height="8.5" rx="3"/><path d="M5 6.5v3M3.5 8h3M10.5 7.5h.01M12 9h.01"/></svg>Games &amp; gifts</button>
+    <button data-page="sounds" role="tab" title="Alt + 2"><svg class="i" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6v4h2.5l3.5 3V3L5 6z"/><path d="M11 5.5a3.5 3.5 0 010 5M12.8 3.5a6 6 0 010 9"/></svg>Sounds <span class="count" id="tabSoundCount"></span></button>
+    <button data-page="overlay" role="tab" title="Alt + 3"><svg class="i" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="1.5" y="2.5" width="13" height="9" rx="1.5"/><path d="M5.5 14.5h5M8 11.5v3"/></svg>Stream overlay</button>
+    <button data-page="settings" role="tab" title="Alt + 4"><svg class="i" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2 4h7M12 4h2M2 8h2M7 8h7M2 12h9M14 12h0"/><circle cx="10.5" cy="4" r="1.5"/><circle cx="5.5" cy="8" r="1.5"/><circle cx="12.5" cy="12" r="1.5"/></svg>Look &amp; settings</button>
+  </nav>
 </header>
 
 <main>
   <div class="col">
+   <div class="page col" data-page="games">
     <div id="home">
       <div class="lib-head"><h1>Games</h1><p>Click a game to set up its gifts. The one marked LIVE is where your gifts go.</p></div>
       <div class="covers" id="covers"></div>
@@ -360,42 +604,128 @@ dialog::backdrop { background: rgba(0,0,0,.5); }
         <div id="chatBox"></div>
       </section>
     </div>
-  </div>
+   </div>
 
-  <div class="col side-right">
+   <div class="page col" data-page="sounds" hidden>
     <section>
-      <h2>Live gifts <span class="right"><button class="small ghost" id="clearFeed">Clear</button></span></h2>
-      <div class="feed" id="feed"><div class="empty">Gifts will show up here.</div></div>
-    </section>
-
-    <section>
-      <h2>Sounds <span class="right"><button class="small" id="stopAll"><svg class="i" viewBox="0 0 16 16"><rect x="3" y="3" width="10" height="10" rx="1.5" fill="currentColor"/></svg> Stop</button></span></h2>
-      <div class="row">
-        <label class="vol" style="flex:1">Volume <input type="range" id="master" min="0" max="1" step="0.05" style="flex:1"></label>
+      <h2>Sound board <span class="right"><span class="pill" id="sCount"></span></span></h2>
+      <div class="sbar">
+        <input type="search" id="sFilter" placeholder="Filter sounds… (e.g. where have you been, sigma, minecraft)" aria-label="Filter sounds" autocomplete="off">
+        <div class="seg" role="radiogroup" aria-label="How sounds are shown" id="sView">
+          <button data-sview="grid" role="radio">Tiles</button><button data-sview="list" role="radio">List</button>
+        </div>
+        <button id="sRandom" title="Play a random sound from what's shown">🎲 Random</button>
+        <button id="stopAll2"><svg class="i" viewBox="0 0 16 16"><rect x="3" y="3" width="10" height="10" rx="1.5" fill="currentColor"/></svg> Stop</button>
       </div>
-      <form class="row" id="findForm" style="margin-top:12px">
-        <input type="text" id="findQ" placeholder="Find any sound, e.g. fahh, metal pipe" style="flex:1" autocomplete="off" aria-label="Find a sound online">
+      <div class="gchips" id="sGroups" role="radiogroup" aria-label="Sound groups"></div>
+      <div id="sounds" class="board"></div>
+      <p class="hint"><b>Click</b> a sound to hear it. <b>☆</b> adds it to Quick sounds on the right (and to the top of every list). <b>✎</b> gives it your own name.
+        A sound missing? <button class="small ghost" id="sRefetch">Get the sound pack again</button></p>
+    </section>
+    <section>
+      <h2>Find any sound online</h2>
+      <form class="row" id="findForm">
+        <input type="text" id="findQ" placeholder="Search MyInstants, e.g. fahh, metal pipe, rizz" style="flex:1" autocomplete="off" aria-label="Find a sound online">
         <button class="small primary" id="findBtn">Search</button>
       </form>
+      <div class="gchips" id="findIdeas" style="margin-top:10px"></div>
       <div id="foundBox" hidden>
         <div class="sounds found" id="found" style="margin-top:8px"></div>
-        <p class="hint" style="margin-top:6px">Sounds from myinstants.com. <b>Add</b> puts one in your list. <button class="small ghost" type="button" id="findClose">Close</button></p>
+        <p class="hint" style="margin-top:6px">Sounds from myinstants.com. <b>Add</b> puts one in your sounds (group "Yours"). <button class="small ghost" type="button" id="findClose">Close</button></p>
       </div>
-      <h2 style="margin:16px 0 6px">Your sounds</h2>
-      <div class="sounds" id="sounds"></div>
+      <h2 style="margin:18px 0 6px">Your own files</h2>
       <label class="drop" id="drop">
         <input type="file" id="upload" accept=".mp3,.wav,.ogg,.m4a,audio/*" multiple hidden>
         <b>+ Add your own sounds</b><br>Drop .mp3 / .wav files here, or click
       </label>
     </section>
+   </div>
 
+   <div class="page col" data-page="overlay" hidden>
     <section>
+      <h2>Stream overlay</h2>
+      <div class="row">
+        <code id="ovUrl"></code>
+        <button class="small" id="ovCopy">Copy</button>
+        <button class="small hot" id="ovLive">Set up in TikTok LIVE Studio</button>
+        <button class="small" id="ovTest">Send a test popup</button>
+      </div>
+      <p class="hint">In OBS or TikTok LIVE Studio add a <b>Browser</b> (or <b>Link</b>) source with that address, size 1920 × 1080. Gift popups show on your stream.</p>
+      <div class="ovedit">
+        <div class="fswrap" id="ovWrap"><div class="ovstage" id="ovStage"><iframe id="ovFrame" title="Your overlay (drag the boxes)" scrolling="no"></iframe></div>
+          <button class="small fsbtn" data-fs="ovWrap">⛶ Full screen</button></div>
+        <p class="hint">This is your overlay. <b>Drag a box</b> to move it (gift popups too), <b>drag its round corner</b> to make it bigger or smaller. Your real overlay (in TikTok LIVE Studio) moves too. <b>Full screen</b> makes it bigger to work on.
+          <button class="small ghost" id="ovPlacesReset" style="margin-left:6px">Put the boxes back</button></p>
+      </div>
+    </section>
+    <section id="popSec">
+      <h2>Gift popups <span class="right"><button class="small ghost" id="popReset">Back to the standard look</button></span></h2>
+      <p class="hint" style="margin:0 0 4px">How the popup looks when a gift comes in. Changes show in the overlay above straight away.</p>
+      <div class="chatgrid">
+        <label>Style<select data-m="popStyle"><option value="dark">Dark</option><option value="light">Light</option><option value="glass">Glass (see-through)</option><option value="neon">Neon glow</option><option value="minecraft">Minecraft</option></select></label>
+        <label>Comes in with<select data-m="popAnim"><option value="bounce">Bounce</option><option value="slide">Slide in</option><option value="zoom">Zoom</option><option value="spin">Spin</option><option value="fade">Fade</option><option value="none">Nothing (just shows)</option></select></label>
+        <label>Seconds on screen<input type="number" min="1" max="20" step="0.5" data-m="popSeconds"></label>
+        <label>Most at once<input type="number" min="1" max="8" data-m="popMax"></label>
+        <label>Only gifts worth at least (coins)<input type="number" min="0" max="1000000" data-m="popMinCoins"></label>
+        <label>Word after the name<input type="text" maxlength="20" data-m="popWord" placeholder="sent"></label>
+        <label class="check" style="flex-direction:row"><input type="checkbox" data-m="showSender"> Show who sent it</label>
+        <label class="check" style="flex-direction:row"><input type="checkbox" data-m="popImage"> Show the gift's picture</label>
+        <label class="check" style="flex-direction:row"><input type="checkbox" data-m="popWiggle"> Wiggle the picture</label>
+        <label class="check" style="flex-direction:row"><input type="checkbox" data-m="popCount"> Show streaks (3×)</label>
+        <label class="check wide" style="flex-direction:row"><input type="checkbox" data-m="popColors"> Use my own colours (instead of the app's colour theme)</label>
+        <label data-popcol>Border<input type="color" data-m="popBorder"></label>
+        <label data-popcol>Name<input type="color" data-m="popName"></label>
+        <label data-popcol>Text<input type="color" data-m="popText"></label>
+        <label data-popcol>What it does<input type="color" data-m="popDoes"></label>
+      </div>
+    </section>
+    <section id="ovMenuBox">
+      <h2>Gift list on the overlay <span class="right"><button class="small ghost" id="ovMenuReset">Back to the standard look</button></span></h2>
+      <p class="hint" style="margin:0">Each gift in the game marked LIVE, its price and what it does. It fills itself in and changes when you switch game, type or gifts. Gift popups show in the middle, so keep the list at a side (or tick "Fade out during popups").</p>
+      <div class="chatgrid">
+        <label class="check" style="flex-direction:row"><input type="checkbox" data-m="menu"> Show the gift list</label>
+        <label>Style<select data-m="menuStyle"><option value="list">List (a page at a time)</option><option value="single">One at a time</option></select></label>
+        <label>Title<input type="text" maxlength="30" data-m="menuTitle"></label>
+        <label>Order<select data-m="menuSort"><option value="cheap">Cheapest first</option><option value="dear">Most expensive first</option><option value="game">As in your game</option></select></label>
+        <label>Gifts per page (list)<input type="number" min="1" max="15" data-m="menuRows"></label>
+        <label>Seconds per page / gift<input type="number" min="2" max="30" data-m="menuSeconds"></label>
+        <label>Background<input type="color" data-m="menuBg"></label>
+        <label>See-through (0 = clear)<input type="range" min="0" max="100" step="1" data-m="menuBgAlpha"></label>
+        <label>Border<input type="color" data-m="menuBorder"></label>
+        <label>Title colour<input type="color" data-m="menuTitleColor"></label>
+        <label>Gift names<input type="color" data-m="menuNameColor"></label>
+        <label>Prices<input type="color" data-m="menuPriceColor"></label>
+        <label>What it does<input type="color" data-m="menuDoesColor"></label>
+        <label class="check" style="flex-direction:row"><input type="checkbox" data-m="menuShowPrice"> Show prices</label>
+        <label class="check" style="flex-direction:row"><input type="checkbox" data-m="menuShowDoes"> Show what it does</label>
+        <label class="check" style="flex-direction:row"><input type="checkbox" data-m="menuHighlight"> Light up a gift when it's sent</label>
+        <label class="check" style="flex-direction:row"><input type="checkbox" data-m="menuHideOnPopup"> Fade out during popups</label>
+      </div>
+      <div class="row" style="margin-top:10px"><a class="small" id="ovMenuOpen" target="_blank" rel="noopener">Open the overlay to see it</a></div>
+    </section>
+   </div>
+
+   <div class="page col" data-page="settings" hidden>
+    <section id="lookSec">
       <h2>Colours</h2>
       <div class="themes" id="themes" role="radiogroup" aria-label="Colour theme"></div>
+      <div class="chatgrid" id="customLook" hidden>
+        <label>Main colour<input type="color" data-look="main"></label>
+        <label>Eye-catcher<input type="color" data-look="hot"></label>
+        <label>Background<select data-look="base"><option value="dark">Dark</option><option value="light">Light</option></select></label>
+      </div>
+      <h2 style="margin-top:20px">Layout</h2>
+      <div class="chatgrid">
+        <label>Text size <span class="pill" id="textSizeVal"></span><input type="range" min="80" max="130" step="5" data-look="textSize"></label>
+        <label>Corners<select data-look="corners"><option value="round">Round</option><option value="soft">A little round</option><option value="square">Square</option></select></label>
+        <label class="check" style="flex-direction:row"><input type="checkbox" data-look="compact"> Compact (fit more on the screen)</label>
+        <label class="check" style="flex-direction:row"><input type="checkbox" data-look="side"> Show the Live gifts column</label>
+        <label class="check" style="flex-direction:row"><input type="checkbox" data-look="motion"> Animations</label>
+      </div>
+      <div class="row" style="margin-top:12px"><button class="small ghost" id="lookReset">Back to the standard layout</button></div>
     </section>
-
     <section>
-      <h2>Settings</h2>
+      <h2>Sounds &amp; TikTok</h2>
       <label class="field">Play sounds in
         <select id="soundsIn">
           <option value="app">This app (you and your stream hear them)</option>
@@ -403,55 +733,42 @@ dialog::backdrop { background: rgba(0,0,0,.5); }
         </select>
       </label>
       <div class="row" style="margin-top:14px"><label class="check"><input type="checkbox" id="autoConnect"> Connect to TikTok by itself when the app opens</label></div>
-      <h2 style="margin-top:18px">Updates</h2>
-      <div class="row"><span class="pill" id="verText">Version</span><button class="small" id="updCheck">Check for updates</button></div>
-      <h2 style="margin-top:18px">Stream overlay</h2>
-      <div class="row">
-        <code id="ovUrl"></code>
-        <button class="small" id="ovCopy">Copy</button>
-        <button class="small hot" id="ovLive">Set up in TikTok LIVE Studio</button>
-      </div>
-      <div class="ovedit">
-        <div class="fswrap" id="ovWrap"><div class="ovstage" id="ovStage"><iframe id="ovFrame" title="Your overlay (drag the boxes)" scrolling="no"></iframe></div>
-          <button class="small fsbtn" data-fs="ovWrap">⛶ Full screen</button></div>
-        <p class="hint">This is your overlay. <b>Drag a box</b> to move it (gift popups too), <b>drag its round corner</b> to make it bigger or smaller. Your real overlay (in TikTok LIVE Studio) moves too. <b>Full screen</b> makes it bigger to work on.
-          <button class="small ghost" id="ovPlacesReset" style="margin-left:6px">Put the boxes back</button></p>
-      </div>
-      <details class="tpgroup" id="ovMenuBox">
-        <summary>Gift list on the overlay</summary>
-        <p class="hint">Each gift in the game marked LIVE, its price and what it does. It fills itself in and changes when you switch game, type or gifts. Gift popups show in the middle, so keep the list at a side (or tick "Fade out during popups"). Changes show on the overlay straight away.</p>
-        <div class="chatgrid">
-          <label class="check" style="flex-direction:row"><input type="checkbox" data-m="menu"> Show the gift list</label>
-          <label>Style<select data-m="menuStyle"><option value="list">List (a page at a time)</option><option value="single">One at a time</option></select></label>
-          <label>Title<input type="text" maxlength="30" data-m="menuTitle"></label>
-          <label>Order<select data-m="menuSort"><option value="cheap">Cheapest first</option><option value="dear">Most expensive first</option><option value="game">As in your game</option></select></label>
-          <label>Gifts per page (list)<input type="number" min="1" max="15" data-m="menuRows"></label>
-          <label>Seconds per page / gift<input type="number" min="2" max="30" data-m="menuSeconds"></label>
-          <label>Background<input type="color" data-m="menuBg"></label>
-          <label>See-through (0 = clear)<input type="range" min="0" max="100" step="1" data-m="menuBgAlpha"></label>
-          <label>Border<input type="color" data-m="menuBorder"></label>
-          <label>Title colour<input type="color" data-m="menuTitleColor"></label>
-          <label>Gift names<input type="color" data-m="menuNameColor"></label>
-          <label>Prices<input type="color" data-m="menuPriceColor"></label>
-          <label>What it does<input type="color" data-m="menuDoesColor"></label>
-          <label class="check" style="flex-direction:row"><input type="checkbox" data-m="menuShowPrice"> Show prices</label>
-          <label class="check" style="flex-direction:row"><input type="checkbox" data-m="menuShowDoes"> Show what it does</label>
-          <label class="check" style="flex-direction:row"><input type="checkbox" data-m="menuHighlight"> Light up a gift when it's sent</label>
-          <label class="check" style="flex-direction:row"><input type="checkbox" data-m="menuHideOnPopup"> Fade out during popups</label>
-        </div>
-        <div class="row" style="margin-top:10px"><button class="small ghost" id="ovMenuReset">Back to the standard look</button><a class="small" id="ovMenuOpen" target="_blank" rel="noopener">Open the overlay to see it</a></div>
-      </details>
-      <p class="hint">In OBS or TikTok LIVE Studio add a <b>Browser</b> source with that address, size 1920 × 1080. Gift popups show on your stream.</p>
-      <details style="margin-top:14px">
+      <details style="margin-top:14px" id="eulerBox">
         <summary>Euler Stream key (only if TikTok says "too many connects")</summary>
         <div class="row" style="margin-top:10px"><input type="password" id="euler" placeholder="paste your free key from eulerstream.com" style="flex:1"><button class="small" id="eulerSave">Save</button></div>
       </details>
-      <details style="margin-top:10px">
-        <summary>Activity log</summary>
-        <pre class="log" id="log" style="margin-top:10px"></pre>
-      </details>
     </section>
+    <section id="updSec">
+      <h2>Updates</h2>
+      <div class="row"><span class="pill" id="verText">Version</span><button class="small" id="updCheck">Check for updates</button></div>
+    </section>
+    <section>
+      <h2>Keyboard shortcuts</h2>
+      <div class="keys">
+        <div><kbd>Ctrl</kbd> + <kbd>K</kbd> or <kbd>/</kbd></div><span>Find any game, sound or setting</span>
+        <div><kbd>Alt</kbd> + <kbd>1</kbd> … <kbd>4</kbd></div><span>Games, Sounds, Overlay, Settings</span>
+        <div><kbd>Esc</kbd></div><span>Stop all sounds (or close what's open)</span>
+      </div>
+    </section>
+    <section id="logSec">
+      <h2>Activity log</h2>
+      <pre class="log" id="log"></pre>
+    </section>
+   </div>
   </div>
+
+  <aside class="col side-right" id="side">
+    <section>
+      <h2>Live gifts <span class="right"><button class="small ghost" id="clearFeed">Clear</button></span></h2>
+      <div class="feed" id="feed"><div class="empty">Gifts will show up here.</div></div>
+    </section>
+    <section>
+      <h2>Quick sounds <span class="right"><button class="small" id="stopAll"><svg class="i" viewBox="0 0 16 16"><rect x="3" y="3" width="10" height="10" rx="1.5" fill="currentColor"/></svg> Stop</button></span></h2>
+      <label class="vol" style="display:flex">Volume <input type="range" id="master" min="0" max="1" step="0.05" style="flex:1"><span class="pill" id="masterVal"></span></label>
+      <div class="quick" id="quick"></div>
+      <button class="small ghost" style="margin-top:10px" data-go="sounds">All sounds →</button>
+    </section>
+  </aside>
 </main>
 
 <dialog id="gallery">
@@ -486,8 +803,23 @@ dialog::backdrop { background: rgba(0,0,0,.5); }
       <li>Set the size to <b>1920 × 1080</b> (or Fit to screen) and press <b>Add</b>.</li>
       <li>Drag it to the top of your sources so the popups show over the game.</li>
     </ol>
-    <p class="hint">The address points back to this PC, so Gift Hype must be open while you stream. If the overlay shows as a tiny box or stops updating, add <code>?refresh=1</code> to the end of the address.</p>
+    <p class="hint">The address points back to this PC, so Unbound must be open while you stream. If the overlay shows as a tiny box or stops updating, add <code>?refresh=1</code> to the end of the address.</p>
     <div class="toolbar"><button id="liveCopy">Copy the address again</button><button class="primary" id="liveDone" style="margin-left:auto">Done</button></div>
+  </div>
+</dialog>
+
+<dialog id="jumpDlg" class="jumpdlg">
+  <div class="dlg-head"><svg class="i" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/></svg>
+    <input type="text" id="jumpQ" placeholder="Find a game, sound, setting…" autocomplete="off" aria-label="Find anything"><kbd>Esc</kbd></div>
+  <div class="dlg-body"><div class="jlist" id="jumpList" role="listbox"></div></div>
+</dialog>
+
+<dialog id="sndDlg">
+  <div class="dlg-head"><h3>Pick a sound</h3><input type="search" id="pickQ" placeholder="Search sounds…" autocomplete="off" aria-label="Search sounds">
+    <button class="ghost" id="pickClose" aria-label="Close"><svg class="i" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button></div>
+  <div class="dlg-body">
+    <div class="gchips" id="pickGroups"></div>
+    <div class="board" id="pickBoard"></div>
   </div>
 </dialog>
 
@@ -527,38 +859,157 @@ let settings = {}, gamesList = [], game = null, sounds = [], status = {}, catalo
 const playing = new Set();
 const looping = new Map();   // id -> sound that repeats until stopped (e.g. a reset's sound for its whole countdown)
 function playSound(file, volume = 1, opts = {}) {
-  if (!file) return;
-  if (playing.size >= 6) { const oldest = [...playing].find(x => !x.loop) || playing.values().next().value; oldest.pause(); playing.delete(oldest); }
+  if (!file) return null;
+  file = resolveSound(file);
+  if (!file) return null;
+  if (playing.size >= 6) { const oldest = [...playing].find(x => !x.loop) || playing.values().next().value; oldest.pause(); playing.delete(oldest); oldest.onended?.(); }
   const a = new Audio('/sounds/' + file.split('/').map(encodeURIComponent).join('/'));
   a.volume = Math.max(0, Math.min(1, volume));
+  a._file = file;
   playing.add(a);
-  a.onended = a.onerror = () => playing.delete(a);
+  a.onended = a.onerror = a.onpause = () => { playing.delete(a); markPlaying(); };
   if (opts.loopFor) {
     stopSound(opts.id);
     a.loop = true;
     looping.set(opts.id, a);
     a._stop = setTimeout(() => stopSound(opts.id), opts.loopFor * 1000);
   }
-  a.play().catch(() => playing.delete(a));
+  a.play().then(markPlaying).catch(() => { playing.delete(a); markPlaying(); });
+  return a;
 }
 function stopSound(id) { const a = looping.get(id); if (!a) return; clearTimeout(a._stop); a.pause(); playing.delete(a); looping.delete(id); }
-function stopAll() { playing.forEach(a => a.pause()); playing.clear(); }
-$('stopAll').onclick = stopAll;
-const soundName = file => sounds.find(s => s.file === file)?.name || (file ? file.split('/').pop() : 'None');
+function stopAll() { [...playing].forEach(a => a.pause()); playing.clear(); markPlaying(); }
+$('stopAll').onclick = $('stopAll2').onclick = stopAll;
+// tiles of sounds that are playing right now light up
+function markPlaying() {
+  const on = new Set([...playing].map(a => a._file));
+  document.querySelectorAll('.tile[data-file]').forEach(t => t.classList.toggle('playing', on.has(t.dataset.file)));
+}
 
-function renderSounds() {
-  const box = $('sounds');
-  box.innerHTML = sounds.map(s => `<div class="snd">
-    <button data-play="${esc(s.file)}" aria-label="Play ${esc(s.name)}">${IC.play}</button>
-    <span class="sn">${esc(s.name)}</span>
-    ${s.custom ? `<span class="mine">yours</span><button class="ghost danger" data-delsnd="${esc(s.file)}" aria-label="Delete ${esc(s.name)}">${IC.x}</button>` : ''}
-  </div>`).join('') || '<div class="empty">No sounds yet.</div>';
+// A gift's sound can be a random pick ("random:all", "random:favs", "random:<group>"); the server picks
+// for real gifts, this picks for Test-listening here.
+let soundGroups = [];
+const groupName = id => soundGroups.find(g => g.id === id)?.name || id;
+const randomPool = sound => {
+  const m = /^random:([\w-]+)$/.exec(sound || '');
+  if (!m) return null;
+  const pool = m[1] === 'all' ? sounds : m[1] === 'favs' ? sounds.filter(s => s.fav) : sounds.filter(s => s.group === m[1]);
+  return pool.length ? pool : sounds;
+};
+function resolveSound(file) { const pool = randomPool(file); return pool ? pool[Math.floor(Math.random() * pool.length)]?.file : file; }
+const soundName = file => {
+  const m = /^random:([\w-]+)$/.exec(file || '');
+  if (m) return '🎲 Random: ' + (m[1] === 'all' ? 'any sound' : m[1] === 'favs' ? 'favourites' : groupName(m[1]));
+  return sounds.find(s => s.file === file)?.name || (file ? file.split('/').pop() : 'No sound');
+};
+
+// ----- The sound board (Sounds page), Quick sounds (right) and the sound picker (gifts) -----
+let sGroup = 'all', sView = 'grid';
+try { sView = localStorage.getItem('gh-sview') || 'grid'; sGroup = localStorage.getItem('gh-sgroup') || 'all'; } catch {}
+const matches = (s, q) => !q || (s.name + ' ' + s.file + ' ' + groupName(s.group)).toLowerCase().includes(q);
+const STAR = on => on ? '★' : '☆';
+function tileHtml(s, o = {}) {
+  return `<div class="tile ${o.cur ? 'cur' : ''}" data-file="${esc(s.file)}">
+    <button class="tp" data-play="${esc(s.file)}" title="Play ${esc(s.name)}">${IC.play}<span>${esc(s.name)}</span></button>
+    ${o.pick ? `<button class="tb use" data-use="${esc(s.file)}">Use</button>` : `
+    ${s.custom && !o.quick ? '<span class="mine">yours</span>' : ''}
+    <button class="tb ${s.fav ? 'on' : 'hov'}" data-fav="${esc(s.file)}" title="${s.fav ? 'Take out of' : 'Add to'} Quick sounds" aria-label="Favourite">${STAR(s.fav)}</button>
+    ${o.quick ? '' : `<button class="tb hov" data-ren="${esc(s.file)}" title="Rename" aria-label="Rename">✎</button>`}
+    ${s.custom && !o.quick ? `<button class="tb hov" data-delsnd="${esc(s.file)}" title="Delete" aria-label="Delete">${IC.x}</button>` : ''}`}
+  </div>`;
+}
+// sounds grouped under headings (or one flat list when searching / one group is picked)
+function boardHtml(list, group, q, o = {}) {
+  const shown = list.filter(s => matches(s, q) && (group === 'all' || (group === 'favs' ? s.fav : s.group === group)));
+  if (!shown.length) return `<div class="empty" style="grid-column:1/-1">${q ? 'No sounds match. Try <b>Find any sound online</b> below.' : group === 'favs' ? 'No favourites yet: press ☆ on a sound.' : 'No sounds here yet.'}</div>`;
+  if (group !== 'all' || q) return shown.map(s => tileHtml(s, { ...o, cur: o.cur === s.file })).join('');
+  return soundGroups.map(g => {
+    const in_ = shown.filter(s => s.group === g.id);
+    return in_.length ? `<div class="ghd">${esc(g.name)} · ${in_.length}</div>` + in_.map(s => tileHtml(s, { ...o, cur: o.cur === s.file })).join('') : '';
+  }).join('');
+}
+function groupChips(box, cur, onPick, list = sounds) {
+  const n = id => id === 'all' ? list.length : id === 'favs' ? list.filter(s => s.fav).length : list.filter(s => s.group === id).length;
+  const chips = [{ id: 'all', name: 'All' }, { id: 'favs', name: '★ Favourites' }, ...soundGroups].filter(g => g.id === 'all' || g.id === 'favs' || n(g.id));
+  box.innerHTML = chips.map(g => `<button role="radio" aria-checked="${g.id === cur}" data-g="${esc(g.id)}">${esc(g.name)}<small>${n(g.id)}</small></button>`).join('');
+  box.querySelectorAll('[data-g]').forEach(b => b.onclick = () => onPick(b.dataset.g));
+}
+function wireTiles(box) {
   box.querySelectorAll('[data-play]').forEach(b => b.onclick = () => playSound(b.dataset.play, settings.masterVolume));
+  box.querySelectorAll('[data-fav]').forEach(b => b.onclick = async () => {
+    const s = sounds.find(x => x.file === b.dataset.fav);
+    if (!s) return;
+    s.fav = !s.fav; renderSounds();
+    try { await api('/api/sounds/fav', { file: s.file, on: s.fav }); } catch (e) { toast(e.message, true); }
+  });
+  box.querySelectorAll('[data-ren]').forEach(b => b.onclick = async () => {
+    const s = sounds.find(x => x.file === b.dataset.ren);
+    const name = prompt('A name for this sound (leave it empty for its first name)', s?.name || '');
+    if (name === null) return;
+    try { await api('/api/sounds/rename', { file: b.dataset.ren, name }); } catch (e) { toast(e.message, true); }
+  });
   box.querySelectorAll('[data-delsnd]').forEach(b => b.onclick = async () => {
     if (!confirm(`Delete the sound "${soundName(b.dataset.delsnd)}"?`)) return;
     try { await api('/api/sounds/delete', { file: b.dataset.delsnd }); } catch (e) { toast(e.message, true); }
   });
 }
+function renderSounds() {
+  if (sGroup !== 'all' && sGroup !== 'favs' && !sounds.some(s => s.group === sGroup)) sGroup = 'all';
+  const q = $('sFilter').value.trim().toLowerCase();
+  groupChips($('sGroups'), sGroup, g => { sGroup = g; try { localStorage.setItem('gh-sgroup', g); } catch {} renderSounds(); });
+  const box = $('sounds');
+  box.className = 'board ' + sView;
+  box.innerHTML = sounds.length ? boardHtml(sounds, sGroup, q) : '<div class="empty">Getting the sound pack… (first time only)</div>';
+  wireTiles(box);
+  document.querySelectorAll('[data-sview]').forEach(b => b.setAttribute('aria-checked', String(b.dataset.sview === sView)));
+  $('sCount').textContent = `${sounds.length} sounds`;
+  $('tabSoundCount').textContent = sounds.length || '';
+  // Quick sounds: your favourites (or the newest viral ones until you have some)
+  const favs = sounds.filter(s => s.fav);
+  const quick = favs.length ? favs : sounds.filter(s => s.group === 'edits' || s.group === 'brainrot').slice(0, 8);
+  $('quick').innerHTML = quick.map(s => tileHtml(s, { quick: true })).join('') || '<div class="empty">No sounds yet.</div>';
+  if (!favs.length && quick.length) $('quick').insertAdjacentHTML('afterbegin', '<p class="hint" style="grid-column:1/-1;margin:0">Press ☆ on any sound to keep it here.</p>');
+  wireTiles($('quick'));
+  markPlaying();
+  if ($('sndDlg').open) renderPicker();
+}
+$('sFilter').oninput = renderSounds;
+document.querySelectorAll('[data-sview]').forEach(b => b.onclick = () => { sView = b.dataset.sview; try { localStorage.setItem('gh-sview', sView); } catch {} renderSounds(); });
+$('sRandom').onclick = () => {
+  const q = $('sFilter').value.trim().toLowerCase();
+  const list = sounds.filter(s => matches(s, q) && (sGroup === 'all' || (sGroup === 'favs' ? s.fav : s.group === sGroup)));
+  if (list.length) playSound(list[Math.floor(Math.random() * list.length)].file, settings.masterVolume);
+};
+$('sRefetch').onclick = async () => {
+  $('sRefetch').disabled = true; toast('Getting the sound pack…');
+  try { const r = await api('/api/sounds/refetch', {}); toast(r.missing ? `Got ${r.got}; ${r.missing} couldn't be downloaded right now` : r.got ? `Got ${r.got} sounds` : 'You already have every sound in the pack'); }
+  catch (e) { toast(e.message, true); }
+  $('sRefetch').disabled = false;
+};
+
+// The sound picker: every sound with search and groups, plus the random choices
+let pickCb = null, pickCur = null, pickGroup = 'all';
+function openSoundPicker(cur, cb) {
+  pickCb = cb; pickCur = cur; $('pickQ').value = '';
+  const g = sounds.find(s => s.file === cur)?.group;
+  pickGroup = 'all';
+  renderPicker(); $('sndDlg').showModal(); $('pickQ').focus();
+  if (g) $('pickBoard').querySelector('.tile.cur')?.scrollIntoView({ block: 'center' });
+}
+function renderPicker() {
+  const q = $('pickQ').value.trim().toLowerCase();
+  groupChips($('pickGroups'), pickGroup, g => { pickGroup = g; renderPicker(); });
+  const randoms = [{ file: 'random:all' }, { file: 'random:favs' }, ...soundGroups.filter(g => sounds.some(s => s.group === g.id)).map(g => ({ file: 'random:' + g.id }))]
+    .map(r => ({ ...r, name: soundName(r.file) })).filter(r => !q || r.name.toLowerCase().includes(q));
+  const extra = `<div class="ghd">Choices</div><div class="tile ${!pickCur ? 'cur' : ''}"><button class="tp" data-use="">${IC.x}<span>No sound</span></button></div>`
+    + randoms.map(r => `<div class="tile ${pickCur === r.file ? 'cur' : ''}"><button class="tp" data-play="${esc(r.file)}" title="Play a random one">${IC.play}<span>${esc(r.name)}</span></button><button class="tb use" data-use="${esc(r.file)}">Use</button></div>`).join('');
+  $('pickBoard').className = 'board';
+  $('pickBoard').innerHTML = (pickGroup === 'all' ? extra : '') + boardHtml(sounds, pickGroup, q, { pick: true, cur: pickCur });
+  wireTiles($('pickBoard'));
+  $('pickBoard').querySelectorAll('[data-use]').forEach(b => b.onclick = () => { const f = b.dataset.use || null; $('sndDlg').close(); pickCb?.(f); });
+}
+$('pickQ').oninput = renderPicker;
+$('pickClose').onclick = () => $('sndDlg').close();
 
 async function uploadFiles(files) {
   let last = null;
@@ -573,7 +1024,7 @@ async function uploadFiles(files) {
   }
   return last;
 }
-// Find real sound clips online (through Gift Hype, from myinstants.com) and add them to your sounds.
+// Find real sound clips online (through Unbound, from myinstants.com) and add them to your sounds.
 let previewAudio = null;
 $('findForm').onsubmit = async e => {
   e.preventDefault();
@@ -606,6 +1057,10 @@ $('findForm').onsubmit = async e => {
   } catch (err) { box.innerHTML = `<div class="empty">${esc(err.message || "Couldn't search right now")}</div>`; }
 };
 $('findClose').onclick = () => { previewAudio?.pause(); $('foundBox').hidden = true; };
+// ideas for the search box: viral sounds people look for
+$('findIdeas').innerHTML = ['where have you been edit', 'phonk', 'brainrot', 'sigma', 'rizz', 'aura', 'goofy ahh', 'minecraft', 'roblox', 'anime', 'bass boosted', 'fortnite', 'spongebob', 'ohio']
+  .map(t => `<button type="button" data-idea="${esc(t)}">${esc(t)}</button>`).join('');
+$('findIdeas').querySelectorAll('[data-idea]').forEach(b => b.onclick = () => { $('findQ').value = b.dataset.idea; $('findForm').requestSubmit(); });
 
 $('upload').onchange = async e => { await uploadFiles([...e.target.files]); e.target.value = ''; };
 const drop = $('drop');
@@ -613,18 +1068,22 @@ drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); };
 drop.ondragleave = () => drop.classList.remove('over');
 drop.ondrop = async e => { e.preventDefault(); drop.classList.remove('over'); await uploadFiles([...e.dataTransfer.files]); };
 
-$('master').oninput = () => saveSettingsSoon({ masterVolume: +$('master').value });
+$('master').oninput = () => { settings.masterVolume = +$('master').value; $('masterVal').textContent = Math.round(settings.masterVolume * 100) + '%'; saveSettingsSoon({ masterVolume: settings.masterVolume }); };
 $('soundsIn').onchange = () => api('/api/settings', { soundsIn: $('soundsIn').value });
 $('autoConnect').onchange = () => api('/api/settings', { autoConnect: $('autoConnect').checked });
 
 // the gift list's settings: every [data-m] field saves itself (sliders and colours as you move them)
 document.querySelectorAll('[data-m]').forEach(el => {
-  const send = () => { const k = el.dataset.m; const v = el.type === 'checkbox' ? el.checked : el.type === 'range' || el.type === 'number' ? +el.value : el.value; settings.overlay[k] = v; saveSettingsSoon({ overlay: { [k]: v } }); };
+  const send = () => { const k = el.dataset.m; const v = el.type === 'checkbox' ? el.checked : el.type === 'range' || el.type === 'number' ? +el.value : el.value; settings.overlay[k] = v; saveSettingsSoon({ overlay: { [k]: v } }); if (k === 'popColors') document.querySelectorAll('[data-popcol]').forEach(l => l.hidden = !v); };
   el.onchange = send;
   if (el.type === 'range' || el.type === 'color' || el.type === 'text') el.oninput = send;
 });
 const MENU_LOOK = { menuX: 2, menuY: 50, menuScale: 1, menuRows: 7, menuTitle: 'SEND A GIFT', menuSort: 'cheap', menuShowPrice: true, menuShowDoes: true, menuBg: '#0A1222', menuBgAlpha: 78,
   menuBorder: '#3A4A66', menuTitleColor: '#FFCF3A', menuNameColor: '#FFFFFF', menuPriceColor: '#FFCF3A', menuDoesColor: '#9FE7FF', menuHighlight: true, menuHideOnPopup: false };
+const POP_LOOK = { popSeconds: 4.5, popMax: 4, popAnim: 'bounce', popStyle: 'dark', popImage: true, popWiggle: true, popCount: true, popColors: false,
+  popBorder: '#4DB3EE', popName: '#4DB3EE', popText: '#FFFFFF', popDoes: '#FF6A3D', popWord: 'sent', popMinCoins: 0, showSender: true };
+$('popReset').onclick = async () => { Object.assign(settings.overlay, POP_LOOK); await api('/api/settings', { overlay: POP_LOOK }); fillMenuSettings(); toast('Popups back to the standard look'); };
+$('ovTest').onclick = async () => { try { await api('/api/overlay/test-popup', {}); toast('Test popup sent to the overlay'); } catch (e) { toast(e.message, true); } };
 $('ovMenuReset').onclick = async () => { Object.assign(settings.overlay, MENU_LOOK); await api('/api/settings', { overlay: MENU_LOOK }); fillMenuSettings(); toast('Gift list back to the standard look'); };
 // the overlay editor: the real overlay page (?edit) at 1920 x 1080, scaled to fit
 $('ovPlacesReset').onclick = async () => {
@@ -634,7 +1093,7 @@ $('ovPlacesReset').onclick = async () => {
   toast('Boxes back where they started');
 };
 // full screen for an editor (Esc or the button again to come back)
-// It fills the whole Gift Hype window, and goes properly full screen too where the window allows it.
+// It fills the whole Unbound window, and goes properly full screen too where the window allows it.
 const bigEditor = (w, on) => {
   w.classList.toggle('big', on);
   w.querySelector('[data-fs]').textContent = on ? '✕ Exit full screen' : '⛶ Full screen';
@@ -656,6 +1115,7 @@ function startOverlayEditor() {
 function fillMenuSettings() {
   startOverlayEditor();
   document.querySelectorAll('[data-m]').forEach(el => { const v = settings.overlay[el.dataset.m]; if (el.type === 'checkbox') el.checked = v !== false; else if (v != null) el.value = v; });
+  document.querySelectorAll('[data-popcol]').forEach(l => l.hidden = !settings.overlay.popColors);
   $('ovMenuOpen').href = `http://localhost:${location.port}/overlay`;
 }
 
@@ -684,27 +1144,62 @@ function saveSettingsSoon(patch) {
 }
 // Each theme: main colour, second colour, eye-catcher (the same order every time).
 const THEMES = [
+  { id: 'unbound', name: 'Unbound', colours: ['#8b6cff', '#101019', '#22d3ee'] },
   { id: 'sky', name: 'Sky', colours: ['#4db3ee', '#f4f7fa', '#e8542a'] },
   { id: 'blaze', name: 'Blaze', colours: ['#ff4500', '#fffafa', '#ffd000'] },
+  { id: 'mint', name: 'Mint', colours: ['#10b981', '#effaf5', '#ec4899'] },
   { id: 'punk', name: 'Punk', colours: ['#0f52ba', '#0e4c7a', '#00f0a8'] },
   { id: 'egyptian', name: 'Egyptian', colours: ['#1034a6', '#6c8597', '#ff2400'] },
+  { id: 'grape', name: 'Grape', colours: ['#8b5cf6', '#1c1433', '#facc15'] },
+  { id: 'mono', name: 'Mono', colours: ['#e5e7eb', '#161618', '#ef4444'] },
+  { id: 'custom', name: 'Your own', colours: [] },
 ];
+const LOOK_STD = { textSize: 100, compact: false, side: true, corners: 'round', motion: true };
 function applyTheme(id) {
-  if (!THEMES.some(t => t.id === id)) id = 'sky';
-  if (id === 'sky') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = id;
-  try { localStorage.setItem('gh-theme', id); } catch {}
-  $('themes').innerHTML = THEMES.map(t => `<button class="theme" role="radio" aria-checked="${t.id === id}" data-theme-id="${t.id}">
-      <span class="sw">${t.colours.map(c => `<i style="background:${c}"></i>`).join('')}</span>${t.name}</button>`).join('');
+  if (!THEMES.some(t => t.id === id)) id = 'unbound';
+  const look = settings.look || {};
+  paintTheme(id, look);
+  try { localStorage.setItem('gh-theme', id); localStorage.setItem('gh-look', JSON.stringify(look)); } catch {}
+  $('themes').innerHTML = THEMES.map(t => {
+    const c = t.id === 'custom' ? [look.main || '#7c4dff', look.base === 'light' ? '#f2f3f7' : '#171a23', look.hot || '#ff2d75'] : t.colours;
+    return `<button class="theme" role="radio" aria-checked="${t.id === id}" data-theme-id="${t.id}"><span class="sw">${c.map(x => `<i style="background:${x}"></i>`).join('')}</span>${t.name}</button>`;
+  }).join('');
   $('themes').querySelectorAll('[data-theme-id]').forEach(b => b.onclick = () => {
     settings.theme = b.dataset.themeId;
     applyTheme(settings.theme);
     api('/api/settings', { theme: settings.theme });
   });
+  $('customLook').hidden = id !== 'custom';
 }
+// text size, compact, corners, the Live gifts column, animations
+function applyLook() {
+  const l = { ...LOOK_STD, ...(settings.look || {}) }, b = document.body;
+  b.style.zoom = l.textSize === 100 ? '' : l.textSize / 100;
+  b.classList.toggle('compact', !!l.compact);
+  b.classList.toggle('no-side', l.side === false);
+  b.classList.toggle('no-motion', l.motion === false);
+  b.classList.remove('corners-soft', 'corners-square');
+  if (l.corners !== 'round') b.classList.add('corners-' + l.corners);
+  document.querySelectorAll('[data-look]').forEach(el => { const v = l[el.dataset.look]; if (el.type === 'checkbox') el.checked = v !== false && !!v; else if (v != null) el.value = v; });
+  $('textSizeVal').textContent = l.textSize + '%';
+}
+document.querySelectorAll('[data-look]').forEach(el => {
+  const send = () => {
+    const k = el.dataset.look, v = el.type === 'checkbox' ? el.checked : el.type === 'range' ? +el.value : el.value;
+    settings.look = { ...(settings.look || {}), [k]: v };
+    if (['main', 'hot', 'base'].includes(k)) applyTheme(settings.theme); else applyLook();
+    saveSettingsSoon({ look: { [k]: v } });
+  };
+  el.onchange = send;
+  if (el.type === 'range' || el.type === 'color') el.oninput = send;
+});
+$('lookReset').onclick = () => { settings.look = { ...settings.look, ...LOOK_STD }; applyLook(); api('/api/settings', { look: LOOK_STD }); toast('Layout back to the standard'); };
 
 function fillSettings() {
   applyTheme(settings.theme);
+  applyLook();
   $('master').value = settings.masterVolume;
+  $('masterVal').textContent = Math.round(settings.masterVolume * 100) + '%';
   $('soundsIn').value = settings.soundsIn;
   $('autoConnect').checked = settings.autoConnect;
 
@@ -713,6 +1208,100 @@ function fillSettings() {
   $('euler').value = settings.eulerStreamApiKey || '';
   if (!$('ttUser').value) $('ttUser').value = settings.tiktokUsername || '';
 }
+
+// ----- Pages (tabs): Games & gifts, Sounds, Stream overlay, Look & settings -----
+const PAGES = ['games', 'sounds', 'overlay', 'settings'];
+let page = 'games';
+function setPage(p, opts = {}) {
+  if (!PAGES.includes(p)) p = 'games';
+  page = p;
+  document.querySelectorAll('.page[data-page]').forEach(el => el.hidden = el.dataset.page !== p);
+  document.querySelectorAll('#tabs [data-page]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.page === p)));
+  if (location.hash.slice(1) !== p) history.replaceState(null, '', '#' + p);
+  try { localStorage.setItem('gh-page', p); } catch {}
+  if (p === 'overlay') startOverlayEditor();
+  if (opts.to) setTimeout(() => { const el = $(opts.to); if (!el) return; if (el.tagName === 'DETAILS') el.open = true; el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 30);
+  else if (!opts.keepScroll) window.scrollTo(0, 0);
+}
+document.querySelectorAll('#tabs [data-page]').forEach(b => b.onclick = () => setPage(b.dataset.page));
+document.addEventListener('click', e => { const b = e.target.closest('[data-go]'); if (b) setPage(b.dataset.go); });
+window.addEventListener('hashchange', () => { const h = location.hash.slice(1); if (PAGES.includes(h) && h !== page) setPage(h); });
+
+// ----- Find anything (Ctrl + K): games, types, pages, settings, sounds and things to do -----
+let jumpItems = [], jumpSel = 0;
+function jumpAll() {
+  const out = [];
+  const go = (kind, label, run, hint = '') => out.push({ kind, label, run, hint });
+  go('Page', 'Games & gifts', () => { setPage('games'); showView('home'); });
+  go('Page', 'Sounds', () => setPage('sounds'));
+  go('Page', 'Stream overlay', () => setPage('overlay'));
+  go('Page', 'Look & settings', () => setPage('settings'));
+  for (const g of gamesList) go('Game', g.name, async () => {
+    setPage('games');
+    await flushSave();
+    if (g.id !== settings.activeGame) await api('/api/games/active', { id: g.id });
+    showView(g.mode ? 'types' : 'game');
+  }, g.id === settings.activeGame ? 'LIVE' : `${g.gifts} gifts`);
+  if (game) for (const m of game.modes.length > 1 ? game.modes : []) go('Type', `${game.name}: ${m.name}`, async () => {
+    setPage('games');
+    if (game.mode !== m.id) { game.mode = m.id; queueSave(); await flushSave(); renderTypes(); renderRules(); if (game.connector === 'minecraft') renderMinecraftBox(); }
+    showView('game');
+  }, `${m.rules.length} gifts`);
+  if (game) {
+    go('Do', 'Add a gift', () => { setPage('games'); showView('game'); addRule(); });
+    go('Do', 'Browse all gifts', () => { setPage('games'); showView('game'); $('browse').click(); });
+  }
+  go('Do', 'Add a game', () => { setPage('games'); showView('home'); openNewGame(); });
+  go('Do', status.tiktok && status.tiktok !== 'offline' ? 'Disconnect from TikTok' : 'Connect to TikTok', () => $('ttBtn').click());
+  go('Do', 'Stop all sounds', stopAll, 'Esc');
+  go('Do', 'Send a test popup', () => $('ovTest').click());
+  go('Do', 'Play a random sound', () => playSound('random:all', settings.masterVolume));
+  go('Do', 'Find a sound online', () => { setPage('sounds', { to: 'findForm' }); setTimeout(() => $('findQ').focus(), 300); });
+  go('Do', 'Add your own sound files', () => $('upload').click());
+  go('Setting', 'Colours / theme', () => setPage('settings', { to: 'lookSec' }));
+  go('Setting', 'Text size, compact, corners', () => setPage('settings', { to: 'lookSec' }));
+  go('Setting', 'Gift popups (style, animation, colours, seconds)', () => setPage('overlay', { to: 'popSec' }));
+  go('Setting', 'Gift list on the overlay', () => setPage('overlay', { to: 'ovMenuBox' }));
+  go('Setting', 'Move the overlay boxes', () => setPage('overlay', { to: 'ovWrap' }));
+  go('Setting', 'Set up the overlay in TikTok LIVE Studio', () => $('ovLive').click());
+  go('Setting', 'Play sounds in the app or the overlay', () => setPage('settings', { to: 'soundsIn' }));
+  go('Setting', 'Euler Stream key', () => setPage('settings', { to: 'eulerBox' }));
+  go('Setting', 'Updates', () => setPage('settings', { to: 'updSec' }));
+  go('Setting', 'Activity log', () => setPage('settings', { to: 'logSec' }));
+  for (const s of sounds) go('Sound', s.name, () => playSound(s.file, settings.masterVolume), (s.fav ? '★ ' : '') + groupName(s.group));
+  return out;
+}
+function renderJump() {
+  const words = $('jumpQ').value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const all = jumpAll();
+  jumpItems = (words.length ? all.filter(i => words.every(w => (i.kind + ' ' + i.label + ' ' + i.hint).toLowerCase().includes(w))) : all.filter(i => i.kind !== 'Sound')).slice(0, 60);
+  jumpSel = Math.min(jumpSel, Math.max(0, jumpItems.length - 1));
+  $('jumpList').innerHTML = jumpItems.map((i, n) => `<button role="option" class="${n === jumpSel ? 'on' : ''}" data-j="${n}"><span class="k">${esc(i.kind)}</span><span>${esc(i.label)}</span>${i.hint ? `<small>${esc(i.hint)}</small>` : ''}</button>`).join('')
+    || '<div class="empty">Nothing found.</div>';
+  $('jumpList').querySelectorAll('[data-j]').forEach(b => { b.onclick = () => runJump(+b.dataset.j); b.onmousemove = () => { if (jumpSel !== +b.dataset.j) { jumpSel = +b.dataset.j; markJump(); } }; });
+}
+const markJump = () => $('jumpList').querySelectorAll('[data-j]').forEach(b => b.classList.toggle('on', +b.dataset.j === jumpSel));
+function runJump(n) { const i = jumpItems[n]; if (!i) return; if (i.kind !== 'Sound') $('jumpDlg').close(); i.run(); }
+function openJump() { if ($('jumpDlg').open) return; $('jumpQ').value = ''; jumpSel = 0; renderJump(); $('jumpDlg').showModal(); $('jumpQ').focus(); }
+$('jumpBtn').onclick = openJump;
+$('jumpQ').oninput = () => { jumpSel = 0; renderJump(); };
+$('jumpQ').onkeydown = e => {
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    jumpSel = (jumpSel + (e.key === 'ArrowDown' ? 1 : -1) + jumpItems.length) % Math.max(1, jumpItems.length);
+    markJump(); $('jumpList').querySelector('.on')?.scrollIntoView({ block: 'nearest' });
+  } else if (e.key === 'Enter') { e.preventDefault(); runJump(jumpSel); }
+};
+$('jumpDlg').onclick = e => { if (e.target === $('jumpDlg')) $('jumpDlg').close(); };
+
+// keyboard: Ctrl + K or / finds anything, Alt + 1-4 changes page, Esc stops the sounds
+document.addEventListener('keydown', e => {
+  const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || e.target.isContentEditable;
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openJump(); return; }
+  if (e.key === '/' && !typing && !document.querySelector('dialog[open]')) { e.preventDefault(); openJump(); return; }
+  if (e.altKey && /^[1-4]$/.test(e.key)) { e.preventDefault(); document.querySelectorAll('dialog[open]').forEach(d => d.close()); setPage(PAGES[+e.key - 1]); return; }
+  if (e.key === 'Escape' && !document.querySelector('dialog[open]') && !document.querySelector('.fswrap.big') && !typing) stopAll();
+}, true);
 
 // ----- TikTok -----
 $('ttBtn').onclick = async () => {
@@ -948,14 +1537,14 @@ function renderConnector() {
     </details>`;
     $('wsCopy').onclick = () => { navigator.clipboard.writeText(WS_SNIPPET(port)); toast('Code copied'); };
   } else if (game.connector === 'keys') {
-    box.innerHTML = `<p class="hint">Gift Hype presses keys in <b>whatever window is in front</b>, so click into your game before going live. Type keys like <code>w</code>, <code>{SPACE}</code>, <code>{ENTER}</code>, <code>{UP}</code>, <code>{F1}</code>. <code>^</code> = Ctrl, <code>+</code> = Shift, <code>%</code> = Alt (e.g. <code>^s</code>). It works in lots of PC games; a few (mostly anti-cheat ones) ignore pretend key presses.</p>`;
+    box.innerHTML = `<p class="hint">Unbound presses keys in <b>whatever window is in front</b>, so click into your game before going live. Type keys like <code>w</code>, <code>{SPACE}</code>, <code>{ENTER}</code>, <code>{UP}</code>, <code>{F1}</code>. <code>^</code> = Ctrl, <code>+</code> = Shift, <code>%</code> = Alt (e.g. <code>^s</code>). It works in lots of PC games; a few (mostly anti-cheat ones) ignore pretend key presses.</p>`;
   } else {
     box.innerHTML = `<p class="hint">Gifts play their sound and pop up on your stream overlay. Nothing is sent to a game.</p>`;
   }
   renderStatus();
 }
 
-// Minecraft: pick a server Gift Hype found on this PC. Its password is read from the server itself.
+// Minecraft: pick a server Unbound found on this PC. Its password is read from the server itself.
 let mcServers = null;
 async function loadServers() {
   try { mcServers = await api('/api/minecraft/servers'); } catch { mcServers = []; }
@@ -973,7 +1562,7 @@ function renderPlay() {
     try {
       await flushSave();
       const r = await api('/api/minecraft/play', {});
-      toast(r.quick === false ? 'Minecraft is opening: play, then Multiplayer, then "Gift Hype"' : 'Minecraft is opening: press Play on "Gift Hype"');
+      toast(r.quick === false ? 'Minecraft is opening: play, then Multiplayer, then "Unbound"' : 'Minecraft is opening: press Play on "Unbound"');
     } catch (e) { toast(e.message, true); }
     playing_ = false; renderPlay();
   };
@@ -985,11 +1574,11 @@ async function renderMinecraftBox() {
   const m = game.minecraft;
   if (isDropperMode()) {
     box.innerHTML = `<div class="conn-box">
-        <p class="wide" style="margin:0"><b>The Dropper has its own world</b>, made by Gift Hype: 100 levels that get harder as you go. Fall through the gaps and land in the water to go to the next level. Hit anything else and you start that level again.</p>
+        <p class="wide" style="margin:0"><b>The Dropper has its own world</b>, made by Unbound: 100 levels that get harder as you go. Fall through the gaps and land in the water to go to the next level. Hit anything else and you start that level again.</p>
         <div class="wide"><label class="check"><input type="checkbox" id="mcEula" ${settings.mcEula ? 'checked' : ''}> I agree to the <a href="https://aka.ms/MinecraftEULA" target="_blank" rel="noopener" style="color:var(--main-text)">Minecraft EULA</a> (needed to open the world for gifts)</label></div>
         <div class="wide row"><button class="small" id="mcRestart">Reopen world</button><span class="pill" id="mcState"></span></div>
       </div>
-      <p class="hint"><b>How to play:</b> press <b>Play Minecraft</b>. The first time, Gift Hype makes the world and builds the levels (about a minute). Your level, punches on/off and any shield are shown at the bottom of your screen, and the reset countdown at the top.</p>`;
+      <p class="hint"><b>How to play:</b> press <b>Play Minecraft</b>. The first time, Unbound makes the world and builds the levels (about a minute). Your level, punches on/off and any shield are shown at the bottom of your screen, and the reset countdown at the top.</p>`;
     $('mcEula').onchange = () => { settings.mcEula = $('mcEula').checked; api('/api/settings', { mcEula: settings.mcEula }); };
     $('mcRestart').onclick = async () => { try { await api('/api/minecraft/restart-world', {}); toast('Reopening the Dropper…'); } catch (e) { toast(e.message, true); } };
     renderStatus();
@@ -1017,8 +1606,8 @@ async function renderMinecraftBox() {
         <div class="wide"><label class="check"><input type="checkbox" id="mcEula" ${settings.mcEula ? 'checked' : ''}> I agree to the <a href="https://aka.ms/MinecraftEULA" target="_blank" rel="noopener" style="color:var(--main-text)">Minecraft EULA</a> (needed to open the world for gifts)</label></div>
         <div class="wide row"><button class="small" id="mcRestart">Reopen world</button><button class="small ghost" id="mcWorlds">Look for worlds again</button><span class="pill" id="mcState"></span></div>
       </div>
-      <p class="hint"><b>How to play:</b> keep Gift Hype open. In Minecraft go to <b>Multiplayer</b> and join <b>Gift Hype</b> (it's added to your list; if not, Direct Connection: <code>localhost:25566</code>). It's your own world, with your stuff. Gifts happen instantly, nothing is typed.<br>
-      Don't open the same world in Singleplayer at the same time. Closing Gift Hype saves and closes the world.</p>`;
+      <p class="hint"><b>How to play:</b> keep Unbound open. In Minecraft go to <b>Multiplayer</b> and join <b>Unbound</b> (it's added to your list; if not, Direct Connection: <code>localhost:25566</code>). It's your own world, with your stuff. Gifts happen instantly, nothing is typed.<br>
+      Don't open the same world in Singleplayer at the same time. Closing Unbound saves and closes the world.</p>`;
     hookWhere();
     $('mcWorld').onchange = async () => { m.world = $('mcWorld').value; queueSave(); await flushSave(); renderStatus(); };
     $('mcWorlds').onclick = async () => { mcWorlds = null; await renderMinecraftBox(); toast(`Found ${mcWorlds.length} world${mcWorlds.length === 1 ? '' : 's'}`); };
@@ -1048,7 +1637,7 @@ async function renderMinecraftBox() {
         <label class="field" style="grid-column: span 2">RCON password <input type="password" data-mc="password" value="${esc(m.password)}" autocomplete="off"></label>` : ''}
       <div class="wide row"><button class="small" id="mcTest">Test connection</button><button class="small ghost" id="mcRescan">Look for servers again</button><span class="pill" id="mcState"></span></div>
     </div>
-    <p class="hint">${picked ? `Using <code>${esc(picked.folder)}</code>. ` : ''}Start that server like normal and Gift Hype connects by itself. No password to type: it reads it from the server's own settings. Leave the name empty and it uses whoever is playing. Commands can use <code>{player}</code>, <code>{from}</code> (the sender), <code>{gift}</code> and <code>{count}</code>.</p>`;
+    <p class="hint">${picked ? `Using <code>${esc(picked.folder)}</code>. ` : ''}Start that server like normal and Unbound connects by itself. No password to type: it reads it from the server's own settings. Leave the name empty and it uses whoever is playing. Commands can use <code>{player}</code>, <code>{from}</code> (the sender), <code>{gift}</code> and <code>{count}</code>.</p>`;
   hookWhere();
   $('mcPick').onchange = () => {
     const v = $('mcPick').value;
@@ -1067,7 +1656,7 @@ async function renderMinecraftBox() {
     try {
       await api('/api/minecraft/enable-rcon', { folder: m.serverFolder });
       mcServers = null; await renderMinecraftBox();
-      toast('Done! Restart that Minecraft server and Gift Hype connects by itself.');
+      toast('Done! Restart that Minecraft server and Unbound connects by itself.');
     } catch (e) { toast(e.message, true); }
   };
   renderStatus();
@@ -1197,7 +1786,7 @@ function renderChatTeleport() {
       <label>Which wins<select data-k="pick"><option value="most" ${c.pick === 'most' ? 'selected' : ''}>The one typed most (one vote each)</option><option value="last" ${c.pick === 'last' ? 'selected' : ''}>The last one typed</option></select></label>
       <label>Look for blocks up to (blocks away)<input type="number" min="32" max="50000" step="500" data-k="range" value="${c.range}"></label>
       <label class="wide">Things chat can't pick<input type="text" data-k="blocked" value="${esc(c.blocked)}" placeholder="e.g. lava, deep dark, end portal frame"></label>
-      <label class="check wide" style="flex-direction:row"><input type="checkbox" data-k="showGame" ${c.showGame ? 'checked' : ''}> Box in Minecraft, fixed on your screen: "TELEPORT IN" and the seconds (never what or how many votes), then what you went to, its picture and how many blocks away. In your own world Minecraft gets a small Gift Hype pack for it; on a server it's text above the hotbar</label>
+      <label class="check wide" style="flex-direction:row"><input type="checkbox" data-k="showGame" ${c.showGame ? 'checked' : ''}> Box in Minecraft, fixed on your screen: "TELEPORT IN" and the seconds (never what or how many votes), then what you went to, its picture and how many blocks away. In your own world Minecraft gets a small Unbound pack for it; on a server it's text above the hotbar</label>
       <div class="wide" id="tpBoxEdit"></div>
       <label class="check wide" style="flex-direction:row"><input type="checkbox" data-k="icon3d" ${c.icon3d !== false ? 'checked' : ''}> 3D block pictures (like the inventory; untick for flat). This and the box size reach Minecraft the next time you join the world</label>
       <label class="check wide" style="flex-direction:row"><input type="checkbox" data-k="showOverlay" ${c.showOverlay ? 'checked' : ''}> Timer on the stream overlay too (leave it off to add your own in TikTok LIVE Studio)</label>
@@ -1233,7 +1822,7 @@ function renderChatTeleport() {
     </details>
     <details class="tpgroup">
       <summary>Search</summary>
-      <p class="hint">Blocks are looked for round you first (the whole height of the world). If one isn't there, Gift Hype finds the nearest structures and biomes it's found in and looks there.</p>
+      <p class="hint">Blocks are looked for round you first (the whole height of the world). If one isn't there, Unbound finds the nearest structures and biomes it's found in and looks there.</p>
       <div class="chatgrid">
         <label>Look round you (blocks)<input type="number" min="16" max="128" step="16" data-k="nearRange" value="${c.nearRange ?? 96}"></label>
         <label>Far away: try first<select data-k="farOrder">${[['nearest', 'Whatever is nearest'], ['structures', 'Structures'], ['biomes', 'Biomes']]
@@ -1402,7 +1991,6 @@ function renderRules() {
   renderChat();
   const box = $('rules');
   if (!R().length) { box.innerHTML = '<div class="empty">No gifts yet. Press <b>+ Add gift</b> or <b>Browse all gifts</b>.</div>'; return; }
-  const soundOpts = sel => `<option value="">No sound</option>` + sounds.map(s => `<option value="${esc(s.file)}" ${s.file === sel ? 'selected' : ''}>${esc(s.name)}${s.custom ? ' (yours)' : ''}</option>`).join('');
   const addOpts = addActionOptions();
   box.innerHTML = R().map((r, i) => {
     const k = known(r.gift);
@@ -1422,7 +2010,7 @@ function renderRules() {
         </div>
       </div>
       <div class="rule-sound">
-        <select data-f="sound" aria-label="Sound">${soundOpts(r.sound)}</select>
+        <button class="small pickbtn" data-pick title="Pick the sound">🔊 ${esc(r.sound ? soundName(r.sound) : 'No sound')} ▾</button>
         <button class="small" data-prev aria-label="Play sound" ${r.sound ? '' : 'disabled'}>${IC.play}</button>
         <label class="small ghost" style="cursor:pointer"><input type="file" accept=".mp3,.wav,.ogg,.m4a,audio/*" data-upsound hidden><span class="pill" style="text-decoration:underline">upload…</span></label>
         <label class="vol">vol <input type="range" min="0" max="1" step="0.05" value="${r.volume}" data-f="volume"></label>
@@ -1448,11 +2036,14 @@ function renderRules() {
           const k = known(inp.value);
           if (k) { r.image = k.image; r.coins = k.coins; el.querySelector('.gimg').outerHTML = giftImgHtml(r); el.querySelector('.coins').textContent = coinText(k.coins); }
         }
-        if (f === 'sound') { el.querySelector('[data-prev]').disabled = !r.sound; if (r.sound) playSound(r.sound, r.volume * settings.masterVolume); }
         queueSave();
       });
     });
     el.querySelector('[data-prev]').onclick = () => playSound(r.sound, r.volume * settings.masterVolume);
+    el.querySelector('[data-pick]').onclick = () => openSoundPicker(r.sound, f => {
+      r.sound = f; queueSave(); renderRules();
+      if (f) playSound(f, r.volume * settings.masterVolume);
+    });
     el.querySelector('[data-upsound]').onchange = async e => {
       const file = await uploadFiles([...e.target.files]);
       if (file) { r.sound = file; renderRules(); queueSave(); }
@@ -1486,7 +2077,7 @@ function defaultActions() {
   if (game.connector === 'keys') return [newAction('keys')];
   return [];
 }
-const randomSound = () => { const b = sounds.filter(s => !s.custom); return b.length ? b[Math.floor(Math.random() * b.length)].file : null; };
+const randomSound = () => { const f = sounds.filter(s => s.fav), b = f.length ? f : sounds.filter(s => ['edits', 'brainrot', 'memes'].includes(s.group)); return b.length ? b[Math.floor(Math.random() * b.length)].file : null; };
 function addRule(name = '', image = null, coins = null) {
   R().push({ id: Math.random().toString(16).slice(2, 12), gift: name, image, coins, sound: randomSound(), volume: 1, alert: true, label: '', perCount: true, actions: defaultActions() });
   renderRules(); queueSave();
@@ -1567,7 +2158,7 @@ function renderUpdate() {
   const show = u && (u.available || u.state === 'updating' || u.state === 'restarting' || u.state === 'failed');
   $('updBar').hidden = !show;
   if (!show) return;
-  $('updText').textContent = u.state === 'updating' ? 'Updating Gift Hype…' : u.state === 'restarting' ? 'Updated! Gift Hype is restarting…' : u.state === 'failed' ? `The update didn't work: ${u.error}` : `A new version of Gift Hype is ready: ${u.latest} (you have ${u.current})`;
+  $('updText').textContent = u.state === 'updating' ? 'Updating Unbound…' : u.state === 'restarting' ? 'Updated! Unbound is restarting…' : u.state === 'failed' ? `The update didn't work: ${u.error}` : `A new version of Unbound is ready: ${u.latest} (you have ${u.current})`;
   $('updNow').hidden = u.state === 'updating' || u.state === 'restarting';
   $('updNow').textContent = u.state === 'failed' ? 'Try again' : 'Update now';
 }
@@ -1581,7 +2172,7 @@ $('updCheck').onclick = async () => {
 };
 
 function applyState(s) {
-  settings = s.settings; gamesList = s.games; game = s.game; sounds = s.sounds; status = s.status; appVersion = s.version || appVersion;
+  settings = s.settings; gamesList = s.games; game = s.game; sounds = s.sounds; soundGroups = s.soundGroups || soundGroups; status = s.status; appVersion = s.version || appVersion;
   fillSettings(); renderGames(); renderSounds();
   if (game) {
     $('gName').value = game.name;
@@ -1592,6 +2183,9 @@ function applyState(s) {
 }
 
 async function init() {
+  let start = location.hash.slice(1);
+  try { if (!PAGES.includes(start)) start = localStorage.getItem('gh-page') || 'games'; } catch {}
+  setPage(start);
   const s = await api('/api/state');
   applyState(s);
   $('feed').innerHTML = s.feed.length ? '' : '<div class="empty">Gifts will show up here.</div>';
@@ -1602,7 +2196,7 @@ async function init() {
   const es = new EventSource('/api/events');
   es.addEventListener('state', e => { saveTimer = null; applyState(JSON.parse(e.data)); });
   es.addEventListener('status', e => { status = JSON.parse(e.data); renderStatus(); renderUpdate(); });
-  es.addEventListener('settings', e => { settings = JSON.parse(e.data); applyTheme(settings.theme); });
+  es.addEventListener('settings', e => { settings = JSON.parse(e.data); applyTheme(settings.theme); applyLook(); });
   es.addEventListener('games', e => { gamesList = JSON.parse(e.data); renderGames(); });
   es.addEventListener('sounds', e => { sounds = JSON.parse(e.data); renderSounds(); if (game) renderRules(); });
   es.addEventListener('gift', e => addFeed(JSON.parse(e.data)));

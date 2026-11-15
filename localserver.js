@@ -78,7 +78,7 @@ function problemText(line) {
     if (/Perflib|counter names|joined the game|left the game/i.test(line)) return null;     // harmless Windows / chat lines
     const msg = line.replace(/^\[[^\]]*\] \[[^\]]*\]: /, '').trim().slice(0, 200);
     if (/Failed to load datapacks|Failed to load registries/i.test(line)) return { rank: 9, text: "the world's data pack didn't load on this Minecraft version" };
-    if (/FAILED TO BIND/i.test(line)) return { rank: 9, text: "another copy of the world's server is still running (close Gift Hype fully, or restart the PC, then try again)" };
+    if (/FAILED TO BIND/i.test(line)) return { rank: 9, text: "another copy of the world's server is still running (close Unbound fully, or restart the PC, then try again)" };
     if (/OutOfMemory|Native memory|Insufficient system resources/i.test(line)) return { rank: 9, text: 'the PC ran out of memory (close other programs and try again)' };
     if (/session\.lock|already locked|locked a portion/i.test(line)) return { rank: 8, text: 'the world is open in Minecraft singleplayer' };
     if (/Failed to start the minecraft server|Exception|Caused by/i.test(line)) return { rank: 5, text: msg };
@@ -93,7 +93,7 @@ export function olderVersion(a, b) {
     return false;
 }
 
-// Adds "Gift Hype" to Minecraft's Multiplayer list (once). Minecraft must be closed to keep it,
+// Adds "Unbound" to Minecraft's Multiplayer list (once). Minecraft must be closed to keep it,
 // otherwise it can write its own list over it; it's added again each time the world starts.
 export function addServerEntry(port) {
     const file = path.join(MC_DIR, 'servers.dat');
@@ -102,10 +102,13 @@ export function addServerEntry(port) {
     try { root = readNbt(fs.readFileSync(file)); } catch { root = { t: 10, v: new Map() }; }
     if (!root.v.has('servers')) root.v.set('servers', { t: 9, v: { listType: 10, items: [] } });
     const list = root.v.get('servers').v;
-    if (list.items.some(s => s.get('ip')?.v === ip)) return false;
+    const had = list.items.find(s => s.get('ip')?.v === ip);
+    // the app's old name: shown with the new one
+    if (had && had.get('name')?.v === 'Gift Hype') { had.set('name', { t: 8, v: 'Unbound' }); fs.writeFileSync(file, writeNbt(root)); return true; }
+    if (had) return false;
     if (fs.existsSync(file) && !fs.existsSync(file + '.before-gift-hype')) fs.copyFileSync(file, file + '.before-gift-hype');
     list.listType = 10;
-    list.items.unshift(new Map([['name', { t: 8, v: 'Gift Hype' }], ['ip', { t: 8, v: ip }], ['acceptTextures', { t: 1, v: 1 }]]));
+    list.items.unshift(new Map([['name', { t: 8, v: 'Unbound' }], ['ip', { t: 8, v: ip }], ['acceptTextures', { t: 1, v: 1 }]]));
     fs.writeFileSync(file, writeNbt(root));
     return true;
 }
@@ -158,7 +161,7 @@ export async function serverJar(dir, version, log) {
                 if (i < 3) { log(`Couldn't get ${what} from Mojang (${e.cause?.code || e.message}), trying again...`); await new Promise(res => setTimeout(res, 3000 * i)); }
             }
         }
-        throw new Error(`couldn't download ${what} from Mojang (${last.cause?.code || last.message}). Check the PC is online and nothing (antivirus, firewall, VPN) is blocking Gift Hype, then press Play again`);
+        throw new Error(`couldn't download ${what} from Mojang (${last.cause?.code || last.message}). Check the PC is online and nothing (antivirus, firewall, VPN) is blocking Unbound, then press Play again`);
     };
     const manifest = await get('https://piston-meta.mojang.com/mc/game/version_manifest_v2.json', "Minecraft's version list", 'json');
     const entry = manifest.versions.find(v => v.id === version);
@@ -188,11 +191,11 @@ export function makeLocalServer({ dir, log, onState }) {
         const old = fs.existsSync(propsFile) ? fs.readFileSync(propsFile, 'utf8') : '';
         password = /rcon\.password=(\S+)/.exec(old)?.[1] || crypto.randomBytes(12).toString('hex');
         fs.writeFileSync(propsFile, [
-            '# Made by Gift Hype: your singleplayer world on a hidden server on this PC only.',
+            '# Made by Unbound: your singleplayer world on a hidden server on this PC only.',
             `server-port=${SERVER_PORT}`, 'server-ip=127.0.0.1',
             'enable-rcon=true', `rcon.port=${RCON_PORT}`, `rcon.password=${password}`, 'broadcast-rcon-to-ops=false',
             'online-mode=true', 'max-players=4', 'spawn-protection=0', 'enable-command-block=false',
-            'motd=Gift Hype - your world with TikTok gifts', 'view-distance=10', 'simulation-distance=10',
+            'motd=Unbound - your world with TikTok gifts', 'view-distance=10', 'simulation-distance=10',
             'sync-chunk-writes=true', 'enforce-secure-profile=false', 'log-ips=false', 'pause-when-empty-seconds=0',
             ...extra,
         ].join('\n') + '\n');
@@ -222,8 +225,8 @@ export function makeLocalServer({ dir, log, onState }) {
         const jar = await serverJar(dir, version, log);
         await closeLeftover();
         writeProps(props);
-        fs.writeFileSync(path.join(dir, 'eula.txt'), '# Accepted in Gift Hype by the player: https://aka.ms/MinecraftEULA\neula=true\n');
-        try { addServerEntry(SERVER_PORT); } catch (e) { log(`Couldn't add Gift Hype to the Multiplayer list: ${e.message}`); }
+        fs.writeFileSync(path.join(dir, 'eula.txt'), '# Accepted in Unbound by the player: https://aka.ms/MinecraftEULA\neula=true\n');
+        try { addServerEntry(SERVER_PORT); } catch (e) { log(`Couldn't add Unbound to the Multiplayer list: ${e.message}`); }
         world = w;
         onState('starting');
         log(`Opening "${w}" (Minecraft ${version}) for gifts...`);
@@ -238,7 +241,7 @@ export function makeLocalServer({ dir, log, onState }) {
             // why it stopped, if it does: the clearest error Minecraft gave (known ones in plain words)
             const known = problemText(line);
             if (known && (!lastProblem || known.rank > lastRank)) { lastProblem = known.text; lastRank = known.rank; }
-            if (/Done \(/.test(line)) { ready = true; log(`"${w}" is ready. In Minecraft: Multiplayer, then Gift Hype.`); onState('ready'); }
+            if (/Done \(/.test(line)) { ready = true; log(`"${w}" is ready. In Minecraft: Multiplayer, then Unbound.`); onState('ready'); }
             else if (/session\.lock|already locked|LockException|locked a portion/i.test(line)) onState('world open in singleplayer');
             else if (/joined the game|left the game/.test(line)) log(line.replace(/^.*INFO\]: /, ''));
             else if (/Failed to start|FAILED TO BIND|Exception in server tick/i.test(line)) log(`Minecraft: ${line.replace(/^.*\]: /, '')}`);
@@ -319,7 +322,7 @@ export function setupLauncher(version) {
     const j = JSON.parse(raw);
     j.profiles ||= {};
     const old = j.profiles['gift-hype'] || {};
-    j.profiles['gift-hype'] = { ...old, name: 'Gift Hype', type: 'custom', icon: 'TNT', lastVersionId: id, created: old.created || now, lastUsed: now };
+    j.profiles['gift-hype'] = { ...old, name: 'Unbound', type: 'custom', icon: 'TNT', lastVersionId: id, created: old.created || now, lastUsed: now };
     fs.writeFileSync(pf, JSON.stringify(j, null, 2));
     return id;
 }

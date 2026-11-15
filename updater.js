@@ -1,10 +1,10 @@
-// Updates: Gift Hype checks GitHub for a newer version and can install it in place.
+// Updates: Unbound checks GitHub for a newer version and can install it in place.
 //
 // The version is the "version" in package.json. A new version is published by pushing it to the
 // main branch of github.com/Outsourcedevv/gift-hype. Updating downloads that branch as a zip,
 // copies the program files over this folder and leaves your own things alone (data: settings,
 // games, keys, the Minecraft world server; your sounds; the downloaded parts in node_modules).
-// If the parts Gift Hype needs changed, they're installed again. Then Gift Hype restarts.
+// If the parts Unbound needs changed, they're installed again. Then Unbound restarts.
 //
 // A copy that's a git checkout (the one updates are made from) never updates itself, so work in
 // progress there can't be overwritten.
@@ -59,7 +59,7 @@ export async function applyUpdate(root, log = () => {}) {
         if (!top) throw new Error('The update was empty');
         const src = path.join(work, top.name);
         const pkg = JSON.parse(fs.readFileSync(path.join(src, 'package.json'), 'utf8'));
-        if (pkg.name !== 'gift-hype') throw new Error("That download isn't Gift Hype");
+        if (pkg.name !== 'gift-hype') throw new Error("That download isn't Unbound");
         const oldDeps = JSON.stringify(JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).dependencies || {});
 
         log(`Installing version ${pkg.version}...`);

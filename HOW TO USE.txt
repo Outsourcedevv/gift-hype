@@ -1,10 +1,11 @@
-﻿GIFT HYPE
-=========
+﻿UNBOUND
+=======
+(Formerly Gift Hype.)
 TikTok LIVE gifts play sounds, pop up on your stream, and make things happen in your games.
 
 OPEN IT
-  Double-click "Gift Hype" on your desktop. It opens in its own window.
-  Closing the window closes Gift Hype.
+  Double-click "Unbound" on your desktop. It opens in its own window.
+  Closing the window closes Unbound.
   (First time on a new PC: run Setup.bat once. It installs what's needed and adds the desktop icon.)
 
 GO LIVE
@@ -20,12 +21,12 @@ GAMES
   TYPES: Minecraft has Parkour Paradise and Block Delete Survival. Each type has its own gifts.
     The type you pick is the one gifts use. "+ Type", Rename and Remove change the list.
   YOUR OWN WORLD (the easy way): Minecraft -> "Singleplayer world" -> pick your world and tick the EULA box.
-    Gift Hype opens that world on a hidden server on your PC (first time it downloads Minecraft's
-    official server). In Minecraft go to Multiplayer and join "Gift Hype" (or localhost:25566).
+    Unbound opens that world on a hidden server on your PC (first time it downloads Minecraft's
+    official server). In Minecraft go to Multiplayer and join "Unbound" (or localhost:25566).
     It's your world with your stuff; gifts happen instantly. Don't open it in Singleplayer at the
-    same time. Closing Gift Hype saves and closes the world.
+    same time. Closing Unbound saves and closes the world.
   SERVER: Minecraft -> "Server" runs commands on your server. Pick your server from the list:
-    Gift Hype finds it on your PC and connects by itself, no password to type.
+    Unbound finds it on your PC and connects by itself, no password to type.
     If it says gift commands are off, press the pink button and restart that server once.
   "+ New game" adds another game: Minecraft, Key presses (presses keys in whatever window
   is in front) or Sounds only (just sounds and stream popups).
@@ -40,7 +41,7 @@ CHAT TELEPORT (Minecraft -> Chat Teleport)
   nearest one:
     - a block: every block there is (chest, diamonds, grass block, spawner, beacon, oak log...), and
       groups like "logs" or "diamonds". First the land around you (96 blocks, the whole height of the
-      world); if it isn't there, Gift Hype asks Minecraft for the nearest biome or structure that block
+      world); if it isn't there, Unbound asks Minecraft for the nearest biome or structure that block
       is found in (cactus: deserts; bell: villages; spawner: mineshafts, fortresses...), loads it and
       looks there: up to 50,000 blocks away ("Look for blocks up to"). Nothing is loaded ahead of
       time: Minecraft knows where biomes and structures are without loading the land, so only the
@@ -73,7 +74,7 @@ CHAT TELEPORT (Minecraft -> Chat Teleport)
   many blocks away it was. "Box left / right",
   "Box down / up" and "Box size" set where it sits and how big it is (untick "Box in Minecraft" to hide
   it). If you change its size (or "3D block pictures") while you're in the world, the
-  picture shows again the next time you join: Gift Hype reopens the world once you've left. The box comes in a small resource pack Gift Hype gives Minecraft when you join your
+  picture shows again the next time you join: Unbound reopens the world once you've left. The box comes in a small resource pack Unbound gives Minecraft when you join your
   world (if Minecraft asks, say Yes). On a server of your own it's plain text above the hotbar.
   More settings, in three sections under the box settings:
     - Box look: a colour for every part of the box and each line of words, your own words ("TELEPORT IN",
@@ -94,7 +95,7 @@ CHUNK CHAT (Minecraft -> Chunk Chat)
   to the top, except air (so you're never buried) and the bedrock floor. You choose whether the block
   typed MOST wins (each viewer has one vote per round; typing another block moves their vote) or the
   LAST block typed. Nothing about the timer shows on stream, so you can add your own in TikTok LIVE
-  Studio; you only hear a sound when the chunk changes. To have Gift Hype show it, tick "Show the
+  Studio; you only hear a sound when the chunk changes. To have Unbound show it, tick "Show the
   timer and the winning block on stream": a box on the overlay (top right), plus a green bar and a
   title in the game. The timer waits while you're not in the world.
   Some blocks can't be picked: what the gifts do (lava, air, cobwebs), blocks you'd fall through
@@ -130,11 +131,11 @@ THE DROPPER (Minecraft -> Dropper)
   levels are much harder than the ones round them. On the bridge, "FAILS HERE" counts how many times
   you've failed that level; entering a level shows its theme and name, and every 10 levels there's a
   "LEVELS DONE!" banner. The levels climb as you go: level 1 starts at y=600 and
-  each level a little higher, up to y=1200 at level 100. Gift Hype makes its own world for it ("Gift Hype Dropper 4", reaching from y=-512 up to y=1535, on Minecraft 26.2) and builds the levels
+  each level a little higher, up to y=1200 at level 100. Unbound makes its own world for it ("Unbound Dropper 4", reaching from y=-512 up to y=1535, on Minecraft 26.2) and builds the levels
   the first time. That takes up to an hour; the Dropper type shows how far it is. If it stops (you
-  close Gift Hype or switch type), it carries on from the same level next time. Press Play Minecraft,
+  close Unbound or switch type), it carries on from the same level next time. Press Play Minecraft,
   then Play in the launcher.
-  ("Gift Hype Dropper", "Gift Hype Dropper 2" and "Gift Hype Dropper 3", the older Dropper worlds,
+  ("Unbound Dropper", "Unbound Dropper 2" and "Unbound Dropper 3", the older Dropper worlds,
   aren't used any more. You can delete them in Minecraft's Singleplayer list.)
   SECRET LEVEL 101: nothing shows it's there (the bar says LEVEL 100 / 100). Beat level 100 and
   instead of the winners' platform you're taken to level 101, "Ascension", at y=1500: the hardest
@@ -174,24 +175,49 @@ GIFTS
   "Once per gift in a streak" = a streak of 5 Roses does the actions 5 times.
   Test tries it right away without going live.
 
+FINDING YOUR WAY
+  The tabs under the top bar: Games & gifts, Sounds, Stream overlay, Look & settings (Alt + 1 to 4).
+  "Find anything..." at the top (or Ctrl + K, or /) finds any game, type, sound or setting: type a few
+  letters, use the arrow keys and press Enter. Esc stops every sound that's playing.
+  The Live gifts and Quick sounds column stays on the right on every tab (you can hide it).
+
 SOUNDS
-  30 real meme sounds to start (fahh, bruh, vine boom, MLG airhorn, metal pipe, DaBaby "let's go", here comes the money, I need a hero...).
-  They download by themselves the first time Gift Hype opens (needs internet once).
-  Find more: type in "Find any sound" (e.g. "emotional damage"), press play to listen, Add to keep it.
+  109 real sounds to start, in groups: Edit audios & songs (Where have you been (edit), Can you feel my heart,
+  After dark, Sahara, Murder in my mind, Golden...), Brainrot (Chicken jockey, Tung tung tung sahur, Tralalero,
+  6 7, Skibidi...), Memes & reactions, Endings & drama, Game sounds, Minecraft and Phone & PC.
+  They download by themselves the first time Unbound opens (needs internet once). If one is missing,
+  press "Get the sound pack again" on the Sounds tab.
+  Sounds tab: click a sound to hear it, filter by name, pick a group, Tiles or List, Random.
+    Star a sound to put it in Quick sounds on the right and at the top of the picker.
+    The pencil gives any sound your own name.
+  A gift's sound: press the sound button on the gift to pick from every sound (with search and groups).
+    "Random" picks a different sound each time: from all sounds, your favourites or one group.
+  Find more: type in "Find any sound online" (e.g. "emotional damage"), press play to listen, Add to keep it.
   Add your own: drop .mp3 / .wav files on "Add your own sounds", or press "upload..." next to a gift.
   They're saved in the sounds\custom folder.
 
+LOOK & SETTINGS
+  Colours: Sky, Blaze, Mint, Punk, Egyptian, Grape, Mono, or "Your own" (pick the main colour, the
+  eye-catcher and a dark or light background). The stream popups use the same colours.
+  Layout: text size, corners (round / a little round / square), compact, the Live gifts column, animations.
+
+GIFT POPUPS (Stream overlay tab)
+  Style (dark, light, glass, neon glow, Minecraft), how they come in (bounce, slide, zoom, spin, fade),
+  seconds on screen, how many at once, only gifts worth at least so many coins, the word after the
+  name ("sent"), show who sent it / the picture / streaks, and your own colours.
+  "Send a test popup" shows one on your overlay straight away.
+
 ON STREAM (OBS / TikTok LIVE Studio)
-  Press "Set up in TikTok LIVE Studio" (Settings, Stream overlay): it copies the address, opens LIVE
+  Press "Set up in TikTok LIVE Studio" (Stream overlay tab): it copies the address, opens LIVE
   Studio and shows the 4 clicks to add it. Or by hand: TikTok LIVE Studio: add a Link source, OBS: add
   a Browser source, with
     http://gifthype.localtest.me:4747/overlay   size 1920 x 1080.
   (localtest.me always points back to your own PC, so it is still only on this PC. TikTok LIVE Studio
   won't take a "localhost" address. In OBS http://localhost:4747/overlay works too.)
-  If your streaming app doesn't hear the Gift Hype window, set "Play sounds in" to the OBS overlay.
+  If your streaming app doesn't hear the Unbound window, set "Play sounds in" to the OBS overlay.
 
 MAKING CHANGES
   Change anything in the app itself (games, gifts, sounds, settings): it saves by itself.
   Change how the app works: ask Claude in the Parkour TT project. The files are in this folder.
-  After a change, close the Gift Hype window and open it again from the desktop.
+  After a change, close the Unbound window and open it again from the desktop.
 

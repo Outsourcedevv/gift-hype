@@ -141,7 +141,7 @@ export function makeChatDelete({ mc, log, broadcast, target, deleteBlocks }) {
         if (lastBy.size > 5000) lastBy.clear();
 
         if (!pending.length && !barsClean) {
-            // bars left over from before (Gift Hype closed during a countdown)
+            // bars left over from before (Unbound closed during a countdown)
             barsClean = true;
             await Promise.all([...Array(SLOTS).keys()].map(i => mc(`bossbar remove gifthype:chatdel${i}`).catch(() => {})));
         }
