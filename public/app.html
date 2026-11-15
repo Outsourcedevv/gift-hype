@@ -138,6 +138,24 @@ button.icon { padding: 6px 9px; }
 .chatgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px 14px; margin-top: 12px; }
 .chatgrid label { display: flex; flex-direction: column; gap: 5px; font-size: 13px; color: var(--muted); }
 .chatgrid .wide { grid-column: 1 / -1; }
+.ovedit { margin-top: 12px; }
+.fswrap { position: relative; }
+.fswrap .fsbtn { position: absolute; right: 10px; top: 10px; z-index: 5; opacity: .9; }
+.fswrap.big { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; background: #000; }
+.fswrap.big > .ovstage, .fswrap.big > .mcstage { width: min(100vw, calc(100vh * 16 / 9)); max-width: none; border-radius: 0; border: 0; }
+.fswrap.big .fsbtn { right: 18px; top: 18px; }
+/* Chat Teleport: a Minecraft screen (1080p, GUI scale 4 = 480 x 270 GUI pixels) to drag the box on */
+.mcstage { position: relative; width: 100%; max-width: 760px; aspect-ratio: 16 / 9; overflow: hidden; border-radius: var(--radius); border: 1px solid var(--line);
+  background: linear-gradient(#7aa8ff 0 60%, #5a8c3c 60%); user-select: none; touch-action: none; }
+.mcstage .cross { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); color: #fff; font: 700 18px monospace; text-shadow: 0 0 2px #000; pointer-events: none; }
+.mcstage .hotbar { position: absolute; left: 50%; bottom: 1.5%; transform: translateX(-50%); width: 38%; height: 8%; background: rgba(40, 40, 40, .75); border: 2px solid #111; pointer-events: none; }
+.mcbox { position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 2px solid; font-family: 'Monocraft', monospace; cursor: move; touch-action: none; box-sizing: border-box; }
+.mcbox::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 6%; background: var(--stripe); }
+.mcbox .big { font-weight: 700; line-height: 1; }
+.mcbox i { position: absolute; right: -9px; bottom: -9px; width: 16px; height: 16px; border-radius: 50%; background: #fff; border: 3px solid #4db3ee; cursor: nwse-resize; }
+.mcbox.drag { outline: 2px dashed #fff; }
+.ovstage { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; border-radius: var(--radius); border: 1px solid var(--line); background: #18202e; }
+.ovstage iframe { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; border: 0; transform-origin: 0 0; }
 @font-face { font-family: 'Monocraft'; src: url('/fonts/Monocraft.ttf') format('truetype'); }
 .tpgroup { border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 14px 12px; margin-top: 12px; background: var(--panel-2); }
 .tpgroup > summary { font-weight: 700; color: var(--text); font-size: 14px; }
@@ -257,7 +275,7 @@ dialog::backdrop { background: rgba(0,0,0,.5); }
 .type span { font-size: 13px; color: var(--muted); }
 .type[aria-checked=true] { border-color: var(--main); background: color-mix(in srgb, var(--main) 14%, var(--panel)); }
 .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--panel); border: 1px solid var(--line); padding: 10px 16px; border-radius: 9px; font-size: 14px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 20; }
-.toast.show { opacity: 1; }
+.toast.show { opacity: 1; pointer-events: auto; cursor: pointer; max-width: min(640px, calc(100vw - 40px)); line-height: 1.4; }
 /* Theme picker */
 .themes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .theme { display: flex; align-items: center; gap: 10px; padding: 9px 10px; text-align: left; }
@@ -393,14 +411,36 @@ dialog::backdrop { background: rgba(0,0,0,.5); }
         <button class="small" id="ovCopy">Copy</button>
         <button class="small hot" id="ovLive">Set up in TikTok LIVE Studio</button>
       </div>
-      <div class="row">
-        <label class="field" style="flex:1">Popups at
-          <select id="ovPos"><option value="top">Top</option><option value="middle">Middle</option><option value="bottom">Bottom</option></select>
-        </label>
-        <label class="field" style="flex:1">Size
-          <input type="range" id="ovScale" min="0.5" max="2.5" step="0.1">
-        </label>
+      <div class="ovedit">
+        <div class="fswrap" id="ovWrap"><div class="ovstage" id="ovStage"><iframe id="ovFrame" title="Your overlay (drag the boxes)" scrolling="no"></iframe></div>
+          <button class="small fsbtn" data-fs="ovWrap">⛶ Full screen</button></div>
+        <p class="hint">This is your overlay. <b>Drag a box</b> to move it (gift popups too), <b>drag its round corner</b> to make it bigger or smaller. Your real overlay (in TikTok LIVE Studio) moves too. <b>Full screen</b> makes it bigger to work on.
+          <button class="small ghost" id="ovPlacesReset" style="margin-left:6px">Put the boxes back</button></p>
       </div>
+      <details class="tpgroup" id="ovMenuBox">
+        <summary>Gift list on the overlay</summary>
+        <p class="hint">Each gift in the game marked LIVE, its price and what it does. It fills itself in and changes when you switch game, type or gifts. Gift popups show in the middle, so keep the list at a side (or tick "Fade out during popups"). Changes show on the overlay straight away.</p>
+        <div class="chatgrid">
+          <label class="check" style="flex-direction:row"><input type="checkbox" data-m="menu"> Show the gift list</label>
+          <label>Style<select data-m="menuStyle"><option value="list">List (a page at a time)</option><option value="single">One at a time</option></select></label>
+          <label>Title<input type="text" maxlength="30" data-m="menuTitle"></label>
+          <label>Order<select data-m="menuSort"><option value="cheap">Cheapest first</option><option value="dear">Most expensive first</option><option value="game">As in your game</option></select></label>
+          <label>Gifts per page (list)<input type="number" min="1" max="15" data-m="menuRows"></label>
+          <label>Seconds per page / gift<input type="number" min="2" max="30" data-m="menuSeconds"></label>
+          <label>Background<input type="color" data-m="menuBg"></label>
+          <label>See-through (0 = clear)<input type="range" min="0" max="100" step="1" data-m="menuBgAlpha"></label>
+          <label>Border<input type="color" data-m="menuBorder"></label>
+          <label>Title colour<input type="color" data-m="menuTitleColor"></label>
+          <label>Gift names<input type="color" data-m="menuNameColor"></label>
+          <label>Prices<input type="color" data-m="menuPriceColor"></label>
+          <label>What it does<input type="color" data-m="menuDoesColor"></label>
+          <label class="check" style="flex-direction:row"><input type="checkbox" data-m="menuShowPrice"> Show prices</label>
+          <label class="check" style="flex-direction:row"><input type="checkbox" data-m="menuShowDoes"> Show what it does</label>
+          <label class="check" style="flex-direction:row"><input type="checkbox" data-m="menuHighlight"> Light up a gift when it's sent</label>
+          <label class="check" style="flex-direction:row"><input type="checkbox" data-m="menuHideOnPopup"> Fade out during popups</label>
+        </div>
+        <div class="row" style="margin-top:10px"><button class="small ghost" id="ovMenuReset">Back to the standard look</button><a class="small" id="ovMenuOpen" target="_blank" rel="noopener">Open the overlay to see it</a></div>
+      </details>
       <p class="hint">In OBS or TikTok LIVE Studio add a <b>Browser</b> source with that address, size 1920 × 1080. Gift popups show on your stream.</p>
       <details style="margin-top:14px">
         <summary>Euler Stream key (only if TikTok says "too many connects")</summary>
@@ -415,7 +455,10 @@ dialog::backdrop { background: rgba(0,0,0,.5); }
 </main>
 
 <dialog id="gallery">
-  <div class="dlg-head"><h3>All gifts</h3><input type="text" id="gSearch" placeholder="Search gifts..."><button class="ghost" id="gClose" aria-label="Close"><svg class="i" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button></div>
+  <div class="dlg-head"><h3>All gifts</h3><input type="text" id="gSearch" placeholder="Search gifts...">
+    <select id="gRange" aria-label="Price"><option value="">All prices</option><option value="1-99">1–99 coins</option><option value="100-999">100–999 coins</option><option value="1000-9999">1,000–9,999 coins</option><option value="10000-">10,000+ coins</option></select>
+    <select id="gSort" aria-label="Order"><option value="up">Cheapest first</option><option value="down">Most expensive first</option></select>
+    <span class="pill" id="gCount"></span><button class="ghost" id="gClose" aria-label="Close"><svg class="i" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button></div>
   <div class="dlg-body"><div class="gallery" id="gGrid"></div></div>
 </dialog>
 
@@ -473,7 +516,9 @@ let toastTimer;
 function toast(msg, err) {
   const t = $('toast');
   t.textContent = msg; t.className = 'toast show' + (err ? ' err' : '');
-  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.className = 'toast', 2600);
+  // problems stay up long enough to read (longer for longer ones); a click closes it
+  t.onclick = () => { clearTimeout(toastTimer); t.className = 'toast'; };
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.className = 'toast', err ? Math.min(30000, Math.max(8000, String(msg).length * 70)) : 2600);
 }
 
 let settings = {}, gamesList = [], game = null, sounds = [], status = {}, catalog = [];
@@ -571,8 +616,49 @@ drop.ondrop = async e => { e.preventDefault(); drop.classList.remove('over'); aw
 $('master').oninput = () => saveSettingsSoon({ masterVolume: +$('master').value });
 $('soundsIn').onchange = () => api('/api/settings', { soundsIn: $('soundsIn').value });
 $('autoConnect').onchange = () => api('/api/settings', { autoConnect: $('autoConnect').checked });
-$('ovPos').onchange = () => api('/api/settings', { overlay: { position: $('ovPos').value } });
-$('ovScale').oninput = () => saveSettingsSoon({ overlay: { scale: +$('ovScale').value } });
+
+// the gift list's settings: every [data-m] field saves itself (sliders and colours as you move them)
+document.querySelectorAll('[data-m]').forEach(el => {
+  const send = () => { const k = el.dataset.m; const v = el.type === 'checkbox' ? el.checked : el.type === 'range' || el.type === 'number' ? +el.value : el.value; settings.overlay[k] = v; saveSettingsSoon({ overlay: { [k]: v } }); };
+  el.onchange = send;
+  if (el.type === 'range' || el.type === 'color' || el.type === 'text') el.oninput = send;
+});
+const MENU_LOOK = { menuX: 2, menuY: 50, menuScale: 1, menuRows: 7, menuTitle: 'SEND A GIFT', menuSort: 'cheap', menuShowPrice: true, menuShowDoes: true, menuBg: '#0A1222', menuBgAlpha: 78,
+  menuBorder: '#3A4A66', menuTitleColor: '#FFCF3A', menuNameColor: '#FFFFFF', menuPriceColor: '#FFCF3A', menuDoesColor: '#9FE7FF', menuHighlight: true, menuHideOnPopup: false };
+$('ovMenuReset').onclick = async () => { Object.assign(settings.overlay, MENU_LOOK); await api('/api/settings', { overlay: MENU_LOOK }); fillMenuSettings(); toast('Gift list back to the standard look'); };
+// the overlay editor: the real overlay page (?edit) at 1920 x 1080, scaled to fit
+$('ovPlacesReset').onclick = async () => {
+  Object.assign(settings.overlay, { menuX: 2, menuY: 50, menuScale: 1, place: {} });
+  await api('/api/settings', { overlay: { menuX: 2, menuY: 50, menuScale: 1, place: { timer: null, chatdel: null, reset: null } } });
+  $('ovFrame').contentWindow?.location.reload();
+  toast('Boxes back where they started');
+};
+// full screen for an editor (Esc or the button again to come back)
+// It fills the whole Gift Hype window, and goes properly full screen too where the window allows it.
+const bigEditor = (w, on) => {
+  w.classList.toggle('big', on);
+  w.querySelector('[data-fs]').textContent = on ? '✕ Exit full screen' : '⛶ Full screen';
+  if (on) w.requestFullscreen?.().catch(() => {}); else if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+};
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-fs]'); if (!b) return;
+  const w = $(b.dataset.fs); if (w) bigEditor(w, !w.classList.contains('big'));
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') document.querySelectorAll('.fswrap.big').forEach(w => bigEditor(w, false)); });
+document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) document.querySelectorAll('.fswrap.big').forEach(w => bigEditor(w, false)); });
+function startOverlayEditor() {
+  const stage = $('ovStage'), frame = $('ovFrame');
+  if (!stage || frame.src) return;
+  frame.src = '/overlay?edit=1';
+  const fit = () => { const k = Math.min(stage.clientWidth / 1920, stage.clientHeight / 1080); frame.style.transform = `scale(${k})`; frame.style.left = (stage.clientWidth - 1920 * k) / 2 + 'px'; frame.style.top = (stage.clientHeight - 1080 * k) / 2 + 'px'; };
+  new ResizeObserver(fit).observe(stage); fit();
+}
+function fillMenuSettings() {
+  startOverlayEditor();
+  document.querySelectorAll('[data-m]').forEach(el => { const v = settings.overlay[el.dataset.m]; if (el.type === 'checkbox') el.checked = v !== false; else if (v != null) el.value = v; });
+  $('ovMenuOpen').href = `http://localhost:${location.port}/overlay`;
+}
+
 $('eulerSave').onclick = async () => { await api('/api/settings', { eulerStreamApiKey: $('euler').value }); toast('Key saved. Connect again to use it.'); };
 const overlayUrl = () => `http://gifthype.localtest.me:${location.port}/overlay`;   // works in TikTok LIVE Studio (it won't take "localhost"), still this PC
 $('ovCopy').onclick = () => { navigator.clipboard.writeText(overlayUrl()); toast('Overlay address copied'); };
@@ -589,10 +675,12 @@ $('ovLive').onclick = async () => {
 };
 $('liveCopy').onclick = () => { navigator.clipboard.writeText(overlayUrl()); toast('Overlay address copied'); };
 $('liveClose').onclick = $('liveDone').onclick = () => $('liveDlg').close();
-let settingsTimer;
+let settingsTimer, settingsPending = {};
+// several quick changes are sent together (none is lost), a quarter of a second after the last
 function saveSettingsSoon(patch) {
+  for (const [k, v] of Object.entries(patch)) settingsPending[k] = v && typeof v === 'object' && !Array.isArray(v) ? { ...(settingsPending[k] || {}), ...v } : v;
   clearTimeout(settingsTimer);
-  settingsTimer = setTimeout(() => api('/api/settings', patch), 250);
+  settingsTimer = setTimeout(() => { const p = settingsPending; settingsPending = {}; api('/api/settings', p); }, 250);
 }
 // Each theme: main colour, second colour, eye-catcher (the same order every time).
 const THEMES = [
@@ -619,8 +707,8 @@ function fillSettings() {
   $('master').value = settings.masterVolume;
   $('soundsIn').value = settings.soundsIn;
   $('autoConnect').checked = settings.autoConnect;
-  $('ovPos').value = settings.overlay.position;
-  $('ovScale').value = settings.overlay.scale;
+
+  fillMenuSettings();
   $('ovUrl').textContent = overlayUrl();
   $('euler').value = settings.eulerStreamApiKey || '';
   if (!$('ttUser').value) $('ttUser').value = settings.tiktokUsername || '';
@@ -1110,10 +1198,8 @@ function renderChatTeleport() {
       <label>Look for blocks up to (blocks away)<input type="number" min="32" max="50000" step="500" data-k="range" value="${c.range}"></label>
       <label class="wide">Things chat can't pick<input type="text" data-k="blocked" value="${esc(c.blocked)}" placeholder="e.g. lava, deep dark, end portal frame"></label>
       <label class="check wide" style="flex-direction:row"><input type="checkbox" data-k="showGame" ${c.showGame ? 'checked' : ''}> Box in Minecraft, fixed on your screen: "TELEPORT IN" and the seconds (never what or how many votes), then what you went to, its picture and how many blocks away. In your own world Minecraft gets a small Gift Hype pack for it; on a server it's text above the hotbar</label>
-      <label>Box left / right<input type="range" min="-100" max="100" step="5" data-k="boxX" value="${c.boxX}"></label>
-      <label>Box down / up<input type="range" min="-100" max="100" step="20" data-k="boxY" value="${c.boxY}"></label>
-      <label>Box size<input type="range" min="75" max="250" step="25" data-k="boxSize" value="${c.boxSize}"></label>
-      <label class="check" style="flex-direction:row"><input type="checkbox" data-k="icon3d" ${c.icon3d !== false ? 'checked' : ''}> 3D block pictures (like the inventory; untick for flat). This and the box size reach Minecraft the next time you join the world</label>
+      <div class="wide" id="tpBoxEdit"></div>
+      <label class="check wide" style="flex-direction:row"><input type="checkbox" data-k="icon3d" ${c.icon3d !== false ? 'checked' : ''}> 3D block pictures (like the inventory; untick for flat). This and the box size reach Minecraft the next time you join the world</label>
       <label class="check wide" style="flex-direction:row"><input type="checkbox" data-k="showOverlay" ${c.showOverlay ? 'checked' : ''}> Timer on the stream overlay too (leave it off to add your own in TikTok LIVE Studio)</label>
     </div>
     <details class="tpgroup" id="tpLook">
@@ -1154,7 +1240,7 @@ function renderChatTeleport() {
             .map(([v, l]) => `<option value="${v}" ${(c.farOrder || 'nearest') === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
         <label>Far away: longest search (seconds)<input type="number" min="10" max="180" data-k="farSeconds" value="${c.farSeconds ?? 60}"></label>
         <label>Far away: places to look in<input type="number" min="1" max="6" data-k="farTries" value="${c.farTries ?? 3}"></label>
-        <label>Chat's picks to try before "nothing found"<input type="number" min="1" max="5" data-k="tryPicks" value="${c.tryPicks ?? 4}"></label>
+        <label>Chat's picks to try before "nothing found" (0 = all, newest first)<input type="number" min="0" max="50" data-k="tryPicks" value="${c.tryPicks ?? 0}"></label>
         <label class="check" style="flex-direction:row"><input type="checkbox" data-k="farStructures" ${c.farStructures !== false ? 'checked' : ''}> Look in structures</label>
         <label class="check" style="flex-direction:row"><input type="checkbox" data-k="farBiomes" ${c.farBiomes !== false ? 'checked' : ''}> Look in biomes</label>
         <label class="check" style="flex-direction:row"><input type="checkbox" data-k="dimOverworld" ${c.dimOverworld !== false ? 'checked' : ''}> Works in the Overworld</label>
@@ -1185,6 +1271,7 @@ function renderChatTeleport() {
     queueSave(); renderChatTeleport(); $('tpLook').open = true;
   };
   tpPreview(c);
+  tpBoxEditor(c);
   const tryIt = async () => {
     const text = $('tpTry').value.trim();
     if (!text) return;
@@ -1198,6 +1285,50 @@ function renderChatTeleport() {
   $('tpTryGo').onclick = tryIt;
   $('tpTry').onkeydown = e => { if (e.key === 'Enter') tryIt(); };
   $('tpNow').onclick = async () => { try { await flushSave(); await api('/api/chatteleport/now', {}); toast('Teleporting…'); } catch (e) { toast(e.message, true); } };
+}
+// The Minecraft box editor: drag the box on a Minecraft screen, drag its corner to resize. Left/right is
+// free; up/down and size go in Minecraft's steps (20 and the box sizes), so it snaps there when you let go.
+function tpBoxEditor(c) {
+  const host = $('tpBoxEdit'); if (!host) return;
+  host.innerHTML = `<div class="fswrap" id="mcWrap"><div class="mcstage" id="mcStage"><div class="cross">+</div><div class="hotbar"></div><div class="mcbox" id="mcBox"><div class="ln"></div><div class="big">27</div><i title="Drag to resize"></i></div></div><button class="small fsbtn" data-fs="mcWrap">⛶ Full screen</button></div>
+    <p class="hint">Your Minecraft screen. <b>Drag the box</b> to move it, <b>drag its round corner</b> to change its size. Where it is changes straight away; a new size reaches Minecraft the next time you join the world.</p>`;
+  const stage = $('mcStage'), box = $('mcBox');
+  const SIZES = [75, 100, 125, 150, 200, 250];
+  const look = k => c[k] ?? TP_LOOK[k];
+  let live = null;                                    // while dragging: { x (GUI px from centre), y, s }
+  const draw = () => {
+    const k = stage.clientWidth / 480, p = live || { x: c.boxX * 1.5, y: -(c.boxY ?? 40), s: (c.boxSize || 100) / 100 };
+    const w = 112 * p.s * k, h = 40 * p.s * k, cx = (240 + p.x) * k, cy = (135 + p.y) * k;
+    Object.assign(box.style, { width: w + 'px', height: h + 'px', left: cx - w / 2 + 'px', top: cy - h / 2 + 'px', background: look('colFill'), borderColor: look('colBorder') });
+    box.style.setProperty('--stripe', look('colStripe'));
+    const ln = box.querySelector('.ln'); ln.textContent = look('txtTeleportIn'); ln.style.cssText = `color:${look('colLabel')};font-size:${7 * p.s * k}px`;
+    box.querySelector('.big').style.cssText = `color:${look('colDigits')};font-size:${14 * p.s * k}px`;
+  };
+  let start = null;
+  box.onpointerdown = ev => {
+    ev.preventDefault(); box.setPointerCapture(ev.pointerId); box.classList.add('drag');
+    start = { mx: ev.clientX, my: ev.clientY, x: c.boxX * 1.5, y: -(c.boxY ?? 40), s: (c.boxSize || 100) / 100, resize: ev.target.tagName === 'I' };
+  };
+  box.onpointermove = ev => {
+    if (!start) return;
+    const k = stage.clientWidth / 480, dx = (ev.clientX - start.mx) / k, dy = (ev.clientY - start.my) / k;
+    live = start.resize ? { x: start.x, y: start.y, s: Math.max(0.6, Math.min(2.6, start.s + dx * 2 / 112)) }
+      : { x: Math.max(-150, Math.min(150, start.x + dx)), y: Math.max(-100, Math.min(100, start.y + dy)), s: start.s };
+    draw();
+  };
+  box.onpointerup = box.onpointercancel = () => {
+    if (!start) return;
+    box.classList.remove('drag');
+    if (live) {
+      c.boxX = Math.round(live.x / 1.5);
+      c.boxY = Math.max(-100, Math.min(100, Math.round(-live.y / 20) * 20));
+      c.boxSize = SIZES.reduce((b, v) => Math.abs(v - live.s * 100) < Math.abs(b - live.s * 100) ? v : b, 100);
+      queueSave();
+    }
+    start = null; live = null; draw();
+  };
+  new ResizeObserver(draw).observe(stage);
+  draw();
 }
 // the box's standard look (the same as hudpack.js BOX_DEFAULTS)
 const TP_LOOK = { colFill: '#F4F8FC', colBorder: '#13304A', colStripe: '#4DB3EE', colShade: '#D5E0EA', colLabel: '#1474B4', colDigits: '#E8542A', colWarn: '#DC2626',
@@ -1394,8 +1525,12 @@ async function loadCatalog() {
 }
 function renderGallery() {
   const q = $('gSearch').value.trim().toLowerCase();
-  const list = catalog.filter(g => !q || g.name.toLowerCase().includes(q)).slice(0, 400);
-  $('gGrid').innerHTML = list.map((g, i) => `<div class="gcard" data-gi="${catalog.indexOf(g)}" tabindex="0" role="button">
+  // every gift (no cut-off), filtered by name and price, cheapest or most expensive first
+  const [lo, hi] = ($('gRange').value || '0-').split('-').map(v => v === '' ? Infinity : +v);
+  const list = catalog.map((g, gi) => ({ g, gi })).filter(({ g }) => (!q || g.name.toLowerCase().includes(q)) && (g.coins ?? 0) >= lo && (g.coins ?? 0) <= hi);
+  if ($('gSort').value === 'down') list.reverse();
+  $('gCount').textContent = `${list.length} gift${list.length === 1 ? '' : 's'}`;
+  $('gGrid').innerHTML = list.map(({ g, gi }) => `<div class="gcard" data-gi="${gi}" tabindex="0" role="button">
     <img src="${pic(g.image)}" alt="" loading="lazy"><span class="n">${esc(g.name)}</span><span class="coins">${coinText(g.coins)}</span></div>`).join('')
     || '<div class="empty">No gifts match.</div>';
   $('gGrid').querySelectorAll('[data-gi]').forEach(c => {
@@ -1405,6 +1540,8 @@ function renderGallery() {
 }
 $('browse').onclick = () => { $('gSearch').value = ''; renderGallery(); $('gallery').showModal(); $('gSearch').focus(); };
 $('gSearch').oninput = renderGallery;
+$('gRange').onchange = renderGallery;
+$('gSort').onchange = renderGallery;
 $('gClose').onclick = () => $('gallery').close();
 
 // ----- Feed -----

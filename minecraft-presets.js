@@ -228,6 +228,62 @@ export function makePresets({ mc, log }) {
     async function teleportTo(player, t, range) {
         const p = await where({ player }), s = sel({ player });
         const at = `execute in ${p.dim} positioned ${p.x.toFixed(1)} ${p.y.toFixed(1)} ${p.z.toFixed(1)}`;
+        // the End's centre: exactly on top of the exit portal's bedrock pillar at 0, 0 (where the dragon
+        // perches). Exactly: the portal round the pillar is live once the dragon's dead, and a block off
+        // would drop you into it and back to the Overworld. Up above it first (slow falling) so the land
+        // loads, then down onto the highest block there (the pillar, or the dragon egg on it).
+        if (t.kind === 'place' && t.filter === 'end_centre') {
+            if (p.dim !== 'minecraft:the_end') throw new Error('only in the End');
+            const end = 'execute in minecraft:the_end';
+            await mc(`${end} run tp ${s} 0.5 100 0.5`);
+            await mc(`effect give ${s} minecraft:slow_falling 8 0 true`).catch(() => {});
+            for (let i = 0; i < 40 && !/passed/i.test(String(await mc(`${end} if loaded 0 0 0`).catch(() => ''))); i++) await new Promise(r => setTimeout(r, 250));
+            let top = null;
+            for (let y = 99; y >= 0; y--) {
+                const r = String(await mc(`${end} if block 0 ${y} 0 #minecraft:air`).catch(e => e.message));
+                if (/failed/i.test(r)) { top = y; break; }             // not air: the top of the pillar
+                if (!/passed/i.test(r)) break;                          // not loaded: leave them slow falling above it
+            }
+            if (top != null) await mc(`${end} run tp ${s} 0.5 ${top + 1} 0.5`);
+            return { x: 0, y: top, z: 0, away: Math.round(Math.hypot(p.x, p.z)) };
+        }
+        // the End ship: only some End cities have one, so the nearest cities are checked for the ship's
+        // dragon head (on its bow), nearest first, and you land on top of the ship there
+        if (t.kind === 'place' && t.filter === 'end_ship') {
+            if (p.dim !== 'minecraft:the_end') throw new Error('only in the End');
+            const until = Date.now() + (t.search?.farSeconds ?? 60) * 1000, cities = [];
+            const locateFrom = async (x, z) => {
+                const reply = String(await mc(`execute in minecraft:the_end positioned ${x.toFixed(1)} 64 ${z.toFixed(1)} run locate structure minecraft:end_city`).catch(e => e.message));
+                const m = /at \[(-?\d+), (~|-?\d+), (-?\d+)\]/.exec(reply);
+                if (!m) return;
+                const cx = +m[1], cz = +m[3];
+                if (!cities.some(c => Math.hypot(c.x - cx, c.z - cz) < 64)) cities.push({ x: cx, z: cz, away: Math.round(Math.hypot(cx - p.x, cz - p.z)) });
+            };
+            await locateFrom(p.x, p.z);
+            // more cities round the first one (cities are about 320 blocks apart)
+            if (cities[0]) for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) await locateFrom(cities[0].x + dx * 500, cities[0].z + dz * 500);
+            cities.sort((a, b) => a.away - b.away);
+            let checked = 0;
+            for (const c of cities.filter(c => c.away <= range).slice(0, 5)) {
+                if (Date.now() > until) break;
+                checked++;
+                const hit = await searchAround(p, 'minecraft:dragon_wall_head', c.x, null, c.z, 96);
+                if (hit) {
+                    // the head looks out from the bow: the deck is behind it. Land 6 blocks back, on top.
+                    const E = 'execute in minecraft:the_end';
+                    await mc(`${E} run forceload add ${hit.x - 8} ${hit.z - 8} ${hit.x + 8} ${hit.z + 8}`).catch(() => {});
+                    let back = [0, 0];
+                    for (const [f, d] of [['north', [0, 1]], ['south', [0, -1]], ['east', [-1, 0]], ['west', [1, 0]]])
+                        if (/passed/i.test(String(await mc(`${E} if block ${hit.x} ${hit.y} ${hit.z} minecraft:dragon_wall_head[facing=${f}]`).catch(() => '')))) { back = d; break; }
+                    const lx = hit.x + back[0] * 6, lz = hit.z + back[1] * 6;
+                    await landAt(s, p, lx, lz, null);
+                    await makeRoom(s, p);
+                    await mc(`${E} run forceload remove ${hit.x - 8} ${hit.z - 8} ${hit.x + 8} ${hit.z + 8}`).catch(() => {});
+                    return { x: lx, y: hit.y, z: lz, away: Math.round(Math.hypot(lx - p.x, lz - p.z)) };
+                }
+            }
+            throw new Error(cities.length ? `none of the ${checked} nearest End cities has a ship` : 'no End city near you');
+        }
         if (t.kind === 'structure' || t.kind === 'biome') {
             const reply = String(await mc(`${at} run locate ${t.kind} ${t.filter}`).catch(e => e.message));
             const m = /at \[(-?\d+), (~|-?\d+), (-?\d+)\]/.exec(reply);

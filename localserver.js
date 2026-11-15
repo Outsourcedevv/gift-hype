@@ -145,15 +145,31 @@ export function findJava() {
 export async function serverJar(dir, version, log) {
     const file = path.join(dir, `minecraft-server-${version}.jar`);
     if (fs.existsSync(file)) return file;
-    const manifest = await (await fetch('https://piston-meta.mojang.com/mc/game/version_manifest_v2.json')).json();
+    // Mojang's servers: tried 3 times (a dropped connection is common), then a message that says what failed
+    const get = async (url, what, as) => {
+        let last;
+        for (let i = 1; i <= 3; i++) {
+            try {
+                const r = await fetch(url);
+                if (!r.ok) throw new Error(`Mojang answered ${r.status}`);
+                return as === 'json' ? await r.json() : Buffer.from(await r.arrayBuffer());
+            } catch (e) {
+                last = e;
+                if (i < 3) { log(`Couldn't get ${what} from Mojang (${e.cause?.code || e.message}), trying again...`); await new Promise(res => setTimeout(res, 3000 * i)); }
+            }
+        }
+        throw new Error(`couldn't download ${what} from Mojang (${last.cause?.code || last.message}). Check the PC is online and nothing (antivirus, firewall, VPN) is blocking Gift Hype, then press Play again`);
+    };
+    const manifest = await get('https://piston-meta.mojang.com/mc/game/version_manifest_v2.json', "Minecraft's version list", 'json');
     const entry = manifest.versions.find(v => v.id === version);
     if (!entry) throw new Error(`Minecraft ${version} wasn't found on Mojang's server list`);
-    const info = await (await fetch(entry.url)).json();
+    const info = await get(entry.url, `the Minecraft ${version} details`, 'json');
     const dl = info.downloads?.server;
     if (!dl) throw new Error(`There is no server download for ${version}`);
     log(`Downloading the Minecraft ${version} server from Mojang (${Math.round(dl.size / 1e6)} MB)...`);
-    const buf = Buffer.from(await (await fetch(dl.url)).arrayBuffer());
-    if (crypto.createHash('sha1').update(buf).digest('hex') !== dl.sha1) throw new Error('The server download was damaged, try again');
+    let buf = await get(dl.url, `the Minecraft ${version} server`);
+    if (crypto.createHash('sha1').update(buf).digest('hex') !== dl.sha1) buf = await get(dl.url, `the Minecraft ${version} server`);
+    if (crypto.createHash('sha1').update(buf).digest('hex') !== dl.sha1) throw new Error('the Minecraft server download was damaged twice, press Play to try again');
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(file + '.part', buf);
     fs.renameSync(file + '.part', file);

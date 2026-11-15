@@ -335,6 +335,7 @@ const BIOME_ICON = [
 export function iconBlockFor(t, reader) {
     const id = String(t.filter || '').replace(/^#?minecraft:/, '');
     const pick = table => { for (const [re, ...ids] of table) if (re.test(id)) for (const b of ids) if (reader.has(b)) return b; return null; };
+    if (t.kind === 'place') return (t.filter === 'end_ship' ? ['purpur_block'] : ['dragon_egg', 'bedrock']).find(b => reader.has(b)) || null;
     if (t.kind === 'structure') return pick(STRUCTURE_ICON);
     if (t.kind === 'biome') return pick(BIOME_ICON);
     if (!t.filter?.startsWith('#')) return id;

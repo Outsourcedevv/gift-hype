@@ -57,9 +57,32 @@ const settings = {
     activeGame: null,
     masterVolume: 0.8,
     soundsIn: 'app',        // 'app' (this window) or 'overlay' (the OBS overlay plays them)
-    overlay: { position: 'top', scale: 1, showSender: true },
+    overlay: { position: 'top', scale: 1, showSender: true, menu: true, menuSide: 'left', menuStyle: 'list' },
     ...readJson(SETTINGS_PATH, {}),
 };
+// The overlay's gift list: every setting it has, checked, with its default
+function normalizeMenu(o = {}) {
+    const num = (v, lo, hi, def) => Number.isFinite(+v) && v !== '' && v !== null ? Math.max(lo, Math.min(hi, +v)) : def;
+    const col = (v, def) => /^#[0-9a-f]{6}$/i.test(String(v)) ? String(v) : def;
+    return {
+        menu: o.menu !== false,                                         // on (default)
+        menuStyle: o.menuStyle === 'single' ? 'single' : 'list',
+        menuX: num(o.menuX, 0, 100, o.menuSide === 'right' ? 98 : 2),   // where: 0 = left edge, 100 = right edge
+        menuY: num(o.menuY, 0, 100, 50),                                // 0 = top, 100 = bottom
+        menuScale: num(o.menuScale, 0.4, 3, 1),                         // its own size (popups have theirs)
+        menuRows: Math.round(num(o.menuRows, 1, 15, 7)),                // gifts per page (list)
+        menuSeconds: Math.round(num(o.menuSeconds, 2, 30, o.menuStyle === 'single' ? 5 : 8)),
+        menuTitle: String(o.menuTitle ?? 'SEND A GIFT').slice(0, 30),
+        menuSort: ['cheap', 'dear', 'game'].includes(o.menuSort) ? o.menuSort : 'cheap',
+        menuShowPrice: o.menuShowPrice !== false, menuShowDoes: o.menuShowDoes !== false,
+        menuBg: col(o.menuBg, '#0A1222'), menuBgAlpha: Math.round(num(o.menuBgAlpha, 0, 100, 78)),
+        menuBorder: col(o.menuBorder, '#3A4A66'), menuTitleColor: col(o.menuTitleColor, '#FFCF3A'),
+        menuNameColor: col(o.menuNameColor, '#FFFFFF'), menuPriceColor: col(o.menuPriceColor, '#FFCF3A'), menuDoesColor: col(o.menuDoesColor, '#9FE7FF'),
+        menuHighlight: o.menuHighlight !== false,                       // a gift sent lights up in the list
+        menuHideOnPopup: o.menuHideOnPopup === true,                    // fades out while a popup shows
+    };
+}
+Object.assign(settings.overlay, normalizeMenu(settings.overlay));
 const saveSettings = () => writeJson(SETTINGS_PATH, settings);
 
 const newId = () => crypto.randomBytes(5).toString('hex');
@@ -426,7 +449,7 @@ function findLiveStudio() {
 // ---------- Live updates (Server-Sent Events) ----------
 
 const clients = new Set();
-const OVERLAY_EVENTS = new Set(['alert', 'play', 'stopSound', 'reset', 'wheel', 'chatdel', 'chunkchat', 'settings', 'state']);
+const OVERLAY_EVENTS = new Set(['alert', 'play', 'stopSound', 'reset', 'wheel', 'chatdel', 'chunkchat', 'settings', 'state', 'menu']);
 const overlaySettings = () => ({ overlay: settings.overlay, theme: settings.theme, soundsIn: settings.soundsIn });
 function broadcast(event, data) {
     const msg = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
@@ -471,6 +494,28 @@ function learnGift(name, coins, image) {
     learned = learned.filter(g => g !== old).concat({ name, coins: coins ?? old?.coins ?? 0, image });
     writeJson(learnedPath, learned);
 }
+
+// ---------- The overlay's gift list: what each gift does in the game you're playing ----------
+// Made from the playing game's (and type's) gift rules: one line per gift, cheapest first, with its
+// picture and price from the gift catalog. Sent to the overlay whenever it changes (games, types, rules).
+function giftMenu() {
+    const g = activeGame();
+    if (!g) return [];
+    const byGift = new Map();
+    for (const r of rulesOf(g) || []) {
+        if (!r.gift || r.gift === '*') continue;
+        const known = findGift(r.gift), k = r.gift.toLowerCase();
+        const e = byGift.get(k) || { name: known?.name || r.gift, image: known?.image || r.image || null, coins: known?.coins ?? r.coins ?? null, does: [], order: byGift.size };
+        const what = String(r.label || '').trim();
+        if (what && !e.does.includes(what)) e.does.push(what);
+        byGift.set(k, e);
+    }
+    return [...byGift.values()].sort((a, b) => (a.coins ?? 1e9) - (b.coins ?? 1e9) || a.name.localeCompare(b.name)).map(e => ({ ...e, does: e.does.join(' + ') }));
+}
+let lastMenu = '';
+setInterval(() => {
+    try { const m = JSON.stringify(giftMenu()); if (m !== lastMenu) { lastMenu = m; broadcast('menu', JSON.parse(m)); } } catch { }
+}, 2000);
 
 // ---------- Finding Minecraft servers on this PC ----------
 
@@ -585,10 +630,12 @@ let packNeedsReload = false;
 function nukeSizes(g) {
     return g.modes.flatMap(m => m.rules.flatMap(r => r.actions.filter(a => a.type === 'nuke').map(a => Math.max(16, Math.min(64, Math.round(+a.size || 40))))));
 }
+// why the world last couldn't be opened (for the Play button's message)
+let worldError = '';
 function syncPack(g) {
     if (isDropper(g)) {
         try { if (installDropperPack()) { packNeedsReload = true; log('Dropper pack updated.'); } return 'singleplayer'; }
-        catch (e) { log(`Couldn't put the Dropper pack in place: ${e.message}`); return 'world failed'; }
+        catch (e) { worldError = `Couldn't put the Dropper pack in place: ${e.message}`; log(worldError); return 'world failed'; }
     }
     if (!g.minecraft.world) return 'no world picked';
     try {
@@ -622,7 +669,8 @@ async function connectMinecraft() {
                 if (isChatTeleport(g)) log(hi?.pictures ? `Chat Teleport box: ${hi.pictures} ${hi.mode === '3d' ? '3D' : 'flat'} block pictures (from ${hi.jar}), for box size ${hi.size}%`
                     : "Chat Teleport box: no block pictures (Minecraft's game files weren't found in .minecraft/versions; play this version once in the launcher)");
             } catch (e) { log(`Couldn't make the Chat Teleport box pack: ${e.message}`); }
-            localServer.start(world, { eula: settings.mcEula, ...opts }).catch(e => { log(`Couldn't open the world: ${e.message}`); setStatus({ minecraft: 'world failed' }); });
+            worldError = '';
+            localServer.start(world, { eula: settings.mcEula, ...opts }).catch(e => { worldError = `Couldn't open the world: ${e.message}`; log(worldError); setStatus({ minecraft: 'world failed' }); });
             return;
         }
         if (localState !== 'ready') return setStatus({ minecraft: localState });
@@ -1112,7 +1160,7 @@ const routes = {
             throw new Error(`The update didn't work: ${e.message}`);
         }
     },
-    'GET /api/overlay-state': async () => ({ settings: overlaySettings(), reset: resetPublic(), chatdel: chatDelete.list(), chunkchat: isChatTeleport(activeGame()) ? await chatTeleport.state() : await chunkChat.state() }),
+    'GET /api/overlay-state': async () => ({ settings: overlaySettings(), menu: giftMenu(), reset: resetPublic(), chatdel: chatDelete.list(), chunkchat: isChatTeleport(activeGame()) ? await chatTeleport.state() : await chunkChat.state() }),
     // Chunk Chat: try a block as if it was typed in chat, or change the chunk now
     'POST /api/chunkchat/try': async b => {
         const r = await chunkChat.onChat(String(b.text || ''), 'You (test)');
@@ -1149,6 +1197,19 @@ const routes = {
             if (['top', 'middle', 'bottom'].includes(b.overlay.position)) o.position = b.overlay.position;
             if (Number.isFinite(+b.overlay.scale)) o.scale = Math.max(0.4, Math.min(3, +b.overlay.scale));
             if (typeof b.overlay.showSender === 'boolean') o.showSender = b.overlay.showSender;
+            // the gift list's settings (anything starting "menu"), checked
+            const menuKeys = Object.keys(b.overlay).filter(k => k.startsWith('menu'));
+            // the other boxes' places (timer, block delete list, reset countdown): x, y (0-100) and size
+            if (b.overlay.place && typeof b.overlay.place === 'object') {
+                const n = (v, lo, hi, d) => Number.isFinite(+v) && v !== null && v !== '' ? Math.max(lo, Math.min(hi, +v)) : d;
+                o.place = { ...(o.place || {}) };
+                for (const k of ['popups', 'timer', 'chatdel', 'reset']) {
+                    const p = b.overlay.place[k];
+                    if (p === null) delete o.place[k];
+                    else if (p && typeof p === 'object') o.place[k] = { x: n(p.x, 0, 100, 50), y: n(p.y, 0, 100, 50), s: n(p.s, 0.3, 3, 1) };
+                }
+            }
+            if (menuKeys.length) { const m = normalizeMenu({ ...o, ...Object.fromEntries(menuKeys.map(k => [k, b.overlay[k]])) }); for (const k of Object.keys(m)) o[k] = m[k]; }
         }
         saveSettings();
         broadcast('settings', publicState().settings);
@@ -1253,7 +1314,7 @@ const routes = {
                 : is('world not found') || is('no world picked') ? "Your world wasn't found. Pick your world again under Connects to, then press Play"
                 : is('eula not accepted') ? 'Tick the Minecraft EULA box first'
                 : is('crashed') ? `Minecraft's server stopped${localServer.problem() ? `: ${localServer.problem()}` : ''}. Press Play to try again; if it keeps happening, send the Activity log (Settings)`
-                : is('world failed') ? "Your world couldn't be opened (see the Activity log in Settings). Press Play to try again"
+                : is('world failed') ? (/press Play/i.test(worldError) ? worldError : `${worldError || "Your world couldn't be opened"}. Press Play to try again`)
                 : localState === 'downloading' ? "Still downloading Minecraft's server (only the first time). Wait a minute and press Play again"
                 : "Your world is still starting (the first time takes longest). Wait a minute and press Play again";
             throw new Error(why);
@@ -1523,13 +1584,26 @@ server.on('error', async e => {
 
 server.listen(settings.port, '127.0.0.1', () => {
     log(`Gift Hype is running: ${appUrl()}   Overlay for OBS / TikTok LIVE Studio: http://${OVERLAY_HOST}:${settings.port}/overlay`);
+    // The overlay's address (and "localhost") also mean this PC's IPv6 address, ::1, which browsers and
+    // TikTok LIVE Studio often try first: answer there too, or the overlay loads but never gets a gift.
+    // Still this PC only. Skipped quietly if the PC has IPv6 turned off.
+    const server6 = http.createServer(server.listeners('request')[0]);
+    server6.on('error', () => {});
+    server6.listen(settings.port, '::1');
     startGameSocket();
     connectMinecraft();
     getSoundPack().catch(e => log(`Starter sounds: ${e.message}`));
     if (settings.autoConnect && settings.tiktokUsername) connectTikTok(settings.tiktokUsername);
     const win = appWindow = openWindow();
-    // Is there a newer version? (checked once, a little after opening)
-    setTimeout(() => checkForUpdate(ROOT).then(u => { setStatus({ update: u }); if (u.available) log(`Update available: version ${u.latest} (you have ${u.current}). Press Update in the bar at the top.`); }).catch(() => {}), 6000);
+    // Is there a newer version? A little after opening, then every 15 minutes while it's open (an
+    // update published while Gift Hype is running shows up without restarting it). Said once per version.
+    let toldAbout = null;
+    const lookForUpdate = () => checkForUpdate(ROOT).then(u => {
+        setStatus({ update: u });
+        if (u.available && toldAbout !== u.latest) { toldAbout = u.latest; log(`Update available: version ${u.latest} (you have ${u.current}). Press Update in the bar at the top.`); }
+    }).catch(() => {});
+    setTimeout(lookForUpdate, 6000);
+    setInterval(lookForUpdate, 15 * 60 * 1000);
     // Close the app when its window is closed.
     win?.on('exit', async () => {
         log('Window closed, Gift Hype is stopping.');

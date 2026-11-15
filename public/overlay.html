@@ -12,10 +12,8 @@
 @font-face { font-family: 'Monocraft'; src: url('/fonts/Monocraft-Bold.ttf') format('truetype'); font-weight: 700; }
 html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; font-family: 'Space Grotesk', system-ui, sans-serif; color: #fff; }
 /* Popups stack in a column; position and size come from the app's settings. */
-#stack { position: absolute; left: 50%; display: flex; flex-direction: column; align-items: center; gap: 14px; transform-origin: top center; }
-body.top #stack { top: 40px; }
-body.middle #stack { top: 50%; }
-body.bottom #stack { bottom: 60px; flex-direction: column-reverse; transform-origin: bottom center; }
+#stack { position: absolute; left: 50%; top: 40px; width: 760px; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.pop.demo, .pop.demo * { animation: none !important; }
 .pop {
   display: flex; align-items: center; gap: 18px; padding: 14px 26px 14px 14px; border-radius: 22px;
   background: rgba(14, 16, 19, .86); border: 2px solid var(--accent);
@@ -134,6 +132,53 @@ body.bottom #stack { bottom: 60px; flex-direction: column-reverse; transform-ori
 .cc.done { border-color: #55ff55; text-align: center; animation: in .4s cubic-bezier(.2,1.4,.4,1) both; }
 .cc.done .block { font-size: 32px; white-space: normal; }
 body.preview { background: repeating-conic-gradient(#20242b 0 25%, #171a1f 0 50%) 0 0 / 40px 40px; }
+
+/* the gift list: what each gift does in the game you're playing (Gift Hype fills it in). Its place,
+   size and colours come from the settings (--m-* below, set by drawMenu). */
+#menu { position: fixed; left: var(--m-x, 2%); top: var(--m-y, 50%); transform: translate(calc(var(--m-x, 2%) * -1), calc(var(--m-y, 50%) * -1)) scale(var(--m-scale, 1));
+  transform-origin: var(--m-x, 2%) var(--m-y, 50%); width: 330px; display: none; transition: opacity .4s;
+  background: var(--m-bg, rgba(10, 18, 34, .78)); border: 2px solid var(--m-border, #3a4a66); border-radius: 16px; padding: 14px 14px 10px; color: var(--m-name, #fff);
+  font-family: 'Monocraft', 'Silkscreen', monospace; box-shadow: 0 8px 30px rgba(0, 0, 0, .35); }
+#menu.on { display: block; }
+#menu.away { opacity: 0; }
+#menu .t { font-weight: 700; font-size: 20px; letter-spacing: 1px; color: var(--m-title, #ffcf3a); text-align: center; margin-bottom: 8px; text-shadow: 2px 2px 0 #000; }
+#menu .row { display: flex; align-items: center; gap: 10px; padding: 6px 4px; border-top: 1px solid rgba(255, 255, 255, .08); border-radius: 8px; animation: menuIn .35s ease both; transition: background .3s, box-shadow .3s; }
+#menu .row img { width: 44px; height: 44px; object-fit: contain; flex: none; }
+#menu .row .nm { font-size: 14px; font-weight: 700; line-height: 1.15; color: var(--m-name, #fff); }
+#menu .c { color: var(--m-price, #ffcf3a); }
+#menu .row .c { font-size: 12px; }
+#menu .d { color: var(--m-does, #9fe7ff); }
+#menu .row .d { font-size: 13px; line-height: 1.2; margin-top: 2px; }
+#menu .pg { text-align: center; font-size: 11px; opacity: .6; margin-top: 4px; }
+/* a gift that was just sent */
+#menu .row.lit { background: rgba(255, 207, 58, .22); box-shadow: 0 0 0 2px var(--m-title, #ffcf3a) inset; animation: litPulse .6s ease 3; }
+#menu.single.lit { box-shadow: 0 0 0 3px var(--m-title, #ffcf3a), 0 0 30px var(--m-title, #ffcf3a); }
+@keyframes litPulse { 50% { transform: scale(1.04); } }
+/* one at a time: a big card for one gift, then the next */
+#menu.single { width: 300px; text-align: center; padding: 14px 16px 12px; }
+#menu.single .one { animation: oneIn .5s ease both; }
+#menu.single .one img { width: 120px; height: 120px; object-fit: contain; display: block; margin: 2px auto 6px; filter: drop-shadow(0 4px 10px rgba(0,0,0,.4)); }
+#menu.single .one .nm { font-size: 22px; font-weight: 700; line-height: 1.1; }
+#menu.single .one .c { font-size: 16px; margin-top: 4px; }
+#menu.single .one .d { font-size: 18px; margin-top: 8px; line-height: 1.2; }
+#menu.single .dots { display: flex; justify-content: center; gap: 5px; margin-top: 10px; flex-wrap: wrap; }
+#menu.single .dots i { width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,.25); }
+#menu.single .dots i.on { background: var(--m-title, #ffcf3a); }
+/* is the overlay reaching Gift Hype? a moment's "connected", or a notice that stays while it can't */
+#conn { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); padding: 8px 14px; border-radius: 10px; font: 700 15px 'Monocraft', monospace;
+  color: #fff; background: rgba(10, 18, 34, .8); border: 2px solid #4ade80; opacity: 0; transition: opacity .4s; pointer-events: none; }
+#conn.show { opacity: 1; }
+#conn.bad { border-color: #f87171; }
+/* the overlay editor (the app shows this page with ?edit): boxes to drag and resize */
+body.editing { background: #18202e; background-image: linear-gradient(rgba(255,255,255,.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.04) 1px, transparent 1px); background-size: 96px 96px; }
+.edframe { position: fixed; z-index: 50; border: 4px dashed #4db3ee; border-radius: 14px; cursor: move; touch-action: none; }
+.edframe:hover, .edframe.drag { border-style: solid; background: rgba(77, 179, 238, .08); }
+.edframe b { position: absolute; left: -4px; top: -44px; background: #4db3ee; color: #05263d; font: 700 24px system-ui, sans-serif; padding: 4px 14px; border-radius: 10px; white-space: nowrap; }
+.edframe i { position: absolute; right: -18px; bottom: -18px; width: 34px; height: 34px; background: #fff; border: 5px solid #4db3ee; border-radius: 50%; cursor: nwse-resize; }
+.edzone { position: fixed; z-index: 40; left: 50%; transform: translateX(-50%); width: 760px; height: 300px; border: 4px dashed rgba(255, 140, 70, .8); border-radius: 18px;
+  color: rgba(255, 170, 110, .95); font: 700 26px system-ui, sans-serif; display: flex; align-items: center; justify-content: center; text-align: center; pointer-events: none; }
+@keyframes oneIn { from { opacity: 0; transform: translateY(10px) scale(.96); } to { opacity: 1; transform: none; } }
+@keyframes menuIn { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: none; } }
 </style>
 </head>
 <body class="top">
@@ -142,6 +187,8 @@ body.preview { background: repeating-conic-gradient(#20242b 0 25%, #171a1f 0 50%
 <div id="slots"></div>
 <div id="chatDel"></div>
 <div id="chunkChat"></div>
+<div id="menu"></div>
+<div id="conn"></div>
 <script>
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const pic = url => url ? '/gift-img?u=' + encodeURIComponent(url) : '';
@@ -153,14 +200,11 @@ function applySettings() {
   const th = { sky: ['#4db3ee', '#ff6a3d'], blaze: ['#ff4500', '#ffd000'], punk: ['#3b82f6', '#00f0a8'], egyptian: ['#3a5ce0', '#ff2400'] }[settings.theme] || ['#4db3ee', '#ff6a3d'];
   document.documentElement.style.setProperty('--accent', th[0]);
   document.documentElement.style.setProperty('--pink', th[1]);
+  if (typeof drawMenu === 'function') try { drawMenu(); } catch { }
   const o = settings.overlay;
   document.body.className = o.position + (location.search.includes('preview') ? ' preview' : '');
-  const s = document.getElementById('stack');
-  s.style.transform = `translateX(-50%) ${o.position === 'middle' ? 'translateY(-50%)' : ''} scale(${o.scale})`;
-  document.getElementById('resetBox').style.transform = `scale(${o.scale})`;
   document.getElementById('slots').style.transform = `translate(-50%, -50%) scale(${o.scale})`;
-  document.getElementById('chatDel').style.transform = `scale(${o.scale})`;
-  document.getElementById('chunkChat').style.transform = `scale(${o.scale})`;
+  applyPlaces();
 }
 
 const MAX = 4;
@@ -332,17 +376,184 @@ function showReset(r) {
   }
 }
 
-fetch('/api/overlay-state').then(r => r.json()).then(s => { settings = s.settings; applySettings(); if (s.reset && s.reset.active) showReset(s.reset); if (s.chatdel) showChatDel({ items: s.chatdel }); if (s.chunkchat) showChunkChat(s.chunkchat); });
+fetch('/api/overlay-state').then(r => r.json()).then(s => { settings = s.settings; applySettings(); showMenu(s.menu || []); if (s.reset && s.reset.active) showReset(s.reset); if (s.chatdel) showChatDel({ items: s.chatdel }); if (s.chunkchat) showChunkChat(s.chunkchat); });
 const es = new EventSource('/api/events');
+// connected / not connected, so you can tell from your streaming app
+let connTimer = null, everOpen = false;
+const conn = (text, bad, ms) => { const c = document.getElementById('conn'); c.textContent = text; c.className = 'show' + (bad ? ' bad' : ''); clearTimeout(connTimer); if (ms) connTimer = setTimeout(() => c.className = '', ms); };
+es.onopen = () => { conn(everOpen ? 'Gift Hype connected again' : 'Gift Hype connected', false, 5000); everOpen = true; };
+es.onerror = () => { setTimeout(() => { if (es.readyState !== 1) conn("Gift Hype isn't connected: is it open on this PC?", true, 0); }, 4000); };
 es.addEventListener('settings', e => { settings = JSON.parse(e.data); applySettings(); });
 es.addEventListener('state', e => { settings = JSON.parse(e.data).settings; applySettings(); });
-es.addEventListener('alert', e => popup(JSON.parse(e.data)));
+es.addEventListener('alert', e => { const d = JSON.parse(e.data); popup(d); try { menuOnGift(d); } catch { } });
 es.addEventListener('play', e => { if (settings.soundsIn === 'overlay') { const p = JSON.parse(e.data); playSound(p.file, p.volume, p); } });
 es.addEventListener('stopSound', e => stopSound(JSON.parse(e.data).id));
-es.addEventListener('reset', e => showReset(JSON.parse(e.data)));
+es.addEventListener('reset', e => { if (!EDITING) showReset(JSON.parse(e.data)); });
 es.addEventListener('wheel', e => spinSlots(JSON.parse(e.data)));
-es.addEventListener('chatdel', e => showChatDel(JSON.parse(e.data)));
-es.addEventListener('chunkchat', e => showChunkChat(JSON.parse(e.data)));
+es.addEventListener('chatdel', e => { if (!EDITING) showChatDel(JSON.parse(e.data)); });
+es.addEventListener('chunkchat', e => { if (!EDITING) showChunkChat(JSON.parse(e.data)); });
+es.addEventListener('menu', e => showMenu(JSON.parse(e.data)));
+
+// ----- where the boxes go: each has x, y (0 = left/top edge, 100 = right/bottom edge) and a size -----
+// The gift list keeps its own settings (menuX, menuY, menuScale); the others are in overlay.place.
+const PLACE = {
+  popups: { id: 'stack', label: 'Gift popups', def: { x: 50, y: 4 } },
+  menu: { id: 'menu', label: 'Gift list', def: { x: 2, y: 50 } },
+  timer: { id: 'chunkChat', label: 'Timer', def: { x: 98, y: 4 } },
+  chatdel: { id: 'chatDel', label: 'Block delete list', def: { x: 98, y: 40 } },
+  reset: { id: 'resetBox', label: 'Reset countdown', def: { x: 2, y: 4 } },
+};
+function placeOf(k) {
+  const o = (settings && settings.overlay) || {};
+  if (k === 'menu') return { x: o.menuX ?? 2, y: o.menuY ?? 50, s: o.menuScale ?? 1 };
+  const p = (o.place || {})[k] || {};
+  // popups start where the old "Popups at" setting put them
+  const def = k === 'popups' ? { x: 50, y: { top: 4, middle: 50, bottom: 96 }[o.position] ?? 4 } : PLACE[k].def;
+  return { x: p.x ?? def.x, y: p.y ?? def.y, s: p.s ?? (o.scale || 1) };
+}
+function applyPlaces() {
+  for (const k in PLACE) {
+    const e = document.getElementById(PLACE[k].id), p = placeOf(k);
+    if (!e) continue;
+    Object.assign(e.style, { position: 'fixed', left: p.x + '%', top: p.y + '%', right: 'auto', bottom: 'auto',
+      transformOrigin: `${p.x}% ${p.y}%`, transform: `translate(${-p.x}%, ${-p.y}%) scale(${p.s})` });
+    // popups low on the screen stack upwards (newest at the bottom), so they stay on screen
+    if (k === 'popups') e.style.flexDirection = p.y > 60 ? 'column-reverse' : 'column';
+  }
+}
+
+// ----- the editor: the app shows this page with ?edit, scaled down. Every box shows (with examples
+// where there's nothing yet); drag one to move it, drag its round corner to resize it. Saved as you let go,
+// and your real overlay (in LIVE Studio) moves too. -----
+const EDITING = new URLSearchParams(location.search).has('edit');
+function setupEditor() {
+  document.body.classList.add('editing');
+  const demo = () => {
+    if (!menuRaw.length) showMenu([{ name: 'Rose', coins: 1, does: 'Spawns a zombie' }, { name: 'Finger Heart', coins: 5, does: 'Diamond kit' }, { name: 'Doughnut', coins: 30, does: 'Lightning' }]);
+    showChunkChat({ on: true, tag: 'TELEPORT IN', left: 23, total: 30, leader: { label: 'VILLAGE', votes: 3 }, top: [{ label: 'VILLAGE', votes: 3 }, { label: 'CHERRY GROVE', votes: 2 }, { label: 'SPAWNER', votes: 1 }] });
+    showChatDel({ items: [{ label: 'DIAMOND ORE', by: 'a viewer', left: 12, total: 20 }] });
+    showReset({ active: true, secondsLeft: 42, total: 60, saveGift: { name: 'Glowing Jellyfish' } });
+    const stack = document.getElementById('stack');
+    if (!stack.querySelector('.pop.demo')) {
+      const el = document.createElement('div');
+      el.className = 'pop demo';
+      el.innerHTML = `<div class="img"></div><div><div class="who"><b>a viewer</b> sent Rose</div><div class="did">Spawns a zombie</div></div>`;
+      stack.prepend(el);
+    }
+  };
+  demo(); setInterval(demo, 2000);
+  const frames = {};
+  for (const k in PLACE) {
+    const f = document.createElement('div');
+    f.className = 'edframe';
+    f.innerHTML = `<b>${PLACE[k].label}</b><i title="Drag to resize"></i>`;
+    document.body.appendChild(f);
+    frames[k] = f;
+    let start = null;
+    const save = () => {
+      const p = placeOf(k);
+      const body = k === 'menu' ? { menuX: +p.x.toFixed(1), menuY: +p.y.toFixed(1), menuScale: +p.s.toFixed(2) } : { place: { [k]: { x: +p.x.toFixed(1), y: +p.y.toFixed(1), s: +p.s.toFixed(2) } } };
+      fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ overlay: body }) });
+    };
+    const set = p => {
+      const o = settings.overlay;
+      if (k === 'menu') { o.menuX = p.x; o.menuY = p.y; o.menuScale = p.s; } else { o.place = { ...(o.place || {}), [k]: p }; }
+      applyPlaces();
+    };
+    f.onpointerdown = ev => {
+      ev.preventDefault();
+      f.setPointerCapture(ev.pointerId);
+      const r = document.getElementById(PLACE[k].id).getBoundingClientRect();
+      start = { mx: ev.clientX, my: ev.clientY, r, p: placeOf(k), resize: ev.target.tagName === 'I' };
+      f.classList.add('drag');
+    };
+    f.onpointermove = ev => {
+      if (!start) return;
+      const dx = ev.clientX - start.mx, dy = ev.clientY - start.my, { r, p } = start;
+      if (start.resize) {
+        const s = Math.max(0.3, Math.min(3, p.s * (r.width + dx) / r.width));
+        set({ ...p, s });
+      } else {
+        const clamp = v => Math.max(0, Math.min(100, v));
+        const x = clamp((r.left + dx) / Math.max(1, innerWidth - r.width) * 100), y = clamp((r.top + dy) / Math.max(1, innerHeight - r.height) * 100);
+        set({ ...p, x, y });
+      }
+    };
+    f.onpointerup = f.onpointercancel = () => { if (!start) return; start = null; f.classList.remove('drag'); save(); };
+  }
+  // keep each frame round its box
+  const follow = () => {
+    for (const k in frames) {
+      const r = document.getElementById(PLACE[k].id).getBoundingClientRect(), f = frames[k];
+      f.style.display = r.width ? '' : 'none';
+      Object.assign(f.style, { left: r.left - 6 + 'px', top: r.top - 6 + 'px', width: r.width + 4 + 'px', height: r.height + 4 + 'px' });
+    }
+    requestAnimationFrame(follow);
+  };
+  follow();
+}
+
+// ----- the gift list: a page at a time (list) or a gift at a time (one at a time) -----
+let menuRaw = [], menuItems = [], menuPage = 0, menuTimer = null, menuShape = '', litName = null, litTimer = null, popTimer = null;
+const mo = () => (settings && settings.overlay) || {};
+function sortMenu() {
+  const o = mo(), by = o.menuSort || 'cheap';
+  menuItems = [...menuRaw].sort((a, b) => by === 'game' ? (a.order ?? 0) - (b.order ?? 0)
+    : by === 'dear' ? (b.coins ?? -1) - (a.coins ?? -1) : (a.coins ?? 1e9) - (b.coins ?? 1e9));
+}
+function showMenu(items) { menuRaw = Array.isArray(items) ? items : []; menuPage = 0; restartMenu(); }
+function pagesOf() { const o = mo(); return o.menuStyle === 'single' ? menuItems.length : Math.ceil(menuItems.length / (o.menuRows || 7)); }
+function restartMenu() {
+  const o = mo();
+  sortMenu();
+  menuShape = [o.menuStyle, o.menuRows, o.menuSeconds, o.menuSort].join('|');
+  if (menuPage >= pagesOf()) menuPage = 0;
+  drawMenu();
+  clearInterval(menuTimer);
+  if (pagesOf() > 1) menuTimer = setInterval(() => { menuPage = (menuPage + 1) % pagesOf(); drawMenu(); }, (o.menuSeconds || 8) * 1000);
+}
+const hexA = (hex, a) => { const n = parseInt(String(hex || '#0a1222').slice(1), 16); return `rgba(${n >> 16 & 255}, ${n >> 8 & 255}, ${n & 255}, ${a})`; };
+function drawMenu() {
+  const el = document.getElementById('menu'), o = mo();
+  // the layout changed (style, rows, speed, order): start again
+  if ([o.menuStyle, o.menuRows, o.menuSeconds, o.menuSort].join('|') !== menuShape) return restartMenu();
+  const on = o.menu !== false && menuItems.length > 0, single = o.menuStyle === 'single';
+  el.className = (on ? 'on' : '') + (single ? ' single' : '') + (el.classList.contains('away') ? ' away' : '') + (single && litName && menuItems[menuPage]?.name === litName ? ' lit' : '');
+  const v = (k, val) => el.style.setProperty(k, val);
+  v('--m-x', (o.menuX ?? 2) + '%'); v('--m-y', (o.menuY ?? 50) + '%'); v('--m-scale', o.menuScale || 1);
+  v('--m-bg', hexA(o.menuBg, (o.menuBgAlpha ?? 78) / 100)); v('--m-border', o.menuBorder || '#3a4a66');
+  v('--m-title', o.menuTitleColor || '#ffcf3a'); v('--m-name', o.menuNameColor || '#fff'); v('--m-price', o.menuPriceColor || '#ffcf3a'); v('--m-does', o.menuDoesColor || '#9fe7ff');
+  if (!on) { el.innerHTML = ''; return; }
+  const title = o.menuTitle ?? 'SEND A GIFT', price = g => o.menuShowPrice !== false && g.coins != null, does = g => o.menuShowDoes !== false && g.does;
+  const head = title ? `<div class="t">${esc(title)}</div>` : '';
+  if (single) {
+    const g = menuItems[menuPage % menuItems.length];
+    el.innerHTML = head + `<div class="one">${g.image ? `<img src="${pic(g.image)}" alt="">` : ''}<div class="nm">${esc(g.name)}</div>${price(g) ? `<div class="c">${Number(g.coins).toLocaleString()} coins</div>` : ''}${does(g) ? `<div class="d">${esc(g.does)}</div>` : ''}</div>`
+      + (menuItems.length > 1 && menuItems.length <= 30 ? `<div class="dots">${menuItems.map((_, i) => `<i class="${i === menuPage ? 'on' : ''}"></i>`).join('')}</div>` : '');
+    return;
+  }
+  const rows = o.menuRows || 7, pages = Math.ceil(menuItems.length / rows), page = menuItems.slice(menuPage * rows, (menuPage + 1) * rows);
+  el.innerHTML = head + page.map(g => `<div class="row${litName === g.name ? ' lit' : ''}">${g.image ? `<img src="${pic(g.image)}" alt="">` : '<span style="width:44px"></span>'}
+    <div><div class="nm">${esc(g.name)}${price(g) ? ` <span class="c">${Number(g.coins).toLocaleString()} coins</span>` : ''}</div>${does(g) ? `<div class="d">${esc(g.does)}</div>` : ''}</div></div>`).join('')
+    + (pages > 1 ? `<div class="pg">${menuPage + 1} / ${pages}</div>` : '');
+}
+// A gift came in: light it up in the list (going to its page or card), and/or fade the list out while
+// the popup shows (settings)
+function menuOnGift(e) {
+  const o = mo(), el = document.getElementById('menu');
+  if (o.menuHideOnPopup) { el.classList.add('away'); clearTimeout(popTimer); popTimer = setTimeout(() => el.classList.remove('away'), 5000); }
+  if (o.menuHighlight === false || !e || !e.gift) return;
+  const i = menuItems.findIndex(g => g.name.toLowerCase() === String(e.gift).toLowerCase());
+  if (i < 0) return;
+  litName = menuItems[i].name;
+  menuPage = o.menuStyle === 'single' ? i : Math.floor(i / (o.menuRows || 7));
+  drawMenu();
+  clearInterval(menuTimer);                       // stay on it a moment, then carry on cycling
+  clearTimeout(litTimer);
+  litTimer = setTimeout(() => { litName = null; restartMenu(); }, 4000);
+}
+
+if (EDITING) setTimeout(setupEditor, 300);
 </script>
 </body>
 </html>

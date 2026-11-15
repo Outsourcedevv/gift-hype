@@ -32,7 +32,7 @@ const STRUCTURE_NAMES = {
     desert_temple: 'desert_pyramid', desert_pyramid: 'desert_pyramid', pyramid: 'desert_pyramid',
     jungle_temple: 'jungle_pyramid', jungle_pyramid: 'jungle_pyramid', witch_hut: 'swamp_hut', swamp_hut: 'swamp_hut', witch_house: 'swamp_hut',
     trial_chamber: 'trial_chambers', trial_chambers: 'trial_chambers', trial: 'trial_chambers',
-    end_city: 'end_city', end_ship: 'end_city', outpost: 'pillager_outpost', pillager_outpost: 'pillager_outpost', pillager_tower: 'pillager_outpost',
+    end_city: 'end_city', outpost: 'pillager_outpost', pillager_outpost: 'pillager_outpost', pillager_tower: 'pillager_outpost',
     portal: '#ruined_portal', ruined_portal: '#ruined_portal', nether_portal_ruin: '#ruined_portal',
     ocean_ruin: '#ocean_ruin', ocean_ruins: '#ocean_ruin', ruins: '#ocean_ruin', ship: '#shipwreck', shipwreck: '#shipwreck', boat: '#shipwreck',
     mineshaft: '#mineshaft', mine: '#mineshaft', abandoned_mineshaft: '#mineshaft',
@@ -89,6 +89,13 @@ export function farTags() {
     }
     return out;
 }
+// ----- places: the End's centre (the exit portal's bedrock pillar, where the dragon perches) -----
+const PLACE_NAMES = new Set(['the_end', 'end', 'end_centre', 'end_center', 'centre', 'center', 'end_middle', 'middle', 'exit_portal', 'end_exit', 'end_fountain', 'fountain',
+    'portal_fountain', 'dragon', 'ender_dragon', 'the_dragon', 'dragon_perch', 'perch', 'main_island', 'end_island', 'dragon_island']);
+export const endCentre = () => ({ key: 'p:end_centre', kind: 'place', filter: 'end_centre', label: 'END CENTRE', dims: new Set(['the_end']) });
+// the End ship (part of some End cities; it has the elytra)
+const SHIP_NAMES = new Set(['end_ship', 'endship', 'end_boat', 'ship_in_the_end', 'end_city_ship', 'elytra', 'elytra_ship', 'elytras', 'end_ships']);
+export const endShip = () => ({ key: 'p:end_ship', kind: 'place', filter: 'end_ship', label: 'END SHIP', dims: new Set(['the_end']) });
 const nice = id => LABELS[id] || id.replace(/^#/, '').replace(/_/g, ' ').toUpperCase();
 
 // ----- the targets, made from a name: s:<structure or #group>, b:<biome>, k:<block or #tag> -----
@@ -110,6 +117,8 @@ let CATALOG = null;
 function catalog() {
     if (CATALOG) return CATALOG;
     const out = [], add = (name, make, rank) => out.push({ name, words: name.split('_'), make, rank });
+    for (const n of PLACE_NAMES) if (n.length > 5) add(n, endCentre, 0);
+    for (const n of SHIP_NAMES) if (n.length > 5) add(n, endShip, 0);
     for (const [n, sid] of Object.entries(STRUCTURE_NAMES)) add(n, () => structureTarget(sid), 0);
     for (const id of Object.keys(LISTS.structures)) add(id, () => structureTarget(id), 0);
     for (const id of Object.keys(LISTS.structureGroups)) add(id, () => structureTarget('#' + id), 0);
@@ -184,6 +193,8 @@ function exactTarget(text) {
     const guesses = blockGuesses(text);
     if (!guesses) return null;
     const words = guesses.filter(g => g.id).map(g => g.id);
+    for (const w of words) if (SHIP_NAMES.has(w)) return endShip();
+    for (const w of words) if (PLACE_NAMES.has(w)) return endCentre();
     for (const w of words) if (ORE_WORDS[w]) return blockTarget('#' + ORE_WORDS[w]);
     for (const w of words) if (BLOCK_NAMES[w]) return blockTarget(BLOCK_NAMES[w]);
     for (const w of words) {
@@ -238,7 +249,9 @@ export function normalizeChatTeleport(c = {}, onByDefault = false) {
         farOrder: ['nearest', 'structures', 'biomes'].includes(c.farOrder) ? c.farOrder : 'nearest',
         farSeconds: n(c.farSeconds, 10, 180, 60),       // the most time spent looking far away
         farTries: n(c.farTries, 1, 6, 3),               // how many far places to look in
-        tryPicks: n(c.tryPicks, 1, 5, 4),               // how many of chat's picks to try before NOTHING FOUND
+        // how many of chat's picks to try before NOTHING FOUND, newest first (0: all of them, the default;
+        // settings from before that, picksV, get it)
+        tryPicks: c.picksV === 2 ? n(c.tryPicks, 0, 50, 0) : 0, picksV: 2,
         dimOverworld: c.dimOverworld !== false, dimNether: c.dimNether !== false, dimEnd: c.dimEnd !== false,   // where it teleports you
     };
 }
@@ -260,23 +273,32 @@ export function makeChatTeleport({ mc, log, broadcast, target, dimOf, teleport }
     const blockedSet = cfg => new Set(String(cfg.blocked).toLowerCase().split(/[\s,;]+/).map(s => s.replace(/^minecraft:/, '').replace(/^#/, '')).filter(Boolean));
     const isBlocked = (cfg, t) => { const b = blockedSet(cfg); return b.has(t.filter.replace(/^#?minecraft:/, '')) || b.has(t.label.toLowerCase().replace(/ /g, '_')); };
     // what chat wants, best first: [{ t, votes, by }]
+    // Most typed: by votes (one each), then everything else typed this round, newest first. Last typed:
+    // newest first. The ones after the first are tried in turn if it isn't found.
     function ranking(cfg) {
         if (!round) return [];
-        if (cfg.pick === 'last') return round.last ? [{ t: round.last.t, by: round.last.by }] : [];
-        const count = new Map();
-        for (const v of round.votes.values()) {
-            const c = count.get(v.t.key) || { t: v.t, votes: 0, at: 0 };
-            c.votes++; c.at = Math.max(c.at, v.at);
-            count.set(v.t.key, c);
+        const out = [], seen = new Set();
+        if (cfg.pick !== 'last') {
+            const count = new Map();
+            for (const v of round.votes.values()) {
+                const c = count.get(v.t.key) || { t: v.t, votes: 0, at: 0 };
+                c.votes++; c.at = Math.max(c.at, v.at);
+                count.set(v.t.key, c);
+            }
+            for (const c of [...count.values()].sort((a, b) => b.votes - a.votes || b.at - a.at)) { out.push(c); seen.add(c.t.key); }
         }
-        return [...count.values()].sort((a, b) => b.votes - a.votes || b.at - a.at);
+        for (let i = round.log.length - 1; i >= 0; i--) {
+            const l = round.log[i];
+            if (!seen.has(l.t.key)) { seen.add(l.t.key); out.push({ t: l.t, by: l.by }); }
+        }
+        return out;
     }
     const publicState = cfg => {
         const r = ranking(cfg), lead = r[0];
         return { on: !!round, tag: 'TELEPORT TO', doneTag: 'TELEPORTED TO', pick: cfg.pick, left: round ? Math.max(0, Math.ceil((round.endsAt - Date.now()) / 1000)) : 0, total: round?.total || cfg.seconds,
             leader: lead && { label: lead.t.label, by: lead.by || null, votes: lead.votes || null }, top: r.slice(0, 3).map(x => ({ label: x.t.label, votes: x.votes })) };
     };
-    const newRound = cfg => { round = { endsAt: Date.now() + cfg.seconds * 1000, total: cfg.seconds, votes: new Map(), last: null }; };
+    const newRound = cfg => { round = { endsAt: Date.now() + cfg.seconds * 1000, total: cfg.seconds, votes: new Map(), last: null, log: [] }; };
     const say = (cfg, d) => { if (cfg.showOverlay) broadcast('chunkchat', d); };
 
     const sel = p => /^\w{1,16}$/.test(p || '') ? `@a[name=${p},limit=1]` : '@p';
@@ -353,7 +375,13 @@ export function makeChatTeleport({ mc, log, broadcast, target, dimOf, teleport }
             if (round && cfg.pauseWhileLoading) round.endsAt = Math.max(Date.now(), holdUntil) + cfg.seconds * 1000;
         }
         async function tryEach() {
-        for (const c of list.slice(0, cfg.tryPicks)) {
+        const until = Date.now() + 5 * 60 * 1000;
+        for (let c of cfg.tryPicks ? list.slice(0, cfg.tryPicks) : list) {
+            if (Date.now() > until) { log('Chat Teleport: gave up after 5 minutes of looking'); break; }
+            // bedrock in the End: the centre (the exit portal's bedrock pillar)
+            if (dim === 'the_end' && c.t.kind === 'block' && c.t.filter === 'minecraft:bedrock') c = { ...c, t: endCentre() };
+            // "ship" in the End: the End ship (elsewhere a shipwreck)
+            if (dim === 'the_end' && c.t.kind === 'structure' && /shipwreck/.test(c.t.filter)) c = { ...c, t: endShip() };
             if (c.t.dims && !c.t.dims.has(dim)) { log(`Chat Teleport: ${c.t.label} isn't in ${DIM_NAME[dim] || dim}`); continue; }
             try {
                 const search = { nearRange: cfg.nearRange, farStructures: cfg.farStructures, farBiomes: cfg.farBiomes, farOrder: cfg.farOrder, farSeconds: cfg.farSeconds, farTries: cfg.farTries };
@@ -368,7 +396,7 @@ export function makeChatTeleport({ mc, log, broadcast, target, dimOf, teleport }
                 say(cfg, { ...publicState(cfg), done: { label: c.t.label, by: c.by || null, votes: c.votes || null } });
                 return;
             } catch (e) {
-                log(`Chat Teleport: no ${c.t.label} found (${e.message})`);
+                log(`Chat Teleport: no ${c.t.label} found (${e.message}), trying the one before`);
             }
         }
         await flash({ none: true });
@@ -400,6 +428,8 @@ export function makeChatTeleport({ mc, log, broadcast, target, dimOf, teleport }
         const who = String(by).slice(0, 30);
         if (t.cfg.pick === 'last') round.last = { t: tg, by: who };
         else round.votes.set(who, { t: tg, at: Date.now() });
+        round.log.push({ t: tg, by: who, at: Date.now() });
+        if (round.log.length > 200) round.log.shift();
         say(t.cfg, publicState(t.cfg));
         return { ok: true, label: tg.label, kind: tg.kind, pick: t.cfg.pick };
     }
