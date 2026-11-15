@@ -1,7 +1,7 @@
 // Pictures of blocks for Chat Teleport's "teleported to" box, taken from your own Minecraft (the game's
 // .jar in .minecraft/versions). Each block becomes a flat 16x16 picture the way its side looks (grass gets
 // its green, leaves their colour); structures and biomes use a block that stands for them. Nothing is
-// downloaded or shared: the pictures only go into the pack your own game loads from Gift Hype.
+// downloaded or shared: the pictures only go into the pack your own game loads from Unbound.
 import fs from 'fs';
 import path from 'path';
 import zlib from 'zlib';

@@ -1,20 +1,20 @@
 @echo off
-title Gift Hype setup
+title Unbound setup
 cd /d "%~dp0"
 echo.
-echo  ===== Gift Hype setup =====
+echo  ===== Unbound setup =====
 echo.
 
 rem Opened from inside a zip? Windows runs it from a temp folder and nothing would be saved.
 echo %~dp0 | findstr /i "\\AppData\\Local\\Temp\\" >nul && (
-    echo  Unzip the Gift Hype folder first (right-click the zip, Extract All^), then run Setup.bat from there.
+    echo  Unzip the Unbound folder first (right-click the zip, Extract All^), then run Setup.bat from there.
     pause
     exit /b 1
 )
 
 where node >nul 2>nul
 if errorlevel 1 (
-    echo  Installing Node.js, which runs Gift Hype. If Windows asks to allow changes, click Yes.
+    echo  Installing Node.js, which runs Unbound. If Windows asks to allow changes, click Yes.
     winget install -e --id OpenJS.NodeJS.LTS --accept-package-agreements --accept-source-agreements
     set "PATH=%PATH%;%ProgramFiles%\nodejs"
 )
@@ -27,14 +27,14 @@ if errorlevel 1 (
 )
 
 if not exist node_modules (
-    echo  Downloading the parts Gift Hype needs...
+    echo  Downloading the parts Unbound needs...
     call npm install --no-audit --no-fund
 )
 
-echo  Adding Gift Hype to your desktop...
+echo  Adding Unbound to your desktop...
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0make-shortcut.ps1"
 
 echo.
-echo  Done! Open Gift Hype from the icon on your desktop.
+echo  Done! Open Unbound from the icon on your desktop.
 echo.
 if /i not "%~1"=="nopause" pause

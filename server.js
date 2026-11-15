@@ -1,4 +1,4 @@
-// Gift Hype: TikTok LIVE gifts play sounds and make things happen in your games.
+// Unbound: TikTok LIVE gifts play sounds and make things happen in your games.
 //
 // Each "game" has its own gift list. A gift can play a sound, pop up on the stream overlay, and
 // do things in the game, through one of these:
@@ -101,7 +101,7 @@ function normalizePop(o = {}) {
 }
 Object.assign(settings.overlay, normalizePop(settings.overlay));
 // How the app itself looks: the custom theme's colours, text size, and the layout
-const THEME_IDS = ['sky', 'blaze', 'punk', 'egyptian', 'mint', 'grape', 'mono', 'custom'];
+const THEME_IDS = ['unbound', 'sky', 'blaze', 'punk', 'egyptian', 'mint', 'grape', 'mono', 'custom'];
 function normalizeLook(l = {}) {
     const col = (v, def) => /^#[0-9a-f]{6}$/i.test(String(v)) ? String(v) : def;
     const num = (v, lo, hi, def) => Number.isFinite(+v) && v !== '' && v !== null ? Math.max(lo, Math.min(hi, +v)) : def;
@@ -115,7 +115,7 @@ function normalizeLook(l = {}) {
     };
 }
 settings.look = normalizeLook(settings.look);
-if (!THEME_IDS.includes(settings.theme)) settings.theme = 'sky';
+if (!THEME_IDS.includes(settings.theme)) settings.theme = 'unbound';
 const saveSettings = () => writeJson(SETTINGS_PATH, settings);
 
 const newId = () => crypto.randomBytes(5).toString('hex');
@@ -364,7 +364,7 @@ const activeGame = () => games[settings.activeGame] || null;
 
 // ---------- Real sound clips (from MyInstants) ----------
 // The starter sounds are the real meme clips. They aren't stored in this app's files: each PC
-// downloads them the first time Gift Hype opens, into sounds/builtin.
+// downloads them the first time Unbound opens, into sounds/builtin.
 const MYINSTANTS = 'https://www.myinstants.com';
 // [name, the clip on MyInstants, group]. Groups are shown in the app in the order of SOUND_GROUPS.
 const SOUND_GROUPS = {
@@ -519,7 +519,7 @@ async function fetchSoundPack() {
         }
     };
     await Promise.all(Array.from({ length: 6 }, worker));
-    log(got === missing.length ? 'Starter sounds ready.' : `Got ${got} of ${missing.length} starter sounds. The rest will be tried next time Gift Hype opens.`);
+    log(got === missing.length ? 'Starter sounds ready.' : `Got ${got} of ${missing.length} starter sounds. The rest will be tried next time Unbound opens.`);
     broadcast('sounds', listSounds());
     return { got, missing: missing.length - got };
 }
@@ -771,7 +771,7 @@ const localServer = makeLocalServer({
     },
 });
 
-// Singleplayer: keep the Gift Hype data pack in the world up to date (with a crater for each nuke size).
+// Singleplayer: keep the Unbound data pack in the world up to date (with a crater for each nuke size).
 let packNeedsReload = false;
 function nukeSizes(g) {
     return g.modes.flatMap(m => m.rules.flatMap(r => r.actions.filter(a => a.type === 'nuke').map(a => Math.max(16, Math.min(64, Math.round(+a.size || 40))))));
@@ -785,7 +785,7 @@ function syncPack(g) {
     }
     if (!g.minecraft.world) return 'no world picked';
     try {
-        if (installPack(g.minecraft.world, nukeSizes(g))) { packNeedsReload = true; log(`Gift Hype pack put into "${g.minecraft.world}".`); }
+        if (installPack(g.minecraft.world, nukeSizes(g))) { packNeedsReload = true; log(`Unbound pack put into "${g.minecraft.world}".`); }
         return 'singleplayer';
     } catch (e) { log(`Couldn't put the pack into the world: ${e.message}`); return 'world not found'; }
 }
@@ -803,10 +803,10 @@ async function connectMinecraft() {
             await disconnectMinecraft();
             rconFor = null;
             // the Dropper world is made the first time on the Minecraft version its pack is written for
-            // (DROPPER_MC; the launcher's "Gift Hype" install plays it). Not your newest world's version: a
+            // (DROPPER_MC; the launcher's "Unbound" install plays it). Not your newest world's version: a
             // newer Minecraft can change the pack's file formats (26.3 did) and then the world won't open.
             const opts = isDropper(g) ? { version: DROPPER_MC, props: DROPPER_PROPS, atLeast: DROPPER_MC } : {};
-            // the Chat Teleport box pack, from Gift Hype (block pictures from this world's Minecraft)
+            // the Chat Teleport box pack, from Unbound (block pictures from this world's Minecraft)
             let mcVersion = opts.version; try { mcVersion = worldVersion(world) || mcVersion; } catch { }
             const tpCfg = (isChatTeleport(g) ? currentMode(g).chatTeleport : (g.modes || []).find(m => /chat teleport/i.test(m.name || ''))?.chatTeleport) || normalizeChatTeleport({});
             try {
@@ -890,7 +890,7 @@ async function buildDropperWorld() {
         removeDropperBuildPack();
         await mc('reload').catch(() => {});
         setStatus({ dropper: 'ready' });
-        log('The Dropper is built. Join Gift Hype in Minecraft to play.');
+        log('The Dropper is built. Join Unbound in Minecraft to play.');
     } catch (e) {
         setStatus({ dropper: 'build stopped' });
         log(`The Dropper build stopped (${e.message}). It starts again next time the world opens.`);
@@ -1010,7 +1010,7 @@ setInterval(async () => {
     } catch (e) { log(`Couldn't reopen the world: ${e.message}`); }
     finally { hudReopening = false; }
 }, 15000);
-// On a server (no Gift Hype pack) these are the blocks that get turned: the ground, trees, water...
+// On a server (no Unbound pack) these are the blocks that get turned: the ground, trees, water...
 const CHUNK_FILTERS_SERVER = ['#minecraft:base_stone_overworld', '#minecraft:dirt', '#minecraft:sand', 'minecraft:gravel', 'minecraft:sandstone', 'minecraft:red_sandstone',
     '#minecraft:terracotta', '#minecraft:logs', '#minecraft:leaves', 'minecraft:water', 'minecraft:lava', '#minecraft:coal_ores', '#minecraft:iron_ores', '#minecraft:copper_ores',
     '#minecraft:gold_ores', '#minecraft:redstone_ores', '#minecraft:lapis_ores', '#minecraft:diamond_ores', '#minecraft:emerald_ores', 'minecraft:clay', 'minecraft:snow_block',
@@ -1063,7 +1063,7 @@ async function runAction(game, a, ctx) {
         return;
     }
     if (game.connector === 'minecraft' && game.minecraft.single && PRESETS[a.type]) {
-        // your world: the Gift Hype data pack does it, run as you
+        // your world: the Unbound data pack does it, run as you
         if (!rcon) return log('Your world is not open yet.');
         if (packNeedsReload) { packNeedsReload = false; await mc('reload'); }
         const who = /^\w{1,16}$/.test(ctx.player) ? `@a[name=${ctx.player},limit=1]` : '@a[limit=1]';
@@ -1298,7 +1298,7 @@ const routes = {
         setStatus({ update: { ...(status.update || {}), state: 'updating' } });
         try {
             const v = await applyUpdate(ROOT, log);
-            log(`Updated to version ${v}. Restarting Gift Hype...`);
+            log(`Updated to version ${v}. Restarting Unbound...`);
             setStatus({ update: { current: v, latest: v, available: false, state: 'restarting' } });
             setTimeout(restartAfterUpdate, 800);
             return { ok: true, version: v };
@@ -1501,9 +1501,9 @@ const routes = {
         }
         let quick = true;
         try { setupLauncher(worldVersion(worldOf(g))); }
-        catch (e) { quick = false; log(`Couldn't add "Gift Hype" to the launcher (${e.message}). In Minecraft: Multiplayer, then Gift Hype.`); }
+        catch (e) { quick = false; log(`Couldn't add "Unbound" to the launcher (${e.message}). In Minecraft: Multiplayer, then Unbound.`); }
         openLauncher();
-        log(quick ? 'Minecraft launcher opened: press Play on "Gift Hype" and you go straight into your world.' : 'Minecraft launcher opened: play Minecraft, then Multiplayer, then Gift Hype.');
+        log(quick ? 'Minecraft launcher opened: press Play on "Unbound" and you go straight into your world.' : 'Minecraft launcher opened: play Minecraft, then Multiplayer, then Unbound.');
         return { ok: true, quick };
     },
     'POST /api/minecraft/restart-world': async () => { await disconnectMinecraft(); await localServer.stop(); rconFor = null; connectMinecraft(); return { ok: true }; },
@@ -1720,7 +1720,7 @@ const server = http.createServer(async (req, res) => {
 
 // ---------- App window ----------
 
-// After an update: close the world and the window, and start Gift Hype again (the new version)
+// After an update: close the world and the window, and start Unbound again (the new version)
 let updating = false, appWindow = null;
 async function restartAfterUpdate() {
     if (localServer.running()) { log('Saving your world...'); await localServer.stop(); }
@@ -1757,26 +1757,35 @@ function openWindow() {
 server.on('error', async e => {
     if (e.code !== 'EADDRINUSE') throw e;
     // Already running: just show its window.
-    console.log('Gift Hype is already running, opening its window.');
+    console.log('Unbound is already running, opening its window.');
     openWindow();
     setTimeout(() => process.exit(0), 1500);
 });
 
 server.listen(settings.port, '127.0.0.1', () => {
-    log(`Gift Hype is running: ${appUrl()}   Overlay for OBS / TikTok LIVE Studio: http://${OVERLAY_HOST}:${settings.port}/overlay`);
+    log(`Unbound is running: ${appUrl()}   Overlay for OBS / TikTok LIVE Studio: http://${OVERLAY_HOST}:${settings.port}/overlay`);
     // The overlay's address (and "localhost") also mean this PC's IPv6 address, ::1, which browsers and
     // TikTok LIVE Studio often try first: answer there too, or the overlay loads but never gets a gift.
     // Still this PC only. Skipped quietly if the PC has IPv6 turned off.
     const server6 = http.createServer(server.listeners('request')[0]);
     server6.on('error', () => {});
     server6.listen(settings.port, '::1');
+    // Gift Hype is now Unbound: the new look once, and the desktop icon gets the new name (Windows)
+    if (settings.brand !== 'unbound') {
+        settings.brand = 'unbound';
+        settings.theme = 'unbound';
+        saveSettings();
+        if (process.platform === 'win32' && !NO_OPEN) {
+            try { spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(ROOT, 'make-shortcut.ps1')], { stdio: 'ignore', windowsHide: true, detached: true }).unref(); } catch { }
+        }
+    }
     startGameSocket();
     connectMinecraft();
     getSoundPack().catch(e => log(`Starter sounds: ${e.message}`));
     if (settings.autoConnect && settings.tiktokUsername) connectTikTok(settings.tiktokUsername);
     const win = appWindow = openWindow();
     // Is there a newer version? A little after opening, then every 15 minutes while it's open (an
-    // update published while Gift Hype is running shows up without restarting it). Said once per version.
+    // update published while Unbound is running shows up without restarting it). Said once per version.
     let toldAbout = null;
     const lookForUpdate = () => checkForUpdate(ROOT).then(u => {
         setStatus({ update: u });
@@ -1786,7 +1795,7 @@ server.listen(settings.port, '127.0.0.1', () => {
     setInterval(lookForUpdate, 15 * 60 * 1000);
     // Close the app when its window is closed.
     win?.on('exit', async () => {
-        log('Window closed, Gift Hype is stopping.');
+        log('Window closed, Unbound is stopping.');
         if (localServer.running()) { log('Saving your world...'); await localServer.stop(); }
         setTimeout(() => process.exit(0), 300);
     });

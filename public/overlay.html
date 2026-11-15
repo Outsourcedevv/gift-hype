@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Gift Hype overlay</title>
+<title>Unbound overlay</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@600&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
 <style>
@@ -154,7 +154,7 @@ body.pst-minecraft .pop { font-family: 'Monocraft', monospace; border-radius: 0;
 .cc.done .block { font-size: 32px; white-space: normal; }
 body.preview { background: repeating-conic-gradient(#20242b 0 25%, #171a1f 0 50%) 0 0 / 40px 40px; }
 
-/* the gift list: what each gift does in the game you're playing (Gift Hype fills it in). Its place,
+/* the gift list: what each gift does in the game you're playing (Unbound fills it in). Its place,
    size and colours come from the settings (--m-* below, set by drawMenu). */
 #menu { position: fixed; left: var(--m-x, 2%); top: var(--m-y, 50%); transform: translate(calc(var(--m-x, 2%) * -1), calc(var(--m-y, 50%) * -1)) scale(var(--m-scale, 1));
   transform-origin: var(--m-x, 2%) var(--m-y, 50%); width: 330px; display: none; transition: opacity .4s;
@@ -185,7 +185,7 @@ body.preview { background: repeating-conic-gradient(#20242b 0 25%, #171a1f 0 50%
 #menu.single .dots { display: flex; justify-content: center; gap: 5px; margin-top: 10px; flex-wrap: wrap; }
 #menu.single .dots i { width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,.25); }
 #menu.single .dots i.on { background: var(--m-title, #ffcf3a); }
-/* is the overlay reaching Gift Hype? a moment's "connected", or a notice that stays while it can't */
+/* is the overlay reaching Unbound? a moment's "connected", or a notice that stays while it can't */
 #conn { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); padding: 8px 14px; border-radius: 10px; font: 700 15px 'Monocraft', monospace;
   color: #fff; background: rgba(10, 18, 34, .8); border: 2px solid #4ade80; opacity: 0; transition: opacity .4s; pointer-events: none; }
 #conn.show { opacity: 1; }
@@ -223,7 +223,7 @@ function applySettings() {
   const o = settings.overlay, look = settings.look || {};
   const th = o.popColors ? [o.popBorder, o.popDoes]
     : settings.theme === 'custom' ? [look.main || '#7c4dff', look.hot || '#ff2d75']
-    : { sky: ['#4db3ee', '#ff6a3d'], blaze: ['#ff4500', '#ffd000'], punk: ['#3b82f6', '#00f0a8'], egyptian: ['#3a5ce0', '#ff2400'], mint: ['#10b981', '#f472b6'], grape: ['#8b5cf6', '#facc15'], mono: ['#e5e7eb', '#ef4444'] }[settings.theme] || ['#4db3ee', '#ff6a3d'];
+    : { unbound: ['#8b6cff', '#22d3ee'], sky: ['#4db3ee', '#ff6a3d'], blaze: ['#ff4500', '#ffd000'], punk: ['#3b82f6', '#00f0a8'], egyptian: ['#3a5ce0', '#ff2400'], mint: ['#10b981', '#f472b6'], grape: ['#8b5cf6', '#facc15'], mono: ['#e5e7eb', '#ef4444'] }[settings.theme] || ['#8b6cff', '#22d3ee'];
   document.documentElement.style.setProperty('--accent', th[0]);
   document.documentElement.style.setProperty('--pink', th[1]);
   const st = document.documentElement.style;
@@ -414,8 +414,8 @@ const es = new EventSource('/api/events');
 // connected / not connected, so you can tell from your streaming app
 let connTimer = null, everOpen = false;
 const conn = (text, bad, ms) => { const c = document.getElementById('conn'); c.textContent = text; c.className = 'show' + (bad ? ' bad' : ''); clearTimeout(connTimer); if (ms) connTimer = setTimeout(() => c.className = '', ms); };
-es.onopen = () => { conn(everOpen ? 'Gift Hype connected again' : 'Gift Hype connected', false, 5000); everOpen = true; };
-es.onerror = () => { setTimeout(() => { if (es.readyState !== 1) conn("Gift Hype isn't connected: is it open on this PC?", true, 0); }, 4000); };
+es.onopen = () => { conn(everOpen ? 'Unbound connected again' : 'Unbound connected', false, 5000); everOpen = true; };
+es.onerror = () => { setTimeout(() => { if (es.readyState !== 1) conn("Unbound isn't connected: is it open on this PC?", true, 0); }, 4000); };
 es.addEventListener('settings', e => { settings = JSON.parse(e.data); applySettings(); });
 es.addEventListener('state', e => { settings = JSON.parse(e.data).settings; applySettings(); });
 es.addEventListener('alert', e => { const d = JSON.parse(e.data); popup(d); try { menuOnGift(d); } catch { } });

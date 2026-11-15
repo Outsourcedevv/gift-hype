@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Gift Hype</title>
+<title>Unbound</title>
 <script>
 // The custom colour theme: the page's colours worked out from two picked colours and dark / light
 window.customVars = l => {
@@ -18,21 +18,32 @@ window.paintTheme = (theme, look) => {
   const r = document.documentElement;
   for (const k of Object.keys(window.customVars({ main: '#000000', hot: '#000000' }))) r.style.removeProperty('--' + k);
   r.style.removeProperty('color-scheme');
-  if (theme && theme !== 'sky') r.dataset.theme = theme; else delete r.dataset.theme;
+  if (theme && theme !== 'unbound') r.dataset.theme = theme; else delete r.dataset.theme;
   if (theme === 'custom' && look) { const v = window.customVars(look); for (const [k, x] of Object.entries(v)) if (k[0] !== '_') r.style.setProperty('--' + k, x); r.style.setProperty('color-scheme', v._scheme); }
 };
-try { paintTheme(localStorage.getItem('gh-theme') || 'sky', JSON.parse(localStorage.getItem('gh-look') || 'null')); } catch {}
+try { paintTheme(localStorage.getItem('gh-theme') || 'unbound', JSON.parse(localStorage.getItem('gh-look') || 'null')); } catch {}
 </script>
 <link rel="icon" href="/icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <style>
 /* Colour themes. Each one is: main colour, second colour (backgrounds), and one eye-catcher
    colour for the things to look at first (Connect, LIVE, alerts). */
+:root { --grad: var(--hot); --on-grad: var(--on-hot); }
+/* 0. Unbound (the standard): deep night, electric violet, cyan */
 :root {
-  --radius: 10px;
-  font-family: 'Space Grotesk', system-ui, sans-serif;
-  /* 1. Sky: sky blue, cloudy white, amber red */
+  --radius: 16px;
+  font-family: 'Inter', system-ui, sans-serif;
+  --main: #8b6cff; --on-main: #ffffff; --main-text: #b9a8ff;
+  --hot: #22d3ee; --on-hot: #04232a; --hot-text: #67e8f9;
+  --bg: #07070c; --header: #0a0a12; --panel: #101019; --panel-2: #161622; --line: rgba(255, 255, 255, .085);
+  --text: #f3f2fb; --muted: #8f8da8; --well: #14141f; --code-bg: #0b0b12; --code-text: #d9d6f0;
+  --green: #4ade80; --amber: #fbbf24; --red: #fb7185; --shadow: rgba(0, 0, 0, .55);
+  color-scheme: dark;
+}
+:root:not([data-theme]) { --grad: linear-gradient(120deg, #8b6cff 0%, #5d8bff 55%, #22d3ee 100%); --on-grad: #ffffff; }
+/* 1. Sky: sky blue, cloudy white, amber red */
+:root[data-theme=sky] {
   --main: #4db3ee; --on-main: #05263d; --main-text: #1474b4;
   --hot: #e8542a; --on-hot: #ffffff; --hot-text: #c8441c;
   --bg: #edf2f7; --header: #ffffff; --panel: #ffffff; --panel-2: #f3f7fb; --line: #d5e0ea;
@@ -405,12 +416,117 @@ dialog::backdrop { background: rgba(0,0,0,.5); }
 .sw i:first-child { margin-left: 0; }
 .sw i:last-child { width: 12px; height: 12px; align-self: center; }
 .toast.err { border-color: var(--red); color: var(--red); }
+
+/* ===================== The modern look (on top of every colour theme) ===================== */
+body { font-size: 14.5px; letter-spacing: -.006em; -webkit-font-smoothing: antialiased; background:
+  radial-gradient(1000px 560px at 6% -10%, color-mix(in srgb, var(--main) 20%, transparent), transparent 70%),
+  radial-gradient(820px 480px at 102% -8%, color-mix(in srgb, var(--hot) 12%, transparent), transparent 70%), var(--bg);
+  background-attachment: fixed; }
+h1, .lib-head h1, .ghead .gtitle, .dlg-head h3, .brand { font-family: 'Sora', 'Inter', sans-serif; }
+header { background: color-mix(in srgb, var(--header) 70%, transparent); backdrop-filter: blur(18px) saturate(1.5); -webkit-backdrop-filter: blur(18px) saturate(1.5); padding: 12px 24px 0; gap: 14px; }
+.brand { gap: 10px; font-size: 20px; font-weight: 700; letter-spacing: -.03em; }
+.brand svg { width: 32px; height: 32px; flex: none; filter: drop-shadow(0 6px 18px color-mix(in srgb, var(--main) 50%, transparent)); }
+.brand .wm { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.brand .live { font-family: 'Inter', sans-serif; font-size: 10px; font-weight: 700; letter-spacing: .16em; padding: 3px 7px; border-radius: 6px; color: var(--hot-text);
+  background: color-mix(in srgb, var(--hot) 14%, transparent); border: 1px solid color-mix(in srgb, var(--hot) 32%, transparent); }
+.tabs { margin: 6px 0 0; padding: 0 0 10px; gap: 4px; }
+.tabs button { border: 1px solid transparent; border-radius: 11px; padding: 8px 14px; font-weight: 500; }
+.tabs button:hover { background: color-mix(in srgb, var(--text) 6%, transparent); }
+.tabs button[aria-selected=true] { color: var(--text); font-weight: 600; background: color-mix(in srgb, var(--main) 16%, transparent);
+  border-color: color-mix(in srgb, var(--main) 38%, transparent); box-shadow: 0 0 26px -8px color-mix(in srgb, var(--main) 70%, transparent); }
+.tabs button[aria-selected=true] svg { color: var(--main-text); }
+.tabs .count { background: color-mix(in srgb, var(--text) 8%, transparent); }
+main { padding: 24px; gap: 24px; }
+.col { gap: 22px; }
+section { background: color-mix(in srgb, var(--panel) 86%, transparent); border: 1px solid var(--line); border-radius: 20px; padding: 22px;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 5%, transparent), 0 24px 60px -36px var(--shadow); }
+h2 { font-size: 15px; font-weight: 600; text-transform: none; letter-spacing: -.01em; color: var(--text); margin-bottom: 16px; }
+.board .ghd { text-transform: none; letter-spacing: 0; font-size: 13px; font-weight: 600; color: var(--muted); }
+button { border-radius: 11px; padding: 9px 15px; font-weight: 500; border-color: var(--line); background: color-mix(in srgb, var(--text) 5%, var(--panel));
+  transition: background .15s, border-color .15s, box-shadow .2s, transform .08s, filter .15s; }
+button:hover { border-color: color-mix(in srgb, var(--text) 22%, transparent); background: color-mix(in srgb, var(--text) 9%, var(--panel)); }
+button:active { transform: translateY(1px); }
+button.primary { background: var(--main); color: var(--on-main); border-color: transparent; box-shadow: 0 10px 24px -12px var(--main); }
+button.primary:hover { background: var(--main); filter: brightness(1.12); }
+button.hot, button.pink { background: var(--grad); color: var(--on-grad); border-color: transparent; font-weight: 600;
+  box-shadow: 0 12px 28px -12px color-mix(in srgb, var(--hot) 85%, transparent), inset 0 1px 0 rgba(255, 255, 255, .25); }
+button.hot:hover, button.pink:hover { background: var(--grad); filter: brightness(1.1) saturate(1.1); }
+button.ghost { background: transparent; }
+button.ghost:hover { background: color-mix(in srgb, var(--text) 7%, transparent); }
+button.small { padding: 6px 11px; border-radius: 9px; font-size: 13px; }
+button.danger { color: var(--red); }
+input[type=text], input[type=search], input[type=number], input[type=password], select, textarea {
+  border-radius: 11px; padding: 10px 12px; border-color: var(--line); background: color-mix(in srgb, var(--text) 4%, var(--panel)); transition: border-color .15s, box-shadow .15s; }
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--main); box-shadow: 0 0 0 4px color-mix(in srgb, var(--main) 22%, transparent); }
+input[type=color] { border-radius: 10px !important; }
+.chip { padding: 7px 13px; background: color-mix(in srgb, var(--text) 5%, transparent); border-color: var(--line); backdrop-filter: blur(8px); }
+.jump { border-radius: 12px; background: color-mix(in srgb, var(--text) 5%, transparent); }
+.jump:hover { background: color-mix(in srgb, var(--text) 9%, transparent); }
+.seg { border-radius: 13px; padding: 3px; gap: 3px; border-color: var(--line); background: color-mix(in srgb, var(--text) 4%, var(--panel)); }
+.seg button { border: 0; border-radius: 10px; background: transparent; }
+.seg button + button { border-left: 0; }
+.seg button:hover { background: color-mix(in srgb, var(--text) 7%, transparent); }
+.seg button[aria-checked=true] { background: var(--main); color: var(--on-main); box-shadow: 0 6px 18px -8px var(--main); }
+.gchips button { border-radius: 999px; background: color-mix(in srgb, var(--text) 4%, transparent); }
+.gchips button[aria-checked=true] { box-shadow: 0 6px 18px -9px var(--main); }
+.lib-head { margin: 6px 0 22px; }
+.lib-head h1 { font-size: 32px; letter-spacing: -.035em; font-weight: 700; }
+.art { border-radius: 18px; border-color: var(--line); }
+.cover-card:hover .art { transform: translateY(-6px) scale(1.015); border-color: color-mix(in srgb, var(--main) 70%, transparent);
+  box-shadow: 0 26px 50px -22px color-mix(in srgb, var(--main) 70%, transparent); }
+.cover-card.on .art { border-color: var(--hot); box-shadow: 0 0 0 1px var(--hot), 0 18px 46px -20px var(--hot); }
+.badge { background: var(--grad); color: var(--on-grad); border-radius: 999px; padding: 4px 10px; top: 12px; left: 12px; box-shadow: 0 6px 16px -6px var(--hot); }
+.badge::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: currentColor; margin-right: 6px; vertical-align: 1px; animation: blink 1.4s ease-in-out infinite; }
+@keyframes blink { 50% { opacity: .25; } }
+.add-card .art { border: 2px dashed color-mix(in srgb, var(--text) 16%, transparent); }
+.add-card:hover .art { border-color: var(--main); background: color-mix(in srgb, var(--main) 7%, transparent); }
+.hero .art { border-radius: 16px; }
+.play-btn { border-radius: 14px; padding: 13px 30px; }
+.rule { border-radius: 16px; padding: 14px; background: color-mix(in srgb, var(--text) 3%, var(--panel)); border-color: var(--line); transition: border-color .15s; }
+.rule:hover { border-color: color-mix(in srgb, var(--text) 16%, transparent); }
+.gimg { border-radius: 12px; background: color-mix(in srgb, var(--text) 6%, transparent); }
+.feed .item { border-radius: 13px; padding: 9px; background: color-mix(in srgb, var(--text) 4%, var(--panel)); }
+.tile { border-radius: 12px; background: color-mix(in srgb, var(--text) 4%, var(--panel)); border-color: var(--line); }
+.tile:hover { border-color: color-mix(in srgb, var(--main) 60%, transparent); box-shadow: 0 10px 26px -16px var(--main); }
+.tile.playing { border-color: var(--hot); box-shadow: 0 0 0 3px color-mix(in srgb, var(--hot) 28%, transparent), 0 10px 30px -12px var(--hot); }
+.board.list .tile, .board.list .tile:hover { box-shadow: none; }
+.theme { border-radius: 13px; padding: 11px 12px; }
+.theme[aria-checked=true] { background: color-mix(in srgb, var(--main) 12%, var(--panel)); }
+.tpgroup, .drop { border-radius: 16px; }
+.drop { border-color: color-mix(in srgb, var(--text) 16%, transparent); background: color-mix(in srgb, var(--text) 2%, transparent); transition: border-color .15s, background .15s; }
+.drop:hover, .drop.over { border-color: var(--main); background: color-mix(in srgb, var(--main) 7%, transparent); }
+.hint code, code, kbd { border-radius: 6px; border-color: var(--line); background: color-mix(in srgb, var(--text) 6%, transparent); }
+dialog { border-radius: 22px; border-color: var(--line); background: color-mix(in srgb, var(--panel) 95%, transparent); box-shadow: 0 40px 120px -30px rgba(0, 0, 0, .7); }
+dialog[open] { animation: dlgIn .18s ease-out; }
+@keyframes dlgIn { from { opacity: 0; transform: translateY(8px) scale(.985); } }
+dialog::backdrop { background: rgba(4, 4, 10, .55); backdrop-filter: blur(6px); }
+.dlg-head { border-bottom-color: var(--line); padding: 16px 20px; }
+.jlist button { border-radius: 10px; }
+.jlist button.on { background: color-mix(in srgb, var(--main) 18%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--main) 35%, transparent); }
+.toast { border-radius: 999px; padding: 11px 20px; background: color-mix(in srgb, var(--panel) 88%, transparent); backdrop-filter: blur(16px); box-shadow: 0 18px 44px -14px var(--shadow); bottom: 26px; }
+.toast.show { border-radius: 16px; }
+.upd { background: var(--grad); color: var(--on-grad); }
+.upd .hot { background: rgba(0, 0, 0, .25); color: #fff; box-shadow: none; }
+.page { animation: pageIn .28s cubic-bezier(.2, .8, .2, 1); }
+@keyframes pageIn { from { opacity: 0; transform: translateY(8px); } }
+.dot.on { box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 25%, transparent), 0 0 10px var(--green); }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--text) 16%, transparent); border-radius: 99px; border: 3px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background-color: color-mix(in srgb, var(--text) 28%, transparent); }
+::-webkit-scrollbar-track { background: transparent; }
+::selection { background: color-mix(in srgb, var(--main) 40%, transparent); }
+body.compact section { padding: 14px; border-radius: 16px; }
+.jumpdlg .dlg-head input, .jumpdlg .dlg-head input:focus { border: 0; background: none; box-shadow: none; padding-left: 4px; }
+body.corners-square section, body.corners-square .badge, body.corners-square .seg, body.corners-square .seg button, body.corners-square .toast { border-radius: 0 !important; }
+body.corners-soft section { border-radius: 8px; }
 </style>
 </head>
 <body>
 <div id="updBar" class="upd" hidden><span id="updText"></span><button class="small hot" id="updNow">Update now</button></div>
 <header>
-  <div class="brand"><img src="/icon.png" alt=""><div><span>GIFT</span> HYPE · <em>LIVE</em></div></div>
+  <div class="brand"><svg viewBox="0 0 100 100" aria-hidden="true"><defs><linearGradient id="lg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#7c5cff"/><stop offset="1" stop-color="#22d3ee"/></linearGradient></defs>
+    <rect x="2" y="2" width="96" height="96" rx="24" fill="url(#lg)"/><path d="M33 31V56a17 17 0 0 0 34 0V20M53 30L67 16L81 30" fill="none" stroke="#fff" stroke-width="11.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <span class="wm">Unbound</span><span class="live">LIVE</span></div>
   <div class="connect">
     <div class="at"><input type="text" id="ttUser" placeholder="your TikTok name" aria-label="TikTok username" autocomplete="off"></div>
     <button class="hot" id="ttBtn">Connect</button>
@@ -687,7 +803,7 @@ dialog::backdrop { background: rgba(0,0,0,.5); }
       <li>Set the size to <b>1920 × 1080</b> (or Fit to screen) and press <b>Add</b>.</li>
       <li>Drag it to the top of your sources so the popups show over the game.</li>
     </ol>
-    <p class="hint">The address points back to this PC, so Gift Hype must be open while you stream. If the overlay shows as a tiny box or stops updating, add <code>?refresh=1</code> to the end of the address.</p>
+    <p class="hint">The address points back to this PC, so Unbound must be open while you stream. If the overlay shows as a tiny box or stops updating, add <code>?refresh=1</code> to the end of the address.</p>
     <div class="toolbar"><button id="liveCopy">Copy the address again</button><button class="primary" id="liveDone" style="margin-left:auto">Done</button></div>
   </div>
 </dialog>
@@ -908,7 +1024,7 @@ async function uploadFiles(files) {
   }
   return last;
 }
-// Find real sound clips online (through Gift Hype, from myinstants.com) and add them to your sounds.
+// Find real sound clips online (through Unbound, from myinstants.com) and add them to your sounds.
 let previewAudio = null;
 $('findForm').onsubmit = async e => {
   e.preventDefault();
@@ -977,7 +1093,7 @@ $('ovPlacesReset').onclick = async () => {
   toast('Boxes back where they started');
 };
 // full screen for an editor (Esc or the button again to come back)
-// It fills the whole Gift Hype window, and goes properly full screen too where the window allows it.
+// It fills the whole Unbound window, and goes properly full screen too where the window allows it.
 const bigEditor = (w, on) => {
   w.classList.toggle('big', on);
   w.querySelector('[data-fs]').textContent = on ? '✕ Exit full screen' : '⛶ Full screen';
@@ -1028,6 +1144,7 @@ function saveSettingsSoon(patch) {
 }
 // Each theme: main colour, second colour, eye-catcher (the same order every time).
 const THEMES = [
+  { id: 'unbound', name: 'Unbound', colours: ['#8b6cff', '#101019', '#22d3ee'] },
   { id: 'sky', name: 'Sky', colours: ['#4db3ee', '#f4f7fa', '#e8542a'] },
   { id: 'blaze', name: 'Blaze', colours: ['#ff4500', '#fffafa', '#ffd000'] },
   { id: 'mint', name: 'Mint', colours: ['#10b981', '#effaf5', '#ec4899'] },
@@ -1039,7 +1156,7 @@ const THEMES = [
 ];
 const LOOK_STD = { textSize: 100, compact: false, side: true, corners: 'round', motion: true };
 function applyTheme(id) {
-  if (!THEMES.some(t => t.id === id)) id = 'sky';
+  if (!THEMES.some(t => t.id === id)) id = 'unbound';
   const look = settings.look || {};
   paintTheme(id, look);
   try { localStorage.setItem('gh-theme', id); localStorage.setItem('gh-look', JSON.stringify(look)); } catch {}
@@ -1420,14 +1537,14 @@ function renderConnector() {
     </details>`;
     $('wsCopy').onclick = () => { navigator.clipboard.writeText(WS_SNIPPET(port)); toast('Code copied'); };
   } else if (game.connector === 'keys') {
-    box.innerHTML = `<p class="hint">Gift Hype presses keys in <b>whatever window is in front</b>, so click into your game before going live. Type keys like <code>w</code>, <code>{SPACE}</code>, <code>{ENTER}</code>, <code>{UP}</code>, <code>{F1}</code>. <code>^</code> = Ctrl, <code>+</code> = Shift, <code>%</code> = Alt (e.g. <code>^s</code>). It works in lots of PC games; a few (mostly anti-cheat ones) ignore pretend key presses.</p>`;
+    box.innerHTML = `<p class="hint">Unbound presses keys in <b>whatever window is in front</b>, so click into your game before going live. Type keys like <code>w</code>, <code>{SPACE}</code>, <code>{ENTER}</code>, <code>{UP}</code>, <code>{F1}</code>. <code>^</code> = Ctrl, <code>+</code> = Shift, <code>%</code> = Alt (e.g. <code>^s</code>). It works in lots of PC games; a few (mostly anti-cheat ones) ignore pretend key presses.</p>`;
   } else {
     box.innerHTML = `<p class="hint">Gifts play their sound and pop up on your stream overlay. Nothing is sent to a game.</p>`;
   }
   renderStatus();
 }
 
-// Minecraft: pick a server Gift Hype found on this PC. Its password is read from the server itself.
+// Minecraft: pick a server Unbound found on this PC. Its password is read from the server itself.
 let mcServers = null;
 async function loadServers() {
   try { mcServers = await api('/api/minecraft/servers'); } catch { mcServers = []; }
@@ -1445,7 +1562,7 @@ function renderPlay() {
     try {
       await flushSave();
       const r = await api('/api/minecraft/play', {});
-      toast(r.quick === false ? 'Minecraft is opening: play, then Multiplayer, then "Gift Hype"' : 'Minecraft is opening: press Play on "Gift Hype"');
+      toast(r.quick === false ? 'Minecraft is opening: play, then Multiplayer, then "Unbound"' : 'Minecraft is opening: press Play on "Unbound"');
     } catch (e) { toast(e.message, true); }
     playing_ = false; renderPlay();
   };
@@ -1457,11 +1574,11 @@ async function renderMinecraftBox() {
   const m = game.minecraft;
   if (isDropperMode()) {
     box.innerHTML = `<div class="conn-box">
-        <p class="wide" style="margin:0"><b>The Dropper has its own world</b>, made by Gift Hype: 100 levels that get harder as you go. Fall through the gaps and land in the water to go to the next level. Hit anything else and you start that level again.</p>
+        <p class="wide" style="margin:0"><b>The Dropper has its own world</b>, made by Unbound: 100 levels that get harder as you go. Fall through the gaps and land in the water to go to the next level. Hit anything else and you start that level again.</p>
         <div class="wide"><label class="check"><input type="checkbox" id="mcEula" ${settings.mcEula ? 'checked' : ''}> I agree to the <a href="https://aka.ms/MinecraftEULA" target="_blank" rel="noopener" style="color:var(--main-text)">Minecraft EULA</a> (needed to open the world for gifts)</label></div>
         <div class="wide row"><button class="small" id="mcRestart">Reopen world</button><span class="pill" id="mcState"></span></div>
       </div>
-      <p class="hint"><b>How to play:</b> press <b>Play Minecraft</b>. The first time, Gift Hype makes the world and builds the levels (about a minute). Your level, punches on/off and any shield are shown at the bottom of your screen, and the reset countdown at the top.</p>`;
+      <p class="hint"><b>How to play:</b> press <b>Play Minecraft</b>. The first time, Unbound makes the world and builds the levels (about a minute). Your level, punches on/off and any shield are shown at the bottom of your screen, and the reset countdown at the top.</p>`;
     $('mcEula').onchange = () => { settings.mcEula = $('mcEula').checked; api('/api/settings', { mcEula: settings.mcEula }); };
     $('mcRestart').onclick = async () => { try { await api('/api/minecraft/restart-world', {}); toast('Reopening the Dropper…'); } catch (e) { toast(e.message, true); } };
     renderStatus();
@@ -1489,8 +1606,8 @@ async function renderMinecraftBox() {
         <div class="wide"><label class="check"><input type="checkbox" id="mcEula" ${settings.mcEula ? 'checked' : ''}> I agree to the <a href="https://aka.ms/MinecraftEULA" target="_blank" rel="noopener" style="color:var(--main-text)">Minecraft EULA</a> (needed to open the world for gifts)</label></div>
         <div class="wide row"><button class="small" id="mcRestart">Reopen world</button><button class="small ghost" id="mcWorlds">Look for worlds again</button><span class="pill" id="mcState"></span></div>
       </div>
-      <p class="hint"><b>How to play:</b> keep Gift Hype open. In Minecraft go to <b>Multiplayer</b> and join <b>Gift Hype</b> (it's added to your list; if not, Direct Connection: <code>localhost:25566</code>). It's your own world, with your stuff. Gifts happen instantly, nothing is typed.<br>
-      Don't open the same world in Singleplayer at the same time. Closing Gift Hype saves and closes the world.</p>`;
+      <p class="hint"><b>How to play:</b> keep Unbound open. In Minecraft go to <b>Multiplayer</b> and join <b>Unbound</b> (it's added to your list; if not, Direct Connection: <code>localhost:25566</code>). It's your own world, with your stuff. Gifts happen instantly, nothing is typed.<br>
+      Don't open the same world in Singleplayer at the same time. Closing Unbound saves and closes the world.</p>`;
     hookWhere();
     $('mcWorld').onchange = async () => { m.world = $('mcWorld').value; queueSave(); await flushSave(); renderStatus(); };
     $('mcWorlds').onclick = async () => { mcWorlds = null; await renderMinecraftBox(); toast(`Found ${mcWorlds.length} world${mcWorlds.length === 1 ? '' : 's'}`); };
@@ -1520,7 +1637,7 @@ async function renderMinecraftBox() {
         <label class="field" style="grid-column: span 2">RCON password <input type="password" data-mc="password" value="${esc(m.password)}" autocomplete="off"></label>` : ''}
       <div class="wide row"><button class="small" id="mcTest">Test connection</button><button class="small ghost" id="mcRescan">Look for servers again</button><span class="pill" id="mcState"></span></div>
     </div>
-    <p class="hint">${picked ? `Using <code>${esc(picked.folder)}</code>. ` : ''}Start that server like normal and Gift Hype connects by itself. No password to type: it reads it from the server's own settings. Leave the name empty and it uses whoever is playing. Commands can use <code>{player}</code>, <code>{from}</code> (the sender), <code>{gift}</code> and <code>{count}</code>.</p>`;
+    <p class="hint">${picked ? `Using <code>${esc(picked.folder)}</code>. ` : ''}Start that server like normal and Unbound connects by itself. No password to type: it reads it from the server's own settings. Leave the name empty and it uses whoever is playing. Commands can use <code>{player}</code>, <code>{from}</code> (the sender), <code>{gift}</code> and <code>{count}</code>.</p>`;
   hookWhere();
   $('mcPick').onchange = () => {
     const v = $('mcPick').value;
@@ -1539,7 +1656,7 @@ async function renderMinecraftBox() {
     try {
       await api('/api/minecraft/enable-rcon', { folder: m.serverFolder });
       mcServers = null; await renderMinecraftBox();
-      toast('Done! Restart that Minecraft server and Gift Hype connects by itself.');
+      toast('Done! Restart that Minecraft server and Unbound connects by itself.');
     } catch (e) { toast(e.message, true); }
   };
   renderStatus();
@@ -1669,7 +1786,7 @@ function renderChatTeleport() {
       <label>Which wins<select data-k="pick"><option value="most" ${c.pick === 'most' ? 'selected' : ''}>The one typed most (one vote each)</option><option value="last" ${c.pick === 'last' ? 'selected' : ''}>The last one typed</option></select></label>
       <label>Look for blocks up to (blocks away)<input type="number" min="32" max="50000" step="500" data-k="range" value="${c.range}"></label>
       <label class="wide">Things chat can't pick<input type="text" data-k="blocked" value="${esc(c.blocked)}" placeholder="e.g. lava, deep dark, end portal frame"></label>
-      <label class="check wide" style="flex-direction:row"><input type="checkbox" data-k="showGame" ${c.showGame ? 'checked' : ''}> Box in Minecraft, fixed on your screen: "TELEPORT IN" and the seconds (never what or how many votes), then what you went to, its picture and how many blocks away. In your own world Minecraft gets a small Gift Hype pack for it; on a server it's text above the hotbar</label>
+      <label class="check wide" style="flex-direction:row"><input type="checkbox" data-k="showGame" ${c.showGame ? 'checked' : ''}> Box in Minecraft, fixed on your screen: "TELEPORT IN" and the seconds (never what or how many votes), then what you went to, its picture and how many blocks away. In your own world Minecraft gets a small Unbound pack for it; on a server it's text above the hotbar</label>
       <div class="wide" id="tpBoxEdit"></div>
       <label class="check wide" style="flex-direction:row"><input type="checkbox" data-k="icon3d" ${c.icon3d !== false ? 'checked' : ''}> 3D block pictures (like the inventory; untick for flat). This and the box size reach Minecraft the next time you join the world</label>
       <label class="check wide" style="flex-direction:row"><input type="checkbox" data-k="showOverlay" ${c.showOverlay ? 'checked' : ''}> Timer on the stream overlay too (leave it off to add your own in TikTok LIVE Studio)</label>
@@ -1705,7 +1822,7 @@ function renderChatTeleport() {
     </details>
     <details class="tpgroup">
       <summary>Search</summary>
-      <p class="hint">Blocks are looked for round you first (the whole height of the world). If one isn't there, Gift Hype finds the nearest structures and biomes it's found in and looks there.</p>
+      <p class="hint">Blocks are looked for round you first (the whole height of the world). If one isn't there, Unbound finds the nearest structures and biomes it's found in and looks there.</p>
       <div class="chatgrid">
         <label>Look round you (blocks)<input type="number" min="16" max="128" step="16" data-k="nearRange" value="${c.nearRange ?? 96}"></label>
         <label>Far away: try first<select data-k="farOrder">${[['nearest', 'Whatever is nearest'], ['structures', 'Structures'], ['biomes', 'Biomes']]
@@ -2041,7 +2158,7 @@ function renderUpdate() {
   const show = u && (u.available || u.state === 'updating' || u.state === 'restarting' || u.state === 'failed');
   $('updBar').hidden = !show;
   if (!show) return;
-  $('updText').textContent = u.state === 'updating' ? 'Updating Gift Hype…' : u.state === 'restarting' ? 'Updated! Gift Hype is restarting…' : u.state === 'failed' ? `The update didn't work: ${u.error}` : `A new version of Gift Hype is ready: ${u.latest} (you have ${u.current})`;
+  $('updText').textContent = u.state === 'updating' ? 'Updating Unbound…' : u.state === 'restarting' ? 'Updated! Unbound is restarting…' : u.state === 'failed' ? `The update didn't work: ${u.error}` : `A new version of Unbound is ready: ${u.latest} (you have ${u.current})`;
   $('updNow').hidden = u.state === 'updating' || u.state === 'restarting';
   $('updNow').textContent = u.state === 'failed' ? 'Try again' : 'Update now';
 }

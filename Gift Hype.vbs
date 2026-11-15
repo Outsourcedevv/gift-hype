@@ -1,4 +1,4 @@
-' Opens Gift Hype as an app, with no black window.
+' Opens Unbound as an app, with no black window.
 ' The first time (or if Node.js is missing) it runs Setup.bat first.
 Set sh = CreateObject("WScript.Shell")
 Set fso = CreateObject("Scripting.FileSystemObject")
@@ -10,7 +10,7 @@ If sh.Run("cmd /c where node >nul 2>nul", 0, True) <> 0 Then needSetup = True
 If needSetup Then
     sh.Run """" & dir & "\Setup.bat"" nopause", 1, True
     If sh.Run("cmd /c where node >nul 2>nul", 0, True) <> 0 Then
-        MsgBox "Gift Hype needs Node.js. Run Setup.bat in the Gift Hype folder, then open Gift Hype again.", 48, "Gift Hype"
+        MsgBox "Unbound needs Node.js. Run Setup.bat in the Unbound folder, then open Unbound again.", 48, "Unbound"
         WScript.Quit
     End If
 End If

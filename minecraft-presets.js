@@ -158,9 +158,9 @@ export function makePresets({ mc, log }) {
         return box && { x: box[0], y: box[1], z: box[2] };
     }
     // Far away blocks: Minecraft finds the nearest biome or structure the block is found in (t.far, from
-    // chatteleport.js; with Gift Hype's pack that's one /locate of a tag), Gift Hype loads the land
+    // chatteleport.js; with Unbound's pack that's one /locate of a tag), Unbound loads the land
     // round it and looks there. Up to 3 places, nearest first. Returns { x, y, z } or null.
-    // Minecraft only looks for biomes 6,400 blocks out, so past that Gift Hype asks again from points in
+    // Minecraft only looks for biomes 6,400 blocks out, so past that Unbound asks again from points in
     // rings further out (nothing gets loaded for that: Minecraft knows biomes without loading the land).
     async function findFar(p, t, range) {
         const dim = p.dim.replace(/^minecraft:/, ''), d = t.far?.dims?.[dim];

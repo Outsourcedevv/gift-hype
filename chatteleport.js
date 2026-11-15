@@ -76,7 +76,7 @@ export function farHints(t) {
     }
     return Object.keys(dims).length ? { key, dims } : null;
 }
-// every far-search tag for Gift Hype's pack: [{ kind: 'biome'|'structure', name, values }]
+// every far-search tag for Unbound's pack: [{ kind: 'biome'|'structure', name, values }]
 export function farTags() {
     const out = [];
     const targets = [...Object.keys(HINTS).map(b => blockTarget(b)), ...[...new Set([...Object.values(GROUPS), ...Object.values(ORE_WORDS)])].map(g => blockTarget('#' + g))];
@@ -258,8 +258,8 @@ export function normalizeChatTeleport(c = {}, onByDefault = false) {
 
 const txt = (t, color, extra = '') => `{"text":${JSON.stringify(t)},"color":"${color}"${extra}}`;
 const BAR = 'gifthype:chatteleport';          // the old timer bar (removed if it's still there)
-// The timer box: fixed on your screen, like the hotbar. In your own world (Gift Hype's hidden server) it's
-// a box drawn by Gift Hype's resource pack (hudpack.js), placed and sized from the settings; on a server
+// The timer box: fixed on your screen, like the hotbar. In your own world (Unbound's hidden server) it's
+// a box drawn by Unbound's resource pack (hudpack.js), placed and sized from the settings; on a server
 // without the pack it's plain text above the hotbar. While it counts down it only says when (never what
 // to or how many votes); after a teleport it shows what you went to, its picture and how far away it was.
 export const BOX_TAG = 'gh_tpbox';           // the old floating box (removed if it's still there)
@@ -302,7 +302,7 @@ export function makeChatTeleport({ mc, log, broadcast, target, dimOf, teleport }
     const say = (cfg, d) => { if (cfg.showOverlay) broadcast('chunkchat', d); };
 
     const sel = p => /^\w{1,16}$/.test(p || '') ? `@a[name=${p},limit=1]` : '@p';
-    // the box: sent again every second (it stays up 1.5 s), so it goes away by itself if Gift Hype stops
+    // the box: sent again every second (it stays up 1.5 s), so it goes away by itself if Unbound stops
     async function showBox(t, cfg, what) {
         const s = sel(t.player);
         if (what) last = what; else what = last;
@@ -332,7 +332,7 @@ export function makeChatTeleport({ mc, log, broadcast, target, dimOf, teleport }
         if (busy) return;
         busy = true;
         try {
-            // a bar or box left over from before Gift Hype was restarted
+            // a bar or box left over from before Unbound was restarted
             if (!cleaned) { cleaned = true; await mc(`bossbar remove ${BAR}`).catch(() => { cleaned = false; }); await mc(`kill @e[type=minecraft:text_display,tag=${BOX_TAG}]`).catch(() => {}); }
             const t = await target();
             if (!t) { if (round || boxUp) { round = null; await hideBox(); broadcast('chunkchat', { on: false }); } return; }
