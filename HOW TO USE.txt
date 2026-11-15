@@ -182,7 +182,7 @@ FINDING YOUR WAY
   The Live gifts and Quick sounds column stays on the right on every tab (you can hide it).
 
 SOUNDS
-  109 real sounds to start, in groups: Edit audios & songs (Where have you been (edit), Can you feel my heart,
+  110 real sounds to start, in groups: Edit audios & songs (Where have you been (edit), Can you feel my heart,
   After dark, Sahara, Murder in my mind, Golden...), Brainrot (Chicken jockey, Tung tung tung sahur, Tralalero,
   6 7, Skibidi...), Memes & reactions, Endings & drama, Game sounds, Minecraft and Phone & PC.
   They download by themselves the first time Unbound opens (needs internet once). If one is missing,
@@ -192,14 +192,33 @@ SOUNDS
     The pencil gives any sound your own name.
   A gift's sound: press the sound button on the gift to pick from every sound (with search and groups).
     "Random" picks a different sound each time: from all sounds, your favourites or one group.
+    "Cut" (next to vol) picks the part of the sound that plays, to cut out the start or the end:
+    drag the two handles on the sound's picture (or type the start and end), "Play the part" to hear
+    it, Save. The button then shows the part, e.g. "2.0 s - 6.0 s". Picking another sound starts again.
+    Look & settings -> "Longest a gift's sound plays" stops every gift's sound after that many seconds,
+    unless the gift's cut has its own end. The Dropper's reset sound still plays for its whole countdown.
   Find more: type in "Find any sound online" (e.g. "emotional damage"), press play to listen, Add to keep it.
   Add your own: drop .mp3 / .wav files on "Add your own sounds", or press "upload..." next to a gift.
+  A whole song you own works too (up to 15 MB): add it, then use Cut on a gift to pick the part.
   They're saved in the sounds\custom folder.
+
+OPENING ANIMATION
+  When Unbound opens: stars warp in, the logo draws itself and breaks out of its ring, and the name
+  lands while it loads underneath. Click or press any key to skip it.
+  Look & settings -> Layout: "Opening animation" and "Opening sound" turn them off;
+  "Play the opening" shows it again. It's off by itself when "Animations" is off.
 
 LOOK & SETTINGS
   Colours: Sky, Blaze, Mint, Punk, Egyptian, Grape, Mono, or "Your own" (pick the main colour, the
   eye-catcher and a dark or light background). The stream popups use the same colours.
   Layout: text size, corners (round / a little round / square), compact, the Live gifts column, animations.
+
+BOXES ON THE OVERLAY (Stream overlay tab)
+  Every box (gift popups, gift list, timer, block delete list, reset countdown) can be shown or hidden
+  on your stream, and has its own Width, Height and Size. Auto = the box's own size. You can also drag
+  a box's side handles in the overlay editor: the right one for width, the bottom one for height, the
+  round corner for the size of everything. Hidden boxes stay faded in the editor so you can still
+  place them. "Put the boxes back" resets places and sizes (shown / hidden stays as it is).
 
 GIFT POPUPS (Stream overlay tab)
   Style (dark, light, glass, neon glow, Minecraft), how they come in (bounce, slide, zoom, spin, fade),

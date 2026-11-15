@@ -112,6 +112,7 @@ function normalizeLook(l = {}) {
         side: l.side !== false,                                         // the Live gifts column on the right
         corners: ['round', 'soft', 'square'].includes(l.corners) ? l.corners : 'round',
         motion: l.motion !== false,                                     // hover and pop animations
+        intro: l.intro !== false, introSound: l.introSound !== false,   // the opening animation and its sound
     };
 }
 settings.look = normalizeLook(settings.look);
@@ -156,6 +157,11 @@ function realSound(sound) {
     return m ? `builtin/${OLD_SOUND_NAMES[m[1]] || m[1]}.mp3` : sound || null;
 }
 
+function soundPart(r) {
+    const num = v => Number.isFinite(+v) && +v > 0 ? Math.min(600, +v) : 0;
+    const start = num(r.soundStart), end = num(r.soundEnd) || (num(r.soundLen) ? start + num(r.soundLen) : 0);
+    return { soundStart: +start.toFixed(2), soundEnd: end > start + 0.05 ? +end.toFixed(2) : 0 };
+}
 function normalizeRules(rules) {
     return (Array.isArray(rules) ? rules : []).map(r => ({
         id: r.id || newId(),
@@ -164,6 +170,9 @@ function normalizeRules(rules) {
         coins: r.coins ?? null,
         sound: realSound(r.sound),
         volume: Number.isFinite(+r.volume) ? Math.max(0, Math.min(1, +r.volume)) : 1,
+        // the part of the sound that plays: from soundStart to soundEnd seconds (0 = to its end).
+        // (2.3.0 had a length instead: it becomes the end.)
+        ...soundPart(r),
         alert: r.alert !== false,
         label: String(r.label || ''),
         perCount: r.perCount !== false,
@@ -382,6 +391,7 @@ const SOUND_LIST = [
     ['can-you-feel-my-heart', 'can-you-feel-my-heart.mp3', 'edits'],
     ['after-dark', 'after-dark.mp3', 'edits'],
     ['another-love', 'another-love.mp3', 'edits'],
+    ['another-love-edit', 'another-love-anime-ahh.mp3', 'edits'],
     ['money-so-big', 'money-so-big.mp3', 'edits'],
     ['chill-guy', 'chill-guy.mp3', 'edits'],
     ['sahara', 'sahara.mp3', 'edits'],
@@ -487,7 +497,7 @@ const SOUND_GROUP_OF = Object.fromEntries(SOUND_LIST.map(([name, , group]) => [n
 // names that read better than the file name
 const SOUND_NICE = { 'where-have-you-been-edit': 'where have you been (edit)', 'six-seven': '6 7 (six seven)', 'fbi-open-up': 'FBI open up', 'dababy-lets-go': 'DaBaby lets go',
     'directed-by-robert-b-weide': 'directed by Robert B. Weide', 'oh-no-no-no-laugh': 'oh no no no (laugh)', 'wait-a-minute': 'wait a minute, who are you', 'golden': 'golden (KPop Demon Hunters)',
-    'fnaf-yay': 'FNAF yay', 'tnt': 'TNT', 'windows-xp': 'Windows XP', 'he-he-he-ha': 'he he he ha', 'minecraft-xp': 'Minecraft XP' };
+    'fnaf-yay': 'FNAF yay', 'another-love-edit': 'another love (longer edit)', 'tnt': 'TNT', 'windows-xp': 'Windows XP', 'he-he-he-ha': 'he he he ha', 'minecraft-xp': 'Minecraft XP' };
 const BUILTIN_SOUNDS = path.join(SOUNDS_DIR, 'builtin');
 const isMp3 = b => b.length > 512 && (b.subarray(0, 3).toString() === 'ID3' || (b[0] === 0xff && (b[1] & 0xe0) === 0xe0));
 const isClipPath = p => /^\/media\/sounds\/[\w.%()-]+\.mp3$/i.test(p) && !p.includes('..');
@@ -1158,7 +1168,11 @@ async function handleGift(giftName, count, from, image, coins) {
     const dropper = isDropper(game), resetEvent = dropper ? dropperResetGift(game, rule, from) : null;
     // a reset's sound plays on (looping) for the whole countdown, until it's saved or runs out
     const soundFile = pickSound(rule.sound);
-    if (soundFile) broadcast('play', { file: soundFile, volume: rule.volume * settings.masterVolume, ...(resetEvent === 'started' ? { id: 'reset', loopFor: dropperReset.total } : {}) });
+    // the part that plays: the gift's own cut (not for random sounds: each is a different file), and the
+    // longest any sound may play when it has no end of its own (0 = all of it)
+    const cut = !/^random:/.test(rule.sound || ''), start = cut ? rule.soundStart : 0;
+    const len = cut && rule.soundEnd ? rule.soundEnd - start : settings.soundMax || 0;
+    if (soundFile) broadcast('play', { file: soundFile, volume: rule.volume * settings.masterVolume, ...(resetEvent === 'started' ? { id: 'reset', loopFor: dropperReset.total } : { start, len }) });
     if (rule.alert && (from === 'TEST' || entry.coins == null || entry.coins * count >= settings.overlay.popMinCoins)) broadcast('alert', { ...entry, label: rule.label, ...(dropper ? { dropper: true, action: dropperAlertText(rule, count).what, actionColor: dropperAlertText(rule, count).color } : {}) });
 
     const ctx = { player: game.minecraft.player || await onlinePlayer(game) || '@p', from, gift: giftName, count, perCount: rule.perCount, image: entry.image };
@@ -1337,6 +1351,7 @@ const routes = {
         if (typeof b.eulerStreamApiKey === 'string' && b.eulerStreamApiKey !== '••••••') settings.eulerStreamApiKey = b.eulerStreamApiKey.trim();
         if (Number.isFinite(+b.masterVolume)) settings.masterVolume = Math.max(0, Math.min(1, +b.masterVolume));
         if (['app', 'overlay'].includes(b.soundsIn)) settings.soundsIn = b.soundsIn;
+        if (b.soundMax !== undefined && Number.isFinite(+b.soundMax)) settings.soundMax = Math.max(0, Math.min(120, +b.soundMax));
         if (typeof b.autoConnect === 'boolean') settings.autoConnect = b.autoConnect;
         if (typeof b.mcEula === 'boolean' && b.mcEula !== settings.mcEula) { settings.mcEula = b.mcEula; setTimeout(connectMinecraft, 50); }
         if (THEME_IDS.includes(b.theme)) settings.theme = b.theme;
@@ -1352,10 +1367,21 @@ const routes = {
             if (b.overlay.place && typeof b.overlay.place === 'object') {
                 const n = (v, lo, hi, d) => Number.isFinite(+v) && v !== null && v !== '' ? Math.max(lo, Math.min(hi, +v)) : d;
                 o.place = { ...(o.place || {}) };
-                for (const k of ['popups', 'timer', 'chatdel', 'reset']) {
+                // a change can be part of a box (e.g. only its width); a field sent as null goes back to normal
+                for (const k of ['popups', 'menu', 'timer', 'chatdel', 'reset']) {
                     const p = b.overlay.place[k];
-                    if (p === null) delete o.place[k];
-                    else if (p && typeof p === 'object') o.place[k] = { x: n(p.x, 0, 100, 50), y: n(p.y, 0, 100, 50), s: n(p.s, 0.3, 3, 1) };
+                    if (p === null) { delete o.place[k]; continue; }
+                    if (!p || typeof p !== 'object') continue;
+                    const q = { ...(o.place[k] || {}), ...p }, out = {};
+                    if (k !== 'menu') {                                     // the gift list keeps its place in menuX / menuY / menuScale
+                        if (q.x != null) out.x = n(q.x, 0, 100, 50);
+                        if (q.y != null) out.y = n(q.y, 0, 100, 50);
+                        if (q.s != null) out.s = n(q.s, 0.3, 3, 1);
+                    }
+                    if (q.w != null && +q.w >= 100) out.w = Math.round(n(q.w, 120, 1900, 400));   // its own width, in overlay pixels
+                    if (q.h != null && +q.h >= 30) out.h = Math.round(n(q.h, 30, 1000, 100));     // its own height
+                    if (q.hide === true && k !== 'menu') out.hide = true;  // not on your stream (the gift list uses "menu")
+                    if (Object.keys(out).length) o.place[k] = out; else delete o.place[k];
                 }
             }
             const popKeys = Object.keys(b.overlay).filter(k => k.startsWith('pop'));
@@ -1605,7 +1631,17 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && url.pathname.startsWith('/sounds/')) {
         const p = soundFilePath(decodeURIComponent(url.pathname.slice('/sounds/'.length)));
         if (!p) return send(res, 404, { error: 'Not found' });
-        return send(res, 200, fs.readFileSync(p), SOUND_TYPES[path.extname(p).toLowerCase()]);
+        // parts of the file too (Range), so a sound can start partway through (a gift's cut)
+        const buf = fs.readFileSync(p), head = { 'Content-Type': SOUND_TYPES[path.extname(p).toLowerCase()], 'Accept-Ranges': 'bytes', 'Cache-Control': 'no-store' };
+        const m = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');
+        if (m && (m[1] !== '' || m[2] !== '')) {
+            const start = m[1] === '' ? Math.max(0, buf.length - +m[2]) : +m[1], end = m[1] !== '' && m[2] !== '' ? Math.min(+m[2], buf.length - 1) : buf.length - 1;
+            if (start >= buf.length || start > end) { res.writeHead(416, { 'Content-Range': `bytes */${buf.length}` }); return res.end(); }
+            res.writeHead(206, { ...head, 'Content-Range': `bytes ${start}-${end}/${buf.length}`, 'Content-Length': end - start + 1 });
+            return res.end(buf.subarray(start, end + 1));
+        }
+        res.writeHead(200, { ...head, 'Content-Length': buf.length });
+        return res.end(buf);
     }
 
     // Upload a sound: raw file in the body, its name in ?name=
