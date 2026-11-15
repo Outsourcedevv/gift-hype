@@ -192,6 +192,9 @@ SOUNDS
     The pencil gives any sound your own name.
   A gift's sound: press the sound button on the gift to pick from every sound (with search and groups).
     "Random" picks a different sound each time: from all sounds, your favourites or one group.
+    "length" (next to vol) = how many seconds the sound plays, then it fades out. Empty = the whole sound.
+    Look & settings -> "Longest a gift's sound plays" cuts every gift's sound at that many seconds
+    (a gift's own length wins over it). The Dropper's reset sound still plays for its whole countdown.
   Find more: type in "Find any sound online" (e.g. "emotional damage"), press play to listen, Add to keep it.
   Add your own: drop .mp3 / .wav files on "Add your own sounds", or press "upload..." next to a gift.
   They're saved in the sounds\custom folder.

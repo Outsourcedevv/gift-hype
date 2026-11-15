@@ -288,8 +288,26 @@ function playSound(file, volume, opts = {}) {
   playing.add(a);
   a.onended = a.onerror = () => playing.delete(a);
   if (opts.loopFor) { stopSound(opts.id); a.loop = true; looping.set(opts.id, a); a._stop = setTimeout(() => stopSound(opts.id), opts.loopFor * 1000); }
+  else cutAfter(a, opts.len);
   a.play().catch(() => playing.delete(a));
 }
+// a sound with a length stops after that many seconds, fading out over its last moment
+function cutAfter(a, len) {
+  if (!(len > 0)) return;
+  const fade = Math.min(0.6, len / 3);
+  // counted from when it really starts playing (not while it loads)
+  a.addEventListener('playing', () => { const v0 = a.volume; a._cut = setTimeout(() => {
+    const t0 = performance.now();
+    const step = () => {
+      if (a.paused) return;
+      const k = Math.min(1, (performance.now() - t0) / (fade * 1000));
+      a.volume = v0 * (1 - k);
+      if (k < 1) requestAnimationFrame(step); else a.pause();
+    };
+    requestAnimationFrame(step);
+  }, Math.max(0, len - fade) * 1000); }, { once: true });
+}
+
 function stopSound(id) { const a = looping.get(id); if (!a) return; clearTimeout(a._stop); a.pause(); playing.delete(a); looping.delete(id); }
 
 // ----- the level slot machine (the Dropper) -----

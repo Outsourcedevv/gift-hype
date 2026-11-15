@@ -164,6 +164,7 @@ function normalizeRules(rules) {
         coins: r.coins ?? null,
         sound: realSound(r.sound),
         volume: Number.isFinite(+r.volume) ? Math.max(0, Math.min(1, +r.volume)) : 1,
+        soundLen: Number.isFinite(+r.soundLen) ? Math.max(0, Math.min(120, +r.soundLen)) : 0,   // seconds the sound plays (0 = all of it)
         alert: r.alert !== false,
         label: String(r.label || ''),
         perCount: r.perCount !== false,
@@ -1158,7 +1159,8 @@ async function handleGift(giftName, count, from, image, coins) {
     const dropper = isDropper(game), resetEvent = dropper ? dropperResetGift(game, rule, from) : null;
     // a reset's sound plays on (looping) for the whole countdown, until it's saved or runs out
     const soundFile = pickSound(rule.sound);
-    if (soundFile) broadcast('play', { file: soundFile, volume: rule.volume * settings.masterVolume, ...(resetEvent === 'started' ? { id: 'reset', loopFor: dropperReset.total } : {}) });
+    // how long it plays: the gift's own length, else the longest any sound may play (0 = all of it)
+    if (soundFile) broadcast('play', { file: soundFile, volume: rule.volume * settings.masterVolume, ...(resetEvent === 'started' ? { id: 'reset', loopFor: dropperReset.total } : { len: rule.soundLen || settings.soundMax || 0 }) });
     if (rule.alert && (from === 'TEST' || entry.coins == null || entry.coins * count >= settings.overlay.popMinCoins)) broadcast('alert', { ...entry, label: rule.label, ...(dropper ? { dropper: true, action: dropperAlertText(rule, count).what, actionColor: dropperAlertText(rule, count).color } : {}) });
 
     const ctx = { player: game.minecraft.player || await onlinePlayer(game) || '@p', from, gift: giftName, count, perCount: rule.perCount, image: entry.image };
@@ -1337,6 +1339,7 @@ const routes = {
         if (typeof b.eulerStreamApiKey === 'string' && b.eulerStreamApiKey !== '••••••') settings.eulerStreamApiKey = b.eulerStreamApiKey.trim();
         if (Number.isFinite(+b.masterVolume)) settings.masterVolume = Math.max(0, Math.min(1, +b.masterVolume));
         if (['app', 'overlay'].includes(b.soundsIn)) settings.soundsIn = b.soundsIn;
+        if (b.soundMax !== undefined && Number.isFinite(+b.soundMax)) settings.soundMax = Math.max(0, Math.min(120, +b.soundMax));
         if (typeof b.autoConnect === 'boolean') settings.autoConnect = b.autoConnect;
         if (typeof b.mcEula === 'boolean' && b.mcEula !== settings.mcEula) { settings.mcEula = b.mcEula; setTimeout(connectMinecraft, 50); }
         if (THEME_IDS.includes(b.theme)) settings.theme = b.theme;

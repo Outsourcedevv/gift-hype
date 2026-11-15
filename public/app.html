@@ -351,6 +351,7 @@ svg.i { width: 14px; height: 14px; flex: none; vertical-align: -2px; }
 .rule-sound { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding-left: 62px; }
 @media (max-width: 760px) { .rule-sound { padding-left: 0; } }
 .rule-sound select { min-width: 170px; }
+.rule-sound .lenin { width: 74px; padding: 6px 8px; }
 .vol { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
 .vol input { width: 90px; }
 .acts { display: flex; flex-direction: column; gap: 8px; padding-left: 62px; }
@@ -746,6 +747,9 @@ body.corners-soft section { border-radius: 8px; }
           <option value="overlay">The stream overlay only</option>
         </select>
       </label>
+      <label class="field" style="margin-top:14px">Longest a gift's sound plays (seconds)
+        <div class="row"><input type="number" id="soundMax" min="0" max="120" step="0.5" placeholder="no limit" style="width:140px"><span class="hint" style="margin:0">Empty = the whole sound. A gift's own <b>length</b> wins over this.</span></div>
+      </label>
       <div class="row" style="margin-top:14px"><label class="check"><input type="checkbox" id="autoConnect"> Connect to TikTok by itself when the app opens</label></div>
       <details style="margin-top:14px" id="eulerBox">
         <summary>Euler Stream key (only if TikTok says "too many connects")</summary>
@@ -887,9 +891,25 @@ function playSound(file, volume = 1, opts = {}) {
     a.loop = true;
     looping.set(opts.id, a);
     a._stop = setTimeout(() => stopSound(opts.id), opts.loopFor * 1000);
-  }
+  } else cutAfter(a, opts.len);
   a.play().then(markPlaying).catch(() => { playing.delete(a); markPlaying(); });
   return a;
+}
+// a sound with a length stops after that many seconds, fading out over its last moment
+function cutAfter(a, len) {
+  if (!(len > 0)) return;
+  const fade = Math.min(0.6, len / 3);
+  // counted from when it really starts playing (not while it loads)
+  a.addEventListener('playing', () => { const v0 = a.volume; a._cut = setTimeout(() => {
+    const t0 = performance.now();
+    const step = () => {
+      if (a.paused) return;
+      const k = Math.min(1, (performance.now() - t0) / (fade * 1000));
+      a.volume = v0 * (1 - k);
+      if (k < 1) requestAnimationFrame(step); else a.pause();
+    };
+    requestAnimationFrame(step);
+  }, Math.max(0, len - fade) * 1000); }, { once: true });
 }
 function stopSound(id) { const a = looping.get(id); if (!a) return; clearTimeout(a._stop); a.pause(); playing.delete(a); looping.delete(id); }
 function stopAll() { [...playing].forEach(a => a.pause()); playing.clear(); markPlaying(); }
@@ -1084,6 +1104,7 @@ drop.ondrop = async e => { e.preventDefault(); drop.classList.remove('over'); aw
 
 $('master').oninput = () => { settings.masterVolume = +$('master').value; $('masterVal').textContent = Math.round(settings.masterVolume * 100) + '%'; saveSettingsSoon({ masterVolume: settings.masterVolume }); };
 $('soundsIn').onchange = () => api('/api/settings', { soundsIn: $('soundsIn').value });
+$('soundMax').onchange = () => { settings.soundMax = Math.max(0, Math.min(120, +$('soundMax').value || 0)); api('/api/settings', { soundMax: settings.soundMax }); if (game) renderRules(); };
 $('autoConnect').onchange = () => api('/api/settings', { autoConnect: $('autoConnect').checked });
 
 // the gift list's settings: every [data-m] field saves itself (sliders and colours as you move them)
@@ -1285,6 +1306,7 @@ function fillSettings() {
   $('master').value = settings.masterVolume;
   $('masterVal').textContent = Math.round(settings.masterVolume * 100) + '%';
   $('soundsIn').value = settings.soundsIn;
+  if (document.activeElement !== $('soundMax')) $('soundMax').value = settings.soundMax || '';
   $('autoConnect').checked = settings.autoConnect;
 
   fillMenuSettings();
@@ -1350,6 +1372,7 @@ function jumpAll() {
   go('Setting', 'Show / hide overlay boxes, width and height', () => setPage('overlay', { to: 'boxSec' }));
   go('Setting', 'Set up the overlay in TikTok LIVE Studio', () => $('ovLive').click());
   go('Setting', 'Play sounds in the app or the overlay', () => setPage('settings', { to: 'soundsIn' }));
+  go('Setting', 'How long sounds play (longest)', () => setPage('settings', { to: 'soundMax' }));
   go('Setting', 'Euler Stream key', () => setPage('settings', { to: 'eulerBox' }));
   go('Setting', 'Updates', () => setPage('settings', { to: 'updSec' }));
   go('Setting', 'Activity log', () => setPage('settings', { to: 'logSec' }));
@@ -2099,6 +2122,7 @@ function renderRules() {
         <button class="small" data-prev aria-label="Play sound" ${r.sound ? '' : 'disabled'}>${IC.play}</button>
         <label class="small ghost" style="cursor:pointer"><input type="file" accept=".mp3,.wav,.ogg,.m4a,audio/*" data-upsound hidden><span class="pill" style="text-decoration:underline">upload…</span></label>
         <label class="vol">vol <input type="range" min="0" max="1" step="0.05" value="${r.volume}" data-f="volume"></label>
+        <label class="vol" title="How many seconds the sound plays, then it fades out. Empty = the whole sound${settings.soundMax ? ` (or ${settings.soundMax} s, the longest set in Settings)` : ''}.">length <input type="number" min="0" max="120" step="0.5" value="${r.soundLen || ''}" placeholder="${settings.soundMax ? settings.soundMax + ' s' : 'full'}" data-f="soundLen" class="lenin"> s</label>
         <label class="check"><input type="checkbox" data-f="alert" ${r.alert ? 'checked' : ''}> Pop up on stream</label>
         <label class="check" title="A streak of 5 does the actions 5 times"><input type="checkbox" data-f="perCount" ${r.perCount ? 'checked' : ''}> Once per gift in a streak</label>
       </div>
@@ -2116,7 +2140,7 @@ function renderRules() {
       const f = inp.dataset.f;
       const ev = inp.type === 'checkbox' || inp.tagName === 'SELECT' ? 'change' : 'input';
       inp.addEventListener(ev, () => {
-        r[f] = inp.type === 'checkbox' ? inp.checked : inp.type === 'range' ? +inp.value : inp.value;
+        r[f] = inp.type === 'checkbox' ? inp.checked : inp.type === 'range' ? +inp.value : inp.type === 'number' ? Math.max(0, Math.min(120, +inp.value || 0)) : inp.value;
         if (f === 'gift') {
           const k = known(inp.value);
           if (k) { r.image = k.image; r.coins = k.coins; el.querySelector('.gimg').outerHTML = giftImgHtml(r); el.querySelector('.coins').textContent = coinText(k.coins); }
@@ -2124,10 +2148,10 @@ function renderRules() {
         queueSave();
       });
     });
-    el.querySelector('[data-prev]').onclick = () => playSound(r.sound, r.volume * settings.masterVolume);
+    el.querySelector('[data-prev]').onclick = () => playSound(r.sound, r.volume * settings.masterVolume, { len: r.soundLen || settings.soundMax || 0 });
     el.querySelector('[data-pick]').onclick = () => openSoundPicker(r.sound, f => {
       r.sound = f; queueSave(); renderRules();
-      if (f) playSound(f, r.volume * settings.masterVolume);
+      if (f) playSound(f, r.volume * settings.masterVolume, { len: r.soundLen || settings.soundMax || 0 });
     });
     el.querySelector('[data-upsound]').onchange = async e => {
       const file = await uploadFiles([...e.target.files]);
