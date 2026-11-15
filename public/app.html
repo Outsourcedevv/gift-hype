@@ -296,6 +296,8 @@ button.icon { padding: 6px 9px; }
 .mcbox.drag { outline: 2px dashed #fff; }
 .ovstage { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; border-radius: var(--radius); border: 1px solid var(--line); background: #18202e; }
 .ovstage iframe { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; border: 0; transform-origin: 0 0; }
+.ovstage.portrait { aspect-ratio: 9 / 16; width: auto; height: min(78vh, 900px); margin: 0 auto; }
+.fswrap.big > .ovstage.portrait { width: min(100vw, calc(100vh * 9 / 16)); height: auto; }
 @font-face { font-family: 'Monocraft'; src: url('/fonts/Monocraft.ttf') format('truetype'); }
 .tpgroup { border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 14px 12px; margin-top: 12px; background: var(--panel-2); }
 .tpgroup > summary { font-weight: 700; color: var(--text); font-size: 14px; }
@@ -866,7 +868,12 @@ ubIntro.start();
         <button class="small hot" id="ovLive">Set up in TikTok LIVE Studio</button>
         <button class="small" id="ovTest">Send a test popup</button>
       </div>
-      <p class="hint">In OBS or TikTok LIVE Studio add a <b>Browser</b> (or <b>Link</b>) source with that address, size 1920 × 1080. Gift popups show on your stream.</p>
+      <p class="hint">In OBS or TikTok LIVE Studio add a <b>Browser</b> (or <b>Link</b>) source with that address and stretch it over the whole screen. Gift popups show on your stream.</p>
+      <div class="row" style="margin-top:12px">
+        <label class="field" style="flex-direction:row;align-items:center;gap:10px">Overlay shape
+          <select data-m="canvas"><option value="auto">Auto (the shape it is in your streaming app)</option><option value="landscape">Landscape 16:9 (1920 × 1080)</option><option value="portrait">Portrait 9:16 (1080 × 1920, vertical streams)</option></select></label>
+      </div>
+      <p class="hint" id="ovView"></p>
       <div class="ovedit">
         <div class="fswrap" id="ovWrap"><div class="ovstage" id="ovStage"><iframe id="ovFrame" title="Your overlay (drag the boxes)" scrolling="no"></iframe></div>
           <button class="small fsbtn" data-fs="ovWrap">⛶ Full screen</button></div>
@@ -1030,7 +1037,7 @@ ubIntro.start();
     <ol class="steps">
       <li>In LIVE Studio, under <b>Sources</b>, press <b>+</b> (Add source) and pick <b>Link</b>.</li>
       <li>Click in the address box and press <b>Ctrl + V</b>: the overlay's address is already copied.<br><code id="liveUrl"></code></li>
-      <li>Set the size to <b>1920 × 1080</b> (or Fit to screen) and press <b>Add</b>.</li>
+      <li>Make it fill the whole screen (<b>Fit to screen</b>) and press <b>Add</b>. Any size works: the overlay scales itself to fit.</li>
       <li>Drag it to the top of your sources so the popups show over the game.</li>
     </ol>
     <p class="hint">The address points back to this PC, so Unbound must be open while you stream. If the overlay shows as a tiny box or stops updating, add <code>?refresh=1</code> to the end of the address.</p>
@@ -1343,7 +1350,7 @@ $('autoConnect').onchange = () => api('/api/settings', { autoConnect: $('autoCon
 
 // the gift list's settings: every [data-m] field saves itself (sliders and colours as you move them)
 document.querySelectorAll('[data-m]').forEach(el => {
-  const send = () => { const k = el.dataset.m; const v = el.type === 'checkbox' ? el.checked : el.type === 'range' || el.type === 'number' ? +el.value : el.value; settings.overlay[k] = v; saveSettingsSoon({ overlay: { [k]: v } }); if (k === 'popColors' || k === 'popType') popFieldsShown(); if (k === 'menu') fillBoxes(); };
+  const send = () => { const k = el.dataset.m; const v = el.type === 'checkbox' ? el.checked : el.type === 'range' || el.type === 'number' ? +el.value : el.value; settings.overlay[k] = v; saveSettingsSoon({ overlay: { [k]: v } }); if (k === 'popColors' || k === 'popType') popFieldsShown(); if (k === 'menu') fillBoxes(); if (k === 'canvas') fitOverlayEditor(); };
   el.onchange = send;
   if (el.type === 'range' || el.type === 'color' || el.type === 'text') el.oninput = send;
 });
@@ -1449,18 +1456,41 @@ document.addEventListener('click', e => {
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') document.querySelectorAll('.fswrap.big').forEach(w => bigEditor(w, false)); });
 document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) document.querySelectorAll('.fswrap.big').forEach(w => bigEditor(w, false)); });
+// The overlay's shape: picked, or (auto) the shape it has in your streaming app (it tells us its size)
+function ovShape() {
+  const c = settings.overlay?.canvas, v = status.overlayView;
+  return c === 'portrait' || c === 'landscape' ? c : v && v.h > v.w ? 'portrait' : 'landscape';
+}
+let fitOverlayEditor = () => {};
 function startOverlayEditor() {
   const stage = $('ovStage'), frame = $('ovFrame');
-  if (!stage || frame.src) return;
+  if (!stage) return;
+  // the editor is the overlay's real stage size (1920 x 1080, or 1080 x 1920 portrait), scaled to fit here
+  fitOverlayEditor = () => {
+    const portrait = ovShape() === 'portrait', W = portrait ? 1080 : 1920, H = portrait ? 1920 : 1080;
+    stage.classList.toggle('portrait', portrait);
+    frame.style.width = W + 'px'; frame.style.height = H + 'px';
+    const k = Math.min(stage.clientWidth / W, stage.clientHeight / H);
+    frame.style.transform = `scale(${k})`; frame.style.left = (stage.clientWidth - W * k) / 2 + 'px'; frame.style.top = (stage.clientHeight - H * k) / 2 + 'px';
+  };
+  if (frame.src) return fitOverlayEditor();
   frame.src = '/overlay?edit=1';
-  const fit = () => { const k = Math.min(stage.clientWidth / 1920, stage.clientHeight / 1080); frame.style.transform = `scale(${k})`; frame.style.left = (stage.clientWidth - 1920 * k) / 2 + 'px'; frame.style.top = (stage.clientHeight - 1080 * k) / 2 + 'px'; };
-  new ResizeObserver(fit).observe(stage); fit();
+  new ResizeObserver(() => fitOverlayEditor()).observe(stage); fitOverlayEditor();
+}
+// what the app knows about the overlay in your streaming app
+function renderOvView() {
+  const v = status.overlayView, box = $('ovView');
+  if (!box) return;
+  if (!v) { box.innerHTML = "Your streaming app hasn't opened the overlay yet (it shows its size here when it does)."; return; }
+  const r = v.w / v.h, shape = Math.abs(r - 16 / 9) < 0.03 ? 'landscape (16:9)' : Math.abs(r - 9 / 16) < 0.03 ? 'portrait (9:16)' : v.h > v.w ? 'portrait-ish' : 'landscape-ish';
+  box.innerHTML = `Your overlay in your streaming app is <b>${v.w} × ${v.h}</b>, ${shape}. It's scaled to fit, so it looks just like the editor below.`;
 }
 function fillMenuSettings() {
   startOverlayEditor();
   document.querySelectorAll('[data-m]').forEach(el => { const v = settings.overlay[el.dataset.m]; if (el.type === 'checkbox') el.checked = v !== false; else if (v != null) el.value = v; });
   popFieldsShown();
   fillBoxes();
+  renderOvView(); fitOverlayEditor();
   $('ovMenuOpen').href = `http://localhost:${location.port}/overlay`;
 }
 
@@ -2676,7 +2706,7 @@ async function init() {
 
   const es = new EventSource('/api/events');
   es.addEventListener('state', e => { saveTimer = null; applyState(JSON.parse(e.data)); });
-  es.addEventListener('status', e => { status = JSON.parse(e.data); renderStatus(); renderUpdate(); });
+  es.addEventListener('status', e => { const was = ovShape(); status = JSON.parse(e.data); renderStatus(); renderUpdate(); renderOvView(); if (ovShape() !== was) fitOverlayEditor(); });
   es.addEventListener('settings', e => { settings = JSON.parse(e.data); applyTheme(settings.theme); applyLook(); fillBoxes(); });
   es.addEventListener('games', e => { gamesList = JSON.parse(e.data); renderGames(); });
   es.addEventListener('sounds', e => { sounds = JSON.parse(e.data); renderSounds(); if (game) renderRules(); });
