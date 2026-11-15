@@ -23,7 +23,8 @@ window.paintTheme = (theme, look) => {
 };
 try { paintTheme(localStorage.getItem('gh-theme') || 'unbound', JSON.parse(localStorage.getItem('gh-look') || 'null')); } catch {}
 </script>
-<link rel="icon" href="/icon.png">
+<link rel="icon" href="/img/logo.svg" type="image/svg+xml">
+<link rel="alternate icon" href="/icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <style>
@@ -440,7 +441,7 @@ body { font-size: 14.5px; letter-spacing: -.006em; -webkit-font-smoothing: antia
 h1, .lib-head h1, .ghead .gtitle, .dlg-head h3, .brand { font-family: 'Sora', 'Inter', sans-serif; }
 header { background: color-mix(in srgb, var(--header) 70%, transparent); backdrop-filter: blur(18px) saturate(1.5); -webkit-backdrop-filter: blur(18px) saturate(1.5); padding: 12px 24px 0; gap: 14px; }
 .brand { gap: 10px; font-size: 20px; font-weight: 700; letter-spacing: -.03em; }
-.brand svg { width: 32px; height: 32px; flex: none; filter: drop-shadow(0 6px 18px color-mix(in srgb, var(--main) 50%, transparent)); }
+.brand img.logo { width: 34px; height: 34px; border-radius: 9px; flex: none; filter: drop-shadow(0 6px 18px color-mix(in srgb, var(--main) 55%, transparent)); }
 .brand .wm { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .brand .live { font-family: 'Inter', sans-serif; font-size: 10px; font-weight: 700; letter-spacing: .16em; padding: 3px 7px; border-radius: 6px; color: var(--hot-text);
   background: color-mix(in srgb, var(--hot) 14%, transparent); border: 1px solid color-mix(in srgb, var(--hot) 32%, transparent); }
@@ -537,10 +538,210 @@ body.corners-soft section { border-radius: 8px; }
 </style>
 </head>
 <body>
+<style>
+/* ===== The opening animation (Look & settings → Opening animation) ===== */
+#intro { position: fixed; inset: 0; z-index: 9999; overflow: hidden; cursor: pointer; display: grid; place-items: center; color: #fff;
+  background: radial-gradient(ellipse 80% 70% at 50% 52%, #150e33 0%, #08061a 45%, #030208 100%); }
+#intro canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+#intro .bloom { position: absolute; left: 50%; top: 44%; width: 90vmin; height: 90vmin; border-radius: 50%; transform: translate(-50%, -50%) scale(.15); opacity: 0;
+  background: radial-gradient(circle, rgba(139, 108, 255, .6), rgba(93, 139, 255, .2) 38%, rgba(34, 211, 238, .06) 55%, transparent 70%); animation: ubBloom 2.4s .15s cubic-bezier(.2, .8, .2, 1) forwards; }
+#intro .flash { position: absolute; inset: 0; opacity: 0; pointer-events: none;
+  background: radial-gradient(circle at 50% 42%, rgba(255, 255, 255, .95), rgba(200, 185, 255, .45) 22%, rgba(34, 211, 238, .08) 45%, transparent 65%); animation: ubFlash 1s 1.5s ease-out forwards; }
+#intro .bars { position: absolute; left: 0; right: 0; height: 9vh; background: #000; z-index: 3; animation: ubBars 1.2s .1s cubic-bezier(.6, 0, .2, 1) both; }
+#intro .bars.t { top: 0; } #intro .bars.b { bottom: 0; }
+#intro .stage { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; animation: ubShake .55s 1.5s; }
+#intro svg.mark { width: min(30vmin, 260px); height: min(30vmin, 260px); overflow: visible; }
+#intro .mark .ring { stroke-dasharray: 100; stroke-dashoffset: 100; transform-box: view-box; transform-origin: 60px 70px; animation: ubDraw .95s .3s cubic-bezier(.5, 0, .2, 1) forwards, ubBreak .55s 1.48s cubic-bezier(.3, 0, .2, 1) forwards; }
+#intro .mark .shard { opacity: 0; transform-box: view-box; transform-origin: 60px 70px; animation: ubShard .9s 1.5s cubic-bezier(.1, .7, .2, 1) forwards; }
+#intro .mark .ring, #intro .mark .u, #intro .mark .ug, #intro .mark .head { opacity: 0; }
+#intro .mark .u { stroke-dasharray: 100; stroke-dashoffset: 100; animation: ubDraw .9s .45s cubic-bezier(.65, 0, .35, 1) forwards; }
+#intro .mark .head { stroke-dasharray: 100; stroke-dashoffset: 100; animation: ubDraw .28s 1.25s cubic-bezier(.2, .8, .2, 1) forwards; }
+#intro .mark .ug { animation: ubGlow 1.4s 1.3s ease-out forwards; }
+#intro .mark .launch { transform-box: view-box; transform-origin: 60px 60px; animation: ubLaunch .75s 1.38s cubic-bezier(.3, 0, .2, 1); }
+#intro .mark .spark { opacity: 0; transform-box: fill-box; transform-origin: center; animation: ubSpark 1.2s 1.55s cubic-bezier(.2, 1.6, .4, 1) forwards; }
+#intro .word { margin-top: 4.2vmin; font: 800 min(8vmin, 76px) / 1 'Sora', 'Inter', sans-serif; letter-spacing: .9em; padding-left: .9em; opacity: 0; filter: blur(14px);
+  background: linear-gradient(100deg, #a48bff 0%, #c9bcff 30%, #ffffff 46%, #9fe9ff 54%, #7aa6ff 70%, #9b7bff 100%); background-size: 260% 100%; background-position: 100% 0;
+  -webkit-background-clip: text; background-clip: text; color: transparent; animation: ubWord 1.25s 1.62s cubic-bezier(.16, .9, .2, 1) forwards, ubShine 2.6s 2.1s ease-in-out forwards; }
+#intro .tag { margin-top: 2.4vmin; font: 500 min(1.9vmin, 15px) 'Inter', sans-serif; letter-spacing: .55em; padding-left: .55em; text-transform: uppercase; color: rgba(214, 208, 255, .72); opacity: 0; animation: ubUp .9s 2.3s ease-out forwards; }
+#intro .load { position: absolute; z-index: 4; bottom: calc(9vh + 26px); left: 50%; width: min(300px, 46vw); transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 10px; opacity: 0; animation: ubUp .7s 2.45s ease-out forwards; }
+#intro .load .bar { width: 100%; height: 2px; border-radius: 2px; background: rgba(255, 255, 255, .1); overflow: hidden; }
+#intro .load .bar i { display: block; height: 100%; width: 8%; background: linear-gradient(90deg, #8b6cff, #22d3ee); box-shadow: 0 0 14px #22d3ee; transition: width .6s cubic-bezier(.2, .8, .2, 1); }
+#intro .load span { font: 600 10px 'Inter', sans-serif; letter-spacing: .28em; text-transform: uppercase; color: rgba(200, 195, 240, .55); }
+#intro .skip { position: absolute; z-index: 4; right: 26px; bottom: calc(9vh + 22px); font: 500 11px 'Inter', sans-serif; letter-spacing: .14em; text-transform: uppercase; color: rgba(255, 255, 255, .3); opacity: 0; animation: ubUp .6s 1s forwards; }
+#intro.out { animation: ubOut .8s cubic-bezier(.7, 0, .3, 1) forwards; pointer-events: none; }
+#intro.out .bars { animation: ubBarsOut .6s cubic-bezier(.6, 0, .2, 1) forwards; }
+body.app-in main, body.app-in header { animation: ubAppIn .9s cubic-bezier(.2, .8, .2, 1) both; }
+@keyframes ubBloom { 60% { opacity: 1; } to { opacity: .85; transform: translate(-50%, -50%) scale(1); } }
+@keyframes ubFlash { 0% { opacity: 0; } 12% { opacity: 1; } to { opacity: 0; } }
+@keyframes ubBars { from { transform: scaleY(1.9); } }
+@keyframes ubBarsOut { to { transform: scaleY(0); } }
+@keyframes ubShake { 0%, 100% { transform: none; } 15% { transform: translate(-6px, 4px) scale(1.02); } 35% { transform: translate(5px, -3px); } 55% { transform: translate(-3px, 2px); } 75% { transform: translate(2px, -1px); } }
+@keyframes ubDraw { 0% { opacity: 0; } 6% { opacity: 1; } to { stroke-dashoffset: 0; opacity: 1; } }
+@keyframes ubBreak { to { transform: scale(1.7) rotate(14deg); opacity: 0; filter: blur(3px); } }
+@keyframes ubShard { 0% { opacity: 1; transform: none; } to { opacity: 0; transform: translate(var(--dx), var(--dy)) rotate(var(--r)) scale(.4); } }
+@keyframes ubGlow { 0% { opacity: 0; } 25% { opacity: 1; } to { opacity: .75; } }
+@keyframes ubLaunch { 0% { transform: none; } 35% { transform: translateY(-9px) scale(1.06); } to { transform: none; } }
+@keyframes ubSpark { 0% { opacity: 0; transform: scale(0) rotate(-90deg); } 60% { opacity: 1; transform: scale(1.6) rotate(10deg); } to { opacity: 1; transform: scale(1) rotate(0); } }
+@keyframes ubWord { to { opacity: 1; filter: blur(0); letter-spacing: .3em; padding-left: .3em; } }
+@keyframes ubShine { to { background-position: 0 0; } }
+@keyframes ubUp { from { opacity: 0; transform: translate(var(--tx, 0), 10px); } to { opacity: 1; transform: translate(var(--tx, 0), 0); } }
+#intro .load { --tx: -50%; }
+@keyframes ubOut { to { opacity: 0; transform: scale(1.14); filter: blur(8px); } }
+@keyframes ubAppIn { from { opacity: 0; transform: translateY(14px) scale(.99); } }
+</style>
+<script>
+// The opening animation: stars warp in, the logo draws itself and breaks out of its ring, the name
+// lands, and the real loading shows underneath. Click or press a key to skip. Off in Look & settings.
+window.ubIntro = (() => {
+  let el = null, done = false, readyAt = null, started = 0, ctx = null, master = null, raf = 0, forced = false;
+  const MIN = 3.6;
+  const look = () => { try { return JSON.parse(localStorage.getItem('gh-look') || '{}') || {}; } catch { return {}; } };
+  const vol = () => { try { const v = parseFloat(localStorage.getItem('gh-vol')); return Number.isFinite(v) ? v : 0.8; } catch { return 0.8; } };
+  // the sound, made right here: a rising whoosh, a deep hit when it breaks out, and a shimmer after
+  function sound() {
+    try {
+      ctx = new (window.AudioContext || window.webkitAudioContext)();
+      if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+      const t0 = ctx.currentTime + 0.05, out = ctx.destination;
+      master = ctx.createGain(); master.gain.value = Math.max(0, Math.min(1, vol())) * 0.55; master.connect(out);
+      const echo = ctx.createDelay(1), fb = ctx.createGain(), wet = ctx.createGain();
+      echo.delayTime.value = 0.23; fb.gain.value = 0.38; wet.gain.value = 0.35;
+      echo.connect(fb).connect(echo); echo.connect(wet).connect(master);
+      const noise = secs => { const b = ctx.createBuffer(1, ctx.sampleRate * secs, ctx.sampleRate), d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; const n = ctx.createBufferSource(); n.buffer = b; return n; };
+      // riser
+      const rn = noise(1.6), bp = ctx.createBiquadFilter(), rg = ctx.createGain();
+      bp.type = 'bandpass'; bp.Q.value = 1.4; bp.frequency.setValueAtTime(250, t0); bp.frequency.exponentialRampToValueAtTime(7000, t0 + 1.42);
+      rg.gain.setValueAtTime(0.0001, t0); rg.gain.exponentialRampToValueAtTime(0.5, t0 + 1.38); rg.gain.exponentialRampToValueAtTime(0.0001, t0 + 1.5);
+      rn.connect(bp).connect(rg).connect(master); rn.start(t0); rn.stop(t0 + 1.6);
+      const ro = ctx.createOscillator(), rl = ctx.createBiquadFilter(), rog = ctx.createGain();
+      ro.type = 'sawtooth'; ro.frequency.setValueAtTime(70, t0); ro.frequency.exponentialRampToValueAtTime(420, t0 + 1.45);
+      rl.type = 'lowpass'; rl.frequency.setValueAtTime(400, t0); rl.frequency.exponentialRampToValueAtTime(3000, t0 + 1.45);
+      rog.gain.setValueAtTime(0.0001, t0); rog.gain.exponentialRampToValueAtTime(0.09, t0 + 1.4); rog.gain.exponentialRampToValueAtTime(0.0001, t0 + 1.5);
+      ro.connect(rl).connect(rog).connect(master); ro.start(t0); ro.stop(t0 + 1.55);
+      // the hit
+      const hit = t0 + 1.5;
+      const sub = ctx.createOscillator(), sg = ctx.createGain();
+      sub.type = 'sine'; sub.frequency.setValueAtTime(95, hit); sub.frequency.exponentialRampToValueAtTime(30, hit + 1.4);
+      sg.gain.setValueAtTime(0.0001, hit); sg.gain.exponentialRampToValueAtTime(1, hit + 0.02); sg.gain.exponentialRampToValueAtTime(0.0001, hit + 2.2);
+      sub.connect(sg).connect(master); sub.start(hit); sub.stop(hit + 2.3);
+      const hn = noise(1), hl = ctx.createBiquadFilter(), hg = ctx.createGain();
+      hl.type = 'lowpass'; hl.frequency.setValueAtTime(2400, hit); hl.frequency.exponentialRampToValueAtTime(200, hit + 0.7);
+      hg.gain.setValueAtTime(0.7, hit); hg.gain.exponentialRampToValueAtTime(0.0001, hit + 0.8);
+      hn.connect(hl).connect(hg); hg.connect(master); hg.connect(echo); hn.start(hit); hn.stop(hit + 1);
+      // shimmer and a low chord under the name
+      [880, 1318.5, 1760, 2637, 3520].forEach((f, i) => {
+        const o = ctx.createOscillator(), g = ctx.createGain(), t = hit + 0.04 + i * 0.05;
+        o.type = 'sine'; o.frequency.value = f; o.detune.value = (i % 2 ? 6 : -6);
+        g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.045, t + 0.03); g.gain.exponentialRampToValueAtTime(0.0001, t + 2.6);
+        o.connect(g); g.connect(master); g.connect(echo); o.start(t); o.stop(t + 2.7);
+      });
+      [110, 164.8, 220, 277.2].forEach(f => {
+        const o = ctx.createOscillator(), g = ctx.createGain(), lp = ctx.createBiquadFilter(), t = hit + 0.1;
+        o.type = 'sawtooth'; o.frequency.value = f; lp.type = 'lowpass'; lp.frequency.value = 900;
+        g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.03, t + 0.5); g.gain.exponentialRampToValueAtTime(0.0001, t + 3.4);
+        o.connect(lp).connect(g).connect(master); o.start(t); o.stop(t + 3.5);
+      });
+    } catch { }
+  }
+  // the stars: 3D points flying at you, as streaks; faster as it builds, a burst when it breaks out
+  function stars(cv) {
+    const g = cv.getContext('2d'), N = 520, P = [];
+    const reset = (p, far) => { p.x = (Math.random() - .5) * 2; p.y = (Math.random() - .5) * 2; p.z = far ? 1 : Math.random(); p.pz = p.z; p.h = Math.random(); };
+    for (let i = 0; i < N; i++) { const p = {}; reset(p); P.push(p); }
+    const size = () => { const d = devicePixelRatio || 1; cv.width = innerWidth * d; cv.height = innerHeight * d; };
+    size(); addEventListener('resize', size);
+    let last = performance.now();
+    const speedAt = t => el && el.classList.contains('out') ? 0.11 : t < 1.45 ? 0.0015 + 0.03 * Math.pow(t / 1.45, 2.2) : t < 2.1 ? 0.09 - (t - 1.45) * 0.12 : 0.008;
+    const frame = now => {
+      if (!el) return;
+      // (a frame's time can be a moment before the start: never below 0, or the maths breaks)
+      const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now;
+      const t = Math.max(0, (now - started) / 1000), sp = speedAt(t) * dt * 60, W = cv.width, H = cv.height, cx = W / 2, cy = H * 0.46, f = Math.min(W, H) * 0.6;
+      g.fillStyle = 'rgba(3, 2, 8, .32)'; g.fillRect(0, 0, W, H);
+      g.lineCap = 'round';
+      for (const p of P) {
+        p.pz = p.z; p.z -= sp;
+        if (p.z <= 0.02) { reset(p, true); continue; }
+        const x1 = cx + p.x / p.pz * f, y1 = cy + p.y / p.pz * f, x2 = cx + p.x / p.z * f, y2 = cy + p.y / p.z * f;
+        if (x2 < -50 || x2 > W + 50 || y2 < -50 || y2 > H + 50) { reset(p, true); continue; }
+        const a = Math.min(1, (1 - p.z) * 1.4), w = Math.max(0.6, (1 - p.z) * 2.6) * (devicePixelRatio || 1);
+        g.strokeStyle = p.h < .5 ? `rgba(164, 139, 255, ${a})` : p.h < .85 ? `rgba(110, 200, 255, ${a})` : `rgba(255, 255, 255, ${a})`;
+        g.lineWidth = w; g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke();
+      }
+      raf = requestAnimationFrame(frame);
+    };
+    raf = requestAnimationFrame(frame);
+  }
+  function shards() {
+    let h = '';
+    for (let i = 0; i < 14; i++) {
+      const a = (i / 14) * Math.PI * 2, r = 46 + (i % 3) * 6, x = 60 + Math.cos(a) * 40, y = 70 + Math.sin(a) * 15, d = 60 + Math.random() * 70;
+      h += `<path class="shard" style="--dx:${(Math.cos(a) * d).toFixed(1)}px;--dy:${(Math.sin(a) * d * 0.7).toFixed(1)}px;--r:${Math.round(Math.random() * 300 - 150)}deg" d="M${x.toFixed(1)} ${y.toFixed(1)} l${(Math.cos(a + 1.6) * 5).toFixed(1)} ${(Math.sin(a + 1.6) * 2).toFixed(1)}" stroke="${i % 2 ? '#3ee8ff' : '#a48bff'}" stroke-width="3" stroke-linecap="round" fill="none"/>`;
+    }
+    return h;
+  }
+  function start(opts = {}) {
+    const l = look();
+    forced = !!opts.force;
+    if (el) return;
+    if (!forced && (location.search.includes('nointro') || l.intro === false || l.motion === false || matchMedia('(prefers-reduced-motion: reduce)').matches)) { done = true; return; }
+    try { if (!forced && sessionStorage.getItem('ub-intro')) { done = true; return; } sessionStorage.setItem('ub-intro', '1'); } catch { }
+    done = false; readyAt = forced ? 0 : null; started = performance.now();
+    el = document.createElement('div');
+    el.id = 'intro';
+    el.innerHTML = `<canvas></canvas><div class="bloom"></div><div class="bars t"></div><div class="bars b"></div>
+      <div class="stage">
+        <svg class="mark" viewBox="0 0 120 120" aria-hidden="true"><defs>
+          <linearGradient id="in-m" x1="0" y1="1" x2=".9" y2="0"><stop offset="0" stop-color="#9b7bff"/><stop offset=".55" stop-color="#6aa0ff"/><stop offset="1" stop-color="#3ee8ff"/></linearGradient>
+          <linearGradient id="in-r" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#3ee8ff"/><stop offset=".5" stop-color="#a48bff"/><stop offset="1" stop-color="#3ee8ff" stop-opacity=".3"/></linearGradient>
+          <filter id="in-b" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="5"/></filter></defs>
+          <g transform="rotate(-18 60 70)"><ellipse class="ring" cx="60" cy="70" rx="40" ry="15" fill="none" stroke="url(#in-r)" stroke-width="3.4" stroke-linecap="round" pathLength="100"/>${shards()}</g>
+          <g class="launch">
+            <path class="ug" pathLength="100" d="M40 42V67a20 20 0 0 0 40 0V26M67 39L80 26L93 39" fill="none" stroke="url(#in-m)" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" filter="url(#in-b)"/>
+            <path class="u" pathLength="100" d="M40 42V67a20 20 0 0 0 40 0V26" fill="none" stroke="url(#in-m)" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+            <path class="head" pathLength="100" d="M67 39L80 26L93 39" fill="none" stroke="#3ee8ff" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+          </g>
+          <path class="spark" d="M99 16l1.6 4.4L105 22l-4.4 1.6L99 28l-1.6-4.4L93 22l4.4-1.6z" fill="#fff"/>
+        </svg>
+        <div class="word">UNBOUND</div>
+        <div class="tag">TikTok gifts · no limits</div>
+      </div>
+      <div class="flash"></div>
+      <div class="load"><div class="bar"><i></i></div><span>Starting up</span></div>
+      <div class="skip">Click to skip</div>`;
+    (document.body || document.documentElement).appendChild(el);
+    stars(el.querySelector('canvas'));
+    if (l.introSound !== false) sound();
+    el.addEventListener('click', () => finish(true));
+    addEventListener('keydown', onKey, true);
+    setTimeout(check, MIN * 1000);
+    setTimeout(() => finish(true), 20000);   // never stuck on it
+  }
+  const onKey = e => { if (el && !e.ctrlKey && !e.altKey && !e.metaKey) { e.preventDefault(); e.stopPropagation(); finish(true); } };
+  function status(text, pct) {
+    if (!el) return;
+    const s = el.querySelector('.load span'), b = el.querySelector('.load .bar i');
+    if (text) s.textContent = text;
+    if (pct != null) b.style.width = pct + '%';
+  }
+  function check() { if (el && readyAt !== null && performance.now() - started >= MIN * 1000) finish(false); }
+  function ready() { readyAt = performance.now(); status('Ready', 100); setTimeout(check, 250); }
+  function finish(skip) {
+    if (!el || el.classList.contains('out')) return;
+    removeEventListener('keydown', onKey, true);
+    if (skip && master && ctx) try { master.gain.setTargetAtTime(0, ctx.currentTime, 0.15); } catch { }
+    el.classList.add('out');
+    document.body.classList.add('app-in');
+    const gone = el;
+    setTimeout(() => { cancelAnimationFrame(raf); gone.remove(); if (el === gone) el = null; done = true; document.body.classList.remove('app-in'); setTimeout(() => { try { ctx && ctx.close(); } catch { } }, 4000); }, 820);
+  }
+  return { start, status, ready, finish, get done() { return done; } };
+})();
+ubIntro.start();
+</script>
 <div id="updBar" class="upd" hidden><span id="updText"></span><button class="small hot" id="updNow">Update now</button></div>
 <header>
-  <div class="brand"><svg viewBox="0 0 100 100" aria-hidden="true"><defs><linearGradient id="lg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#7c5cff"/><stop offset="1" stop-color="#22d3ee"/></linearGradient></defs>
-    <rect x="2" y="2" width="96" height="96" rx="24" fill="url(#lg)"/><path d="M33 31V56a17 17 0 0 0 34 0V20M53 30L67 16L81 30" fill="none" stroke="#fff" stroke-width="11.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  <div class="brand"><img class="logo" src="/img/logo.svg" alt="">
     <span class="wm">Unbound</span><span class="live">LIVE</span></div>
   <div class="connect">
     <div class="at"><input type="text" id="ttUser" placeholder="your TikTok name" aria-label="TikTok username" autocomplete="off"></div>
@@ -742,6 +943,9 @@ body.corners-soft section { border-radius: 8px; }
         <label class="check" style="flex-direction:row"><input type="checkbox" data-look="compact"> Compact (fit more on the screen)</label>
         <label class="check" style="flex-direction:row"><input type="checkbox" data-look="side"> Show the Live gifts column</label>
         <label class="check" style="flex-direction:row"><input type="checkbox" data-look="motion"> Animations</label>
+        <label class="check" style="flex-direction:row"><input type="checkbox" data-look="intro"> Opening animation</label>
+        <label class="check" style="flex-direction:row"><input type="checkbox" data-look="introSound"> Opening sound</label>
+        <div><button class="small" id="introPlay">▶ Play the opening</button></div>
       </div>
       <div class="row" style="margin-top:12px"><button class="small ghost" id="lookReset">Back to the standard layout</button></div>
     </section>
@@ -1287,7 +1491,7 @@ const THEMES = [
   { id: 'mono', name: 'Mono', colours: ['#e5e7eb', '#161618', '#ef4444'] },
   { id: 'custom', name: 'Your own', colours: [] },
 ];
-const LOOK_STD = { textSize: 100, compact: false, side: true, corners: 'round', motion: true };
+const LOOK_STD = { textSize: 100, compact: false, side: true, corners: 'round', motion: true, intro: true, introSound: true };
 function applyTheme(id) {
   if (!THEMES.some(t => t.id === id)) id = 'unbound';
   const look = settings.look || {};
@@ -1326,6 +1530,7 @@ document.querySelectorAll('[data-look]').forEach(el => {
   el.onchange = send;
   if (el.type === 'range' || el.type === 'color') el.oninput = send;
 });
+$('introPlay').onclick = () => { try { localStorage.setItem('gh-look', JSON.stringify(settings.look || {})); } catch {} ubIntro.start({ force: true }); setTimeout(() => ubIntro.ready(), 300); };
 $('lookReset').onclick = () => { settings.look = { ...settings.look, ...LOOK_STD }; applyLook(); api('/api/settings', { look: LOOK_STD }); toast('Layout back to the standard'); };
 
 function fillSettings() {
@@ -1333,6 +1538,7 @@ function fillSettings() {
   applyLook();
   $('master').value = settings.masterVolume;
   $('masterVal').textContent = Math.round(settings.masterVolume * 100) + '%';
+  try { localStorage.setItem('gh-vol', settings.masterVolume); } catch {}
   $('soundsIn').value = settings.soundsIn;
   if (document.activeElement !== $('soundMax')) $('soundMax').value = settings.soundMax || '';
   $('autoConnect').checked = settings.autoConnect;
@@ -1394,6 +1600,8 @@ function jumpAll() {
   go('Do', 'Add your own sound files', () => $('upload').click());
   go('Setting', 'Colours / theme', () => setPage('settings', { to: 'lookSec' }));
   go('Setting', 'Text size, compact, corners', () => setPage('settings', { to: 'lookSec' }));
+  go('Do', 'Play the opening animation', () => $('introPlay').click());
+  go('Setting', 'Opening animation and sound on / off', () => setPage('settings', { to: 'lookSec' }));
   go('Setting', 'Gift popups (style, animation, colours, seconds)', () => setPage('overlay', { to: 'popSec' }));
   go('Setting', 'Gift list on the overlay', () => setPage('overlay', { to: 'ovMenuBox' }));
   go('Setting', 'Move the overlay boxes', () => setPage('overlay', { to: 'ovWrap' }));
@@ -2447,8 +2655,11 @@ async function init() {
   let start = location.hash.slice(1);
   try { if (!PAGES.includes(start)) start = localStorage.getItem('gh-page') || 'games'; } catch {}
   setPage(start);
+  ubIntro.status('Loading your games', 40);
   const s = await api('/api/state');
+  ubIntro.status('Getting your sounds ready', 80);
   applyState(s);
+  setTimeout(() => ubIntro.ready(), 150);
   $('feed').innerHTML = s.feed.length ? '' : '<div class="empty">Gifts will show up here.</div>';
   s.feed.slice().reverse().forEach(e => addFeed(e, false));
   $('log').textContent = s.log.join('\n');

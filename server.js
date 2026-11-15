@@ -112,6 +112,7 @@ function normalizeLook(l = {}) {
         side: l.side !== false,                                         // the Live gifts column on the right
         corners: ['round', 'soft', 'square'].includes(l.corners) ? l.corners : 'round',
         motion: l.motion !== false,                                     // hover and pop animations
+        intro: l.intro !== false, introSound: l.introSound !== false,   // the opening animation and its sound
     };
 }
 settings.look = normalizeLook(settings.look);
@@ -390,6 +391,7 @@ const SOUND_LIST = [
     ['can-you-feel-my-heart', 'can-you-feel-my-heart.mp3', 'edits'],
     ['after-dark', 'after-dark.mp3', 'edits'],
     ['another-love', 'another-love.mp3', 'edits'],
+    ['another-love-edit', 'another-love-anime-ahh.mp3', 'edits'],
     ['money-so-big', 'money-so-big.mp3', 'edits'],
     ['chill-guy', 'chill-guy.mp3', 'edits'],
     ['sahara', 'sahara.mp3', 'edits'],
@@ -495,7 +497,7 @@ const SOUND_GROUP_OF = Object.fromEntries(SOUND_LIST.map(([name, , group]) => [n
 // names that read better than the file name
 const SOUND_NICE = { 'where-have-you-been-edit': 'where have you been (edit)', 'six-seven': '6 7 (six seven)', 'fbi-open-up': 'FBI open up', 'dababy-lets-go': 'DaBaby lets go',
     'directed-by-robert-b-weide': 'directed by Robert B. Weide', 'oh-no-no-no-laugh': 'oh no no no (laugh)', 'wait-a-minute': 'wait a minute, who are you', 'golden': 'golden (KPop Demon Hunters)',
-    'fnaf-yay': 'FNAF yay', 'tnt': 'TNT', 'windows-xp': 'Windows XP', 'he-he-he-ha': 'he he he ha', 'minecraft-xp': 'Minecraft XP' };
+    'fnaf-yay': 'FNAF yay', 'another-love-edit': 'another love (longer edit)', 'tnt': 'TNT', 'windows-xp': 'Windows XP', 'he-he-he-ha': 'he he he ha', 'minecraft-xp': 'Minecraft XP' };
 const BUILTIN_SOUNDS = path.join(SOUNDS_DIR, 'builtin');
 const isMp3 = b => b.length > 512 && (b.subarray(0, 3).toString() === 'ID3' || (b[0] === 0xff && (b[1] & 0xe0) === 0xe0));
 const isClipPath = p => /^\/media\/sounds\/[\w.%()-]+\.mp3$/i.test(p) && !p.includes('..');

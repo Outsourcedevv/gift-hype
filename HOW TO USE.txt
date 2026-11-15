@@ -182,7 +182,7 @@ FINDING YOUR WAY
   The Live gifts and Quick sounds column stays on the right on every tab (you can hide it).
 
 SOUNDS
-  109 real sounds to start, in groups: Edit audios & songs (Where have you been (edit), Can you feel my heart,
+  110 real sounds to start, in groups: Edit audios & songs (Where have you been (edit), Can you feel my heart,
   After dark, Sahara, Murder in my mind, Golden...), Brainrot (Chicken jockey, Tung tung tung sahur, Tralalero,
   6 7, Skibidi...), Memes & reactions, Endings & drama, Game sounds, Minecraft and Phone & PC.
   They download by themselves the first time Unbound opens (needs internet once). If one is missing,
@@ -199,7 +199,14 @@ SOUNDS
     unless the gift's cut has its own end. The Dropper's reset sound still plays for its whole countdown.
   Find more: type in "Find any sound online" (e.g. "emotional damage"), press play to listen, Add to keep it.
   Add your own: drop .mp3 / .wav files on "Add your own sounds", or press "upload..." next to a gift.
+  A whole song you own works too (up to 15 MB): add it, then use Cut on a gift to pick the part.
   They're saved in the sounds\custom folder.
+
+OPENING ANIMATION
+  When Unbound opens: stars warp in, the logo draws itself and breaks out of its ring, and the name
+  lands while it loads underneath. Click or press any key to skip it.
+  Look & settings -> Layout: "Opening animation" and "Opening sound" turn them off;
+  "Play the opening" shows it again. It's off by itself when "Animations" is off.
 
 LOOK & SETTINGS
   Colours: Sky, Blaze, Mint, Punk, Egyptian, Grape, Mono, or "Your own" (pick the main colour, the
