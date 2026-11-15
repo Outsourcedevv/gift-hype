@@ -57,7 +57,7 @@ const settings = {
     activeGame: null,
     masterVolume: 0.8,
     soundsIn: 'app',        // 'app' (this window) or 'overlay' (the OBS overlay plays them)
-    overlay: { position: 'top', scale: 1, showSender: true, menu: true, menuSide: 'left', menuStyle: 'list' },
+    overlay: { position: 'top', scale: 1, showSender: true, menu: true, menuSide: 'left', menuStyle: 'list', canvas: 'auto' },
     ...readJson(SETTINGS_PATH, {}),
 };
 // The overlay's gift list: every setting it has, checked, with its default
@@ -101,6 +101,7 @@ function normalizePop(o = {}) {
     };
 }
 Object.assign(settings.overlay, normalizePop(settings.overlay));
+if (!['auto', 'landscape', 'portrait'].includes(settings.overlay.canvas)) settings.overlay.canvas = 'auto';
 // How the app itself looks: the custom theme's colours, text size, and the layout
 const THEME_IDS = ['unbound', 'sky', 'blaze', 'punk', 'egyptian', 'mint', 'grape', 'mono', 'custom'];
 function normalizeLook(l = {}) {
@@ -1362,6 +1363,8 @@ const routes = {
             if (['top', 'middle', 'bottom'].includes(b.overlay.position)) o.position = b.overlay.position;
             if (Number.isFinite(+b.overlay.scale)) o.scale = Math.max(0.4, Math.min(3, +b.overlay.scale));
             if (typeof b.overlay.showSender === 'boolean') o.showSender = b.overlay.showSender;
+            // the overlay's shape: auto (the shape it has in your streaming app), landscape 1920 x 1080 or portrait 1080 x 1920
+            if (['auto', 'landscape', 'portrait'].includes(b.overlay.canvas)) o.canvas = b.overlay.canvas;
             // the gift list's settings (anything starting "menu"), checked
             const menuKeys = Object.keys(b.overlay).filter(k => k.startsWith('menu'));
             // the other boxes' places (timer, block delete list, reset countdown): x, y (0-100) and size
@@ -1549,7 +1552,7 @@ const routes = {
 // localtest.me is a public name that always points to 127.0.0.1, so it's still this PC. Through it
 // only the overlay works (the page, its sounds, gift pictures and the live gift events), nothing else.
 const OVERLAY_HOST = 'gifthype.localtest.me';
-const OVERLAY_PATHS = new Set(['/overlay', '/api/overlay-state', '/api/events', '/gift-img']);
+const OVERLAY_PATHS = new Set(['/overlay', '/api/overlay-state', '/api/events', '/gift-img', '/api/overlay/view']);
 const overlayOnly = req => String(req.headers.host || '').replace(/:\d+$/, '').toLowerCase() === OVERLAY_HOST;
 // Pages only from this PC: blocks other websites (and DNS tricks) from using the app.
 function allowed(req) {
@@ -1626,6 +1629,14 @@ const server = http.createServer(async (req, res) => {
         clients.add(res);
         req.on('close', () => clients.delete(res));
         return;
+    }
+
+    // The stream overlay says how big it is in your streaming app (e.g. TikTok LIVE Studio), so the app can
+    // show you, and the editor can be that shape too
+    if (req.method === 'GET' && url.pathname === '/api/overlay/view') {
+        const w = Math.round(+url.searchParams.get('w')), h = Math.round(+url.searchParams.get('h'));
+        if (w >= 50 && h >= 50 && w <= 10000 && h <= 10000 && (status.overlayView?.w !== w || status.overlayView?.h !== h)) setStatus({ overlayView: { w, h } });
+        return send(res, 200, { ok: true });
     }
 
     // Sound files

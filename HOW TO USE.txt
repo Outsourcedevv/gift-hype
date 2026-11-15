@@ -232,7 +232,10 @@ ON STREAM (OBS / TikTok LIVE Studio)
   Press "Set up in TikTok LIVE Studio" (Stream overlay tab): it copies the address, opens LIVE
   Studio and shows the 4 clicks to add it. Or by hand: TikTok LIVE Studio: add a Link source, OBS: add
   a Browser source, with
-    http://gifthype.localtest.me:4747/overlay   size 1920 x 1080.
+    http://gifthype.localtest.me:4747/overlay   and make it fill the whole screen (any size works).
+  The overlay is drawn at 1920 x 1080 (or 1080 x 1920 for a vertical stream) and scaled to fit, so it
+  looks the same as in the editor whatever size your streaming app gives it. The Stream overlay tab
+  shows the size your streaming app uses; "Overlay shape" is Auto (that shape), Landscape or Portrait.
   (localtest.me always points back to your own PC, so it is still only on this PC. TikTok LIVE Studio
   won't take a "localhost" address. In OBS http://localhost:4747/overlay works too.)
   If your streaming app doesn't hear the Unbound window, set "Play sounds in" to the OBS overlay.
