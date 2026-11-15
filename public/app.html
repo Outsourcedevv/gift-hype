@@ -154,6 +154,14 @@ kbd { font-family: 'JetBrains Mono', monospace; font-size: 10px; border: 1px sol
 .quick .tile .tp span { font-size: 13px; }
 .quick .tile .tb.hov { display: block; }
 .quick .tile .tb:not(.on) { opacity: .5; }
+.boxes { display: flex; flex-direction: column; gap: 8px; }
+.boxrow { display: grid; grid-template-columns: minmax(140px, 1.1fr) auto repeat(3, minmax(120px, 1fr)) auto; gap: 14px; align-items: center; padding: 10px 12px; border: 1px solid var(--line); border-radius: 14px; background: color-mix(in srgb, var(--text) 3%, var(--panel)); }
+.boxrow.off { opacity: .6; }
+.boxrow .bn { font-weight: 600; }
+.boxrow label.sl { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--muted); }
+.boxrow label.sl span { display: flex; justify-content: space-between; }
+.boxrow label.sl b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+@media (max-width: 900px) { .boxrow { grid-template-columns: 1fr auto; } .boxrow label.sl { grid-column: 1 / -1; } }
 .keys { display: grid; grid-template-columns: max-content 1fr; gap: 10px 18px; align-items: center; font-size: 14px; }
 .keys span { color: var(--muted); }
 .rule-sound .pickbtn { max-width: 260px; overflow: hidden; text-overflow: ellipsis; text-transform: capitalize; }
@@ -188,7 +196,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 header {
   display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
   padding: 12px 20px; border-bottom: 1px solid var(--line); background: var(--header);
-  position: sticky; top: 0; z-index: 5;
+  position: sticky; top: 0; z-index: 30;
 }
 .brand { font-weight: 700; letter-spacing: .02em; font-size: 18px; display: flex; align-items: center; gap: 10px; }
 .brand img { width: 28px; height: 28px; border-radius: 7px; }
@@ -658,6 +666,12 @@ body.corners-soft section { border-radius: 8px; }
           <button class="small ghost" id="ovPlacesReset" style="margin-left:6px">Put the boxes back</button></p>
       </div>
     </section>
+    <section id="boxSec">
+      <h2>Boxes on the overlay <span class="right"><button class="small ghost" id="boxShowAll">Show all</button></span></h2>
+      <p class="hint" style="margin:0 0 12px">Show or hide each box on your stream, and make it wider, narrower, taller or shorter (the words fit inside). You can also drag the side handles of a box in the overlay above.
+        <b>Auto</b> = the box's own size. Hidden boxes stay faded in the overlay above so you can still place them.</p>
+      <div class="boxes" id="boxList"></div>
+    </section>
     <section id="popSec">
       <h2>Gift popups <span class="right"><button class="small ghost" id="popReset">Back to the standard look</button></span></h2>
       <p class="hint" style="margin:0 0 4px">How the popup looks when a gift comes in. Changes show in the overlay above straight away.</p>
@@ -1074,12 +1088,75 @@ $('autoConnect').onchange = () => api('/api/settings', { autoConnect: $('autoCon
 
 // the gift list's settings: every [data-m] field saves itself (sliders and colours as you move them)
 document.querySelectorAll('[data-m]').forEach(el => {
-  const send = () => { const k = el.dataset.m; const v = el.type === 'checkbox' ? el.checked : el.type === 'range' || el.type === 'number' ? +el.value : el.value; settings.overlay[k] = v; saveSettingsSoon({ overlay: { [k]: v } }); if (k === 'popColors') document.querySelectorAll('[data-popcol]').forEach(l => l.hidden = !v); };
+  const send = () => { const k = el.dataset.m; const v = el.type === 'checkbox' ? el.checked : el.type === 'range' || el.type === 'number' ? +el.value : el.value; settings.overlay[k] = v; saveSettingsSoon({ overlay: { [k]: v } }); if (k === 'popColors') document.querySelectorAll('[data-popcol]').forEach(l => l.hidden = !v); if (k === 'menu') fillBoxes(); };
   el.onchange = send;
   if (el.type === 'range' || el.type === 'color' || el.type === 'text') el.oninput = send;
 });
 const MENU_LOOK = { menuX: 2, menuY: 50, menuScale: 1, menuRows: 7, menuTitle: 'SEND A GIFT', menuSort: 'cheap', menuShowPrice: true, menuShowDoes: true, menuBg: '#0A1222', menuBgAlpha: 78,
   menuBorder: '#3A4A66', menuTitleColor: '#FFCF3A', menuNameColor: '#FFFFFF', menuPriceColor: '#FFCF3A', menuDoesColor: '#9FE7FF', menuHighlight: true, menuHideOnPopup: false };
+// ----- Boxes on the overlay: show / hide, width, height and size of each one -----
+const BOXES = [
+  { k: 'popups', name: 'Gift popups' }, { k: 'menu', name: 'Gift list' }, { k: 'timer', name: 'Timer (Chunk Chat / Chat Teleport)' },
+  { k: 'chatdel', name: 'Block delete list' }, { k: 'reset', name: 'Reset countdown (Dropper)' },
+];
+const boxPlace = k => (settings.overlay.place || {})[k] || {};
+const boxShown = k => k === 'menu' ? settings.overlay.menu !== false : !boxPlace(k).hide;
+const boxSize = k => k === 'menu' ? settings.overlay.menuScale ?? 1 : boxPlace(k).s ?? settings.overlay.scale ?? 1;
+function setBox(k, patch) {
+  const o = settings.overlay;
+  o.place = { ...(o.place || {}), [k]: { ...boxPlace(k), ...patch } };
+  for (const f in patch) if (patch[f] == null) delete o.place[k][f];
+  saveSettingsSoon({ overlay: { place: { [k]: patch } } });
+}
+function renderBoxes() {
+  $('boxList').innerHTML = BOXES.map(b => `<div class="boxrow" data-box="${b.k}">
+      <span class="bn">${esc(b.name)}</span>
+      <label class="check" style="flex-direction:row"><input type="checkbox" data-bshow> Show</label>
+      <label class="sl"><span>Width <b data-bv="w"></b></span><input type="range" min="0" max="1600" step="10" data-bw></label>
+      <label class="sl"><span>Height <b data-bv="h"></b></span><input type="range" min="0" max="800" step="5" data-bh></label>
+      <label class="sl"><span>Size <b data-bv="s"></b></span><input type="range" min="30" max="300" step="5" data-bs></label>
+      <button class="small ghost" data-breset title="Width, height and size back to normal">Reset</button>
+    </div>`).join('');
+  $('boxList').querySelectorAll('[data-box]').forEach(row => {
+    const k = row.dataset.box;
+    row.querySelector('[data-bshow]').onchange = e => {
+      if (k === 'menu') { settings.overlay.menu = e.target.checked; saveSettingsSoon({ overlay: { menu: e.target.checked } }); }
+      else setBox(k, { hide: !e.target.checked });
+      fillBoxes(); fillMenuSettings();
+    };
+    // below 100 (width) / 30 (height) means Auto: the box's own size
+    row.querySelector('[data-bw]').oninput = e => { const v = +e.target.value; setBox(k, { w: v >= 100 ? v : null }); fillBoxes(); };
+    row.querySelector('[data-bh]').oninput = e => { const v = +e.target.value; setBox(k, { h: v >= 30 ? v : null }); fillBoxes(); };
+    row.querySelector('[data-bs]').oninput = e => {
+      const v = +e.target.value / 100;
+      if (k === 'menu') { settings.overlay.menuScale = v; saveSettingsSoon({ overlay: { menuScale: v } }); } else setBox(k, { s: v });
+      fillBoxes();
+    };
+    row.querySelector('[data-breset]').onclick = () => {
+      if (k === 'menu') { settings.overlay.menuScale = 1; saveSettingsSoon({ overlay: { menuScale: 1 } }); setBox(k, { w: null, h: null }); }
+      else setBox(k, { w: null, h: null, s: null });
+      fillBoxes();
+    };
+  });
+}
+function fillBoxes() {
+  if (!$('boxList').children.length) renderBoxes();
+  $('boxList').querySelectorAll('[data-box]').forEach(row => {
+    const k = row.dataset.box, p = boxPlace(k), shown = boxShown(k), busy = el => el === document.activeElement;
+    row.classList.toggle('off', !shown);
+    const set = (sel, v) => { const el = row.querySelector(sel); if (!busy(el)) { if (el.type === 'checkbox') el.checked = v; else el.value = v; } };
+    set('[data-bshow]', shown); set('[data-bw]', p.w || 0); set('[data-bh]', p.h || 0); set('[data-bs]', Math.round(boxSize(k) * 100));
+    row.querySelector('[data-bv="w"]').textContent = p.w ? p.w + ' px' : 'Auto';
+    row.querySelector('[data-bv="h"]').textContent = p.h ? p.h + ' px' : 'Auto';
+    row.querySelector('[data-bv="s"]').textContent = Math.round(boxSize(k) * 100) + '%';
+  });
+}
+$('boxShowAll').onclick = () => {
+  settings.overlay.menu = true;
+  for (const b of BOXES) if (b.k !== 'menu') setBox(b.k, { hide: false });
+  saveSettingsSoon({ overlay: { menu: true } });
+  fillBoxes(); fillMenuSettings(); toast('Every box shows on your stream');
+};
 const POP_LOOK = { popSeconds: 4.5, popMax: 4, popAnim: 'bounce', popStyle: 'dark', popImage: true, popWiggle: true, popCount: true, popColors: false,
   popBorder: '#4DB3EE', popName: '#4DB3EE', popText: '#FFFFFF', popDoes: '#FF6A3D', popWord: 'sent', popMinCoins: 0, showSender: true };
 $('popReset').onclick = async () => { Object.assign(settings.overlay, POP_LOOK); await api('/api/settings', { overlay: POP_LOOK }); fillMenuSettings(); toast('Popups back to the standard look'); };
@@ -1087,8 +1164,13 @@ $('ovTest').onclick = async () => { try { await api('/api/overlay/test-popup', {
 $('ovMenuReset').onclick = async () => { Object.assign(settings.overlay, MENU_LOOK); await api('/api/settings', { overlay: MENU_LOOK }); fillMenuSettings(); toast('Gift list back to the standard look'); };
 // the overlay editor: the real overlay page (?edit) at 1920 x 1080, scaled to fit
 $('ovPlacesReset').onclick = async () => {
-  Object.assign(settings.overlay, { menuX: 2, menuY: 50, menuScale: 1, place: {} });
-  await api('/api/settings', { overlay: { menuX: 2, menuY: 50, menuScale: 1, place: { timer: null, chatdel: null, reset: null } } });
+  // places, widths, heights and sizes back to the start; shown / hidden stays as it is
+  const back = { x: null, y: null, s: null, w: null, h: null }, place = {};
+  for (const b of BOXES) place[b.k] = back;
+  const hidden = Object.fromEntries(BOXES.filter(b => b.k !== 'menu' && boxPlace(b.k).hide).map(b => [b.k, { hide: true }]));
+  Object.assign(settings.overlay, { menuX: 2, menuY: 50, menuScale: 1, place: hidden });
+  await api('/api/settings', { overlay: { menuX: 2, menuY: 50, menuScale: 1, place } });
+  fillBoxes();
   $('ovFrame').contentWindow?.location.reload();
   toast('Boxes back where they started');
 };
@@ -1116,6 +1198,7 @@ function fillMenuSettings() {
   startOverlayEditor();
   document.querySelectorAll('[data-m]').forEach(el => { const v = settings.overlay[el.dataset.m]; if (el.type === 'checkbox') el.checked = v !== false; else if (v != null) el.value = v; });
   document.querySelectorAll('[data-popcol]').forEach(l => l.hidden = !settings.overlay.popColors);
+  fillBoxes();
   $('ovMenuOpen').href = `http://localhost:${location.port}/overlay`;
 }
 
@@ -1138,7 +1221,8 @@ $('liveClose').onclick = $('liveDone').onclick = () => $('liveDlg').close();
 let settingsTimer, settingsPending = {};
 // several quick changes are sent together (none is lost), a quarter of a second after the last
 function saveSettingsSoon(patch) {
-  for (const [k, v] of Object.entries(patch)) settingsPending[k] = v && typeof v === 'object' && !Array.isArray(v) ? { ...(settingsPending[k] || {}), ...v } : v;
+  const merge = (a, b) => { const o = { ...(a && typeof a === 'object' ? a : {}) }; for (const [k, v] of Object.entries(b)) o[k] = v && typeof v === 'object' && !Array.isArray(v) ? merge(o[k], v) : v; return o; };
+  settingsPending = merge(settingsPending, patch);
   clearTimeout(settingsTimer);
   settingsTimer = setTimeout(() => { const p = settingsPending; settingsPending = {}; api('/api/settings', p); }, 250);
 }
@@ -1263,6 +1347,7 @@ function jumpAll() {
   go('Setting', 'Gift popups (style, animation, colours, seconds)', () => setPage('overlay', { to: 'popSec' }));
   go('Setting', 'Gift list on the overlay', () => setPage('overlay', { to: 'ovMenuBox' }));
   go('Setting', 'Move the overlay boxes', () => setPage('overlay', { to: 'ovWrap' }));
+  go('Setting', 'Show / hide overlay boxes, width and height', () => setPage('overlay', { to: 'boxSec' }));
   go('Setting', 'Set up the overlay in TikTok LIVE Studio', () => $('ovLive').click());
   go('Setting', 'Play sounds in the app or the overlay', () => setPage('settings', { to: 'soundsIn' }));
   go('Setting', 'Euler Stream key', () => setPage('settings', { to: 'eulerBox' }));
@@ -2196,7 +2281,7 @@ async function init() {
   const es = new EventSource('/api/events');
   es.addEventListener('state', e => { saveTimer = null; applyState(JSON.parse(e.data)); });
   es.addEventListener('status', e => { status = JSON.parse(e.data); renderStatus(); renderUpdate(); });
-  es.addEventListener('settings', e => { settings = JSON.parse(e.data); applyTheme(settings.theme); applyLook(); });
+  es.addEventListener('settings', e => { settings = JSON.parse(e.data); applyTheme(settings.theme); applyLook(); fillBoxes(); });
   es.addEventListener('games', e => { gamesList = JSON.parse(e.data); renderGames(); });
   es.addEventListener('sounds', e => { sounds = JSON.parse(e.data); renderSounds(); if (game) renderRules(); });
   es.addEventListener('gift', e => addFeed(JSON.parse(e.data)));

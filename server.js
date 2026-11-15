@@ -1352,10 +1352,21 @@ const routes = {
             if (b.overlay.place && typeof b.overlay.place === 'object') {
                 const n = (v, lo, hi, d) => Number.isFinite(+v) && v !== null && v !== '' ? Math.max(lo, Math.min(hi, +v)) : d;
                 o.place = { ...(o.place || {}) };
-                for (const k of ['popups', 'timer', 'chatdel', 'reset']) {
+                // a change can be part of a box (e.g. only its width); a field sent as null goes back to normal
+                for (const k of ['popups', 'menu', 'timer', 'chatdel', 'reset']) {
                     const p = b.overlay.place[k];
-                    if (p === null) delete o.place[k];
-                    else if (p && typeof p === 'object') o.place[k] = { x: n(p.x, 0, 100, 50), y: n(p.y, 0, 100, 50), s: n(p.s, 0.3, 3, 1) };
+                    if (p === null) { delete o.place[k]; continue; }
+                    if (!p || typeof p !== 'object') continue;
+                    const q = { ...(o.place[k] || {}), ...p }, out = {};
+                    if (k !== 'menu') {                                     // the gift list keeps its place in menuX / menuY / menuScale
+                        if (q.x != null) out.x = n(q.x, 0, 100, 50);
+                        if (q.y != null) out.y = n(q.y, 0, 100, 50);
+                        if (q.s != null) out.s = n(q.s, 0.3, 3, 1);
+                    }
+                    if (q.w != null && +q.w >= 100) out.w = Math.round(n(q.w, 120, 1900, 400));   // its own width, in overlay pixels
+                    if (q.h != null && +q.h >= 30) out.h = Math.round(n(q.h, 30, 1000, 100));     // its own height
+                    if (q.hide === true && k !== 'menu') out.hide = true;  // not on your stream (the gift list uses "menu")
+                    if (Object.keys(out).length) o.place[k] = out; else delete o.place[k];
                 }
             }
             const popKeys = Object.keys(b.overlay).filter(k => k.startsWith('pop'));

@@ -201,6 +201,13 @@ LOOK & SETTINGS
   eye-catcher and a dark or light background). The stream popups use the same colours.
   Layout: text size, corners (round / a little round / square), compact, the Live gifts column, animations.
 
+BOXES ON THE OVERLAY (Stream overlay tab)
+  Every box (gift popups, gift list, timer, block delete list, reset countdown) can be shown or hidden
+  on your stream, and has its own Width, Height and Size. Auto = the box's own size. You can also drag
+  a box's side handles in the overlay editor: the right one for width, the bottom one for height, the
+  round corner for the size of everything. Hidden boxes stay faded in the editor so you can still
+  place them. "Put the boxes back" resets places and sizes (shown / hidden stays as it is).
+
 GIFT POPUPS (Stream overlay tab)
   Style (dark, light, glass, neon glow, Minecraft), how they come in (bounce, slide, zoom, spin, fade),
   seconds on screen, how many at once, only gifts worth at least so many coins, the word after the

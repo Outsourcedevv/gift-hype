@@ -100,7 +100,7 @@ body.pst-minecraft .pop { font-family: 'Monocraft', monospace; border-radius: 0;
 @keyframes flash { 50% { opacity: .25; } }
 
 /* The reset countdown (as in Parkour Paradise): which gift saves you */
-#resetBox { position: absolute; left: 40px; top: 40px; width: 420px; transform-origin: top left; }
+#resetBox { position: absolute; left: 40px; top: 40px; width: var(--bw, 420px); transform-origin: top left; }
 #resetBox:empty { display: none; }
 .reset { border-radius: 16px; padding: 14px 18px 16px; background: rgba(20, 4, 10, .88); border: 3px solid var(--pink); box-shadow: 0 0 30px rgba(254,44,85,.45); animation: in .45s cubic-bezier(.2,1.4,.4,1); }
 .reset.urgent { animation: in .45s cubic-bezier(.2,1.4,.4,1), throb .5s ease-in-out infinite alternate; }
@@ -119,7 +119,7 @@ body.pst-minecraft .pop { font-family: 'Monocraft', monospace; border-radius: 0;
 .reset.result .who { font-size: 17px; margin-top: 4px; }
 @keyframes throb { to { transform: scale(1.04); box-shadow: 0 0 46px rgba(254,44,85,.8); } }
 /* Chat block delete: blocks typed in chat, each with its countdown (top right) */
-#chatDel { position: absolute; right: 40px; top: 40px; width: min(380px, calc(100vw - 80px)); transform-origin: top right; display: flex; flex-direction: column; gap: 10px; font-family: 'Monocraft', monospace; }
+#chatDel { position: absolute; right: 40px; top: 40px; width: var(--bw, min(380px, calc(100vw - 80px))); transform-origin: top right; display: flex; flex-direction: column; gap: 10px; font-family: 'Monocraft', monospace; }
 .cd { position: relative; padding: 10px 14px 12px; background: rgba(12, 12, 12, .86); border: 3px solid #3f3f3f; border-radius: 4px;
   box-shadow: inset -3px -3px 0 rgba(0,0,0,.5), inset 3px 3px 0 rgba(255,255,255,.12), 0 6px 20px rgba(0,0,0,.45); animation: in .4s cubic-bezier(.2,1.4,.4,1) both; }
 .cd .row1 { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
@@ -134,7 +134,7 @@ body.pst-minecraft .pop { font-family: 'Monocraft', monospace; border-radius: 0;
 .cd.gone .by { color: #fff; }
 @keyframes throbcd { to { box-shadow: 0 0 26px rgba(255,85,85,.7); } }
 /* Chunk Chat: the block that's winning, the timer, and the top picks */
-#chunkChat { position: absolute; right: 40px; top: 40px; width: min(400px, calc(100vw - 80px)); transform-origin: top right; font-family: 'Monocraft', monospace; }
+#chunkChat { position: absolute; right: 40px; top: 40px; width: var(--bw, min(400px, calc(100vw - 80px))); transform-origin: top right; font-family: 'Monocraft', monospace; }
 #chunkChat:empty { display: none; }
 .cc { padding: 12px 16px 14px; background: rgba(12, 12, 12, .88); border: 3px solid #3f3f3f; border-radius: 4px;
   box-shadow: inset -3px -3px 0 rgba(0,0,0,.5), inset 3px 3px 0 rgba(255,255,255,.12), 0 6px 20px rgba(0,0,0,.45); animation: in .4s cubic-bezier(.2,1.4,.4,1) both; }
@@ -157,7 +157,7 @@ body.preview { background: repeating-conic-gradient(#20242b 0 25%, #171a1f 0 50%
 /* the gift list: what each gift does in the game you're playing (Unbound fills it in). Its place,
    size and colours come from the settings (--m-* below, set by drawMenu). */
 #menu { position: fixed; left: var(--m-x, 2%); top: var(--m-y, 50%); transform: translate(calc(var(--m-x, 2%) * -1), calc(var(--m-y, 50%) * -1)) scale(var(--m-scale, 1));
-  transform-origin: var(--m-x, 2%) var(--m-y, 50%); width: 330px; display: none; transition: opacity .4s;
+  transform-origin: var(--m-x, 2%) var(--m-y, 50%); width: var(--bw, 330px); min-height: var(--bh, 0px); display: none; transition: opacity .4s;
   background: var(--m-bg, rgba(10, 18, 34, .78)); border: 2px solid var(--m-border, #3a4a66); border-radius: 16px; padding: 14px 14px 10px; color: var(--m-name, #fff);
   font-family: 'Monocraft', 'Silkscreen', monospace; box-shadow: 0 8px 30px rgba(0, 0, 0, .35); }
 #menu.on { display: block; }
@@ -176,7 +176,7 @@ body.preview { background: repeating-conic-gradient(#20242b 0 25%, #171a1f 0 50%
 #menu.single.lit { box-shadow: 0 0 0 3px var(--m-title, #ffcf3a), 0 0 30px var(--m-title, #ffcf3a); }
 @keyframes litPulse { 50% { transform: scale(1.04); } }
 /* one at a time: a big card for one gift, then the next */
-#menu.single { width: 300px; text-align: center; padding: 14px 16px 12px; }
+#menu.single { width: var(--bw, 300px); text-align: center; padding: 14px 16px 12px; }
 #menu.single .one { animation: oneIn .5s ease both; }
 #menu.single .one img { width: 120px; height: 120px; object-fit: contain; display: block; margin: 2px auto 6px; filter: drop-shadow(0 4px 10px rgba(0,0,0,.4)); }
 #menu.single .one .nm { font-size: 22px; font-weight: 700; line-height: 1.1; }
@@ -190,12 +190,24 @@ body.preview { background: repeating-conic-gradient(#20242b 0 25%, #171a1f 0 50%
   color: #fff; background: rgba(10, 18, 34, .8); border: 2px solid #4ade80; opacity: 0; transition: opacity .4s; pointer-events: none; }
 #conn.show { opacity: 1; }
 #conn.bad { border-color: #f87171; }
+/* each box's own width and height (Overlay → Boxes in the app): the words fit and stay in the middle */
+#stack .pop { width: var(--bw, auto); max-width: max(900px, var(--bw, 0px)); min-height: var(--bh, 0px); box-sizing: border-box; justify-content: center; }
+#stack .pop > div:last-child { min-width: 0; }
+.reset, .cd, .cc { min-height: var(--bh, 0px); box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; }
+.boxhidden { display: none !important; }
+body.editing .boxhidden { display: revert !important; opacity: .35; }
+body.editing #menu.boxhidden { display: block !important; }
 /* the overlay editor (the app shows this page with ?edit): boxes to drag and resize */
 body.editing { background: #18202e; background-image: linear-gradient(rgba(255,255,255,.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.04) 1px, transparent 1px); background-size: 96px 96px; }
 .edframe { position: fixed; z-index: 50; border: 4px dashed #4db3ee; border-radius: 14px; cursor: move; touch-action: none; }
 .edframe:hover, .edframe.drag { border-style: solid; background: rgba(77, 179, 238, .08); }
 .edframe b { position: absolute; left: -4px; top: -44px; background: #4db3ee; color: #05263d; font: 700 24px system-ui, sans-serif; padding: 4px 14px; border-radius: 10px; white-space: nowrap; }
 .edframe i { position: absolute; right: -18px; bottom: -18px; width: 34px; height: 34px; background: #fff; border: 5px solid #4db3ee; border-radius: 50%; cursor: nwse-resize; }
+.edframe u { position: absolute; background: #fff; border: 5px solid #4db3ee; border-radius: 10px; }
+.edframe u.ew { right: -14px; top: 50%; width: 22px; height: 64px; margin-top: -32px; cursor: ew-resize; }
+.edframe u.ns { bottom: -14px; left: 50%; width: 64px; height: 22px; margin-left: -32px; cursor: ns-resize; }
+.edframe.off { border-color: #8a93a3; }
+.edframe.off b { background: #8a93a3; }
 .edzone { position: fixed; z-index: 40; left: 50%; transform: translateX(-50%); width: 760px; height: 300px; border: 4px dashed rgba(255, 140, 70, .8); border-radius: 18px;
   color: rgba(255, 170, 110, .95); font: 700 26px system-ui, sans-serif; display: flex; align-items: center; justify-content: center; text-align: center; pointer-events: none; }
 @keyframes oneIn { from { opacity: 0; transform: translateY(10px) scale(.96); } to { opacity: 1; transform: none; } }
@@ -215,6 +227,8 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const pic = url => url ? '/gift-img?u=' + encodeURIComponent(url) : '';
 let settings = { overlay: { position: 'top', scale: 1, showSender: true }, soundsIn: 'app' };
 const EDITING = new URLSearchParams(location.search).has('edit');
+// the part of each box that takes the width and height (popups: one popup; lists: one entry)
+const PANEL = { popups: '#stack .pop', menu: '#menu', timer: '#chunkChat .cc', chatdel: '#chatDel .cd', reset: '#resetBox .reset' };
 const DEMO_ROSE = 'https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/eba3a9bb85c33e017f3648eaf88d7189~tplv-obj.webp';
 if (location.search.includes('preview')) document.body.classList.add('preview');
 
@@ -438,11 +452,13 @@ const PLACE = {
 };
 function placeOf(k) {
   const o = (settings && settings.overlay) || {};
-  if (k === 'menu') return { x: o.menuX ?? 2, y: o.menuY ?? 50, s: o.menuScale ?? 1 };
   const p = (o.place || {})[k] || {};
+  // width / height in overlay pixels (none = the box's own size); hide = not on your stream
+  const wh = { w: p.w || null, h: p.h || null, hide: k === 'menu' ? o.menu === false : !!p.hide };
+  if (k === 'menu') return { x: o.menuX ?? 2, y: o.menuY ?? 50, s: o.menuScale ?? 1, ...wh };
   // popups start where the old "Popups at" setting put them
   const def = k === 'popups' ? { x: 50, y: { top: 4, middle: 50, bottom: 96 }[o.position] ?? 4 } : PLACE[k].def;
-  return { x: p.x ?? def.x, y: p.y ?? def.y, s: p.s ?? (o.scale || 1) };
+  return { x: p.x ?? def.x, y: p.y ?? def.y, s: p.s ?? (o.scale || 1), ...wh };
 }
 function applyPlaces() {
   for (const k in PLACE) {
@@ -451,7 +467,10 @@ function applyPlaces() {
     Object.assign(e.style, { position: 'fixed', left: p.x + '%', top: p.y + '%', right: 'auto', bottom: 'auto',
       transformOrigin: `${p.x}% ${p.y}%`, transform: `translate(${-p.x}%, ${-p.y}%) scale(${p.s})` });
     // popups low on the screen stack upwards (newest at the bottom), so they stay on screen
-    if (k === 'popups') e.style.flexDirection = p.y > 60 ? 'column-reverse' : 'column';
+    if (k === 'popups') { e.style.flexDirection = p.y > 60 ? 'column-reverse' : 'column'; e.style.width = Math.max(760, p.w || 0) + 'px'; }
+    if (p.w) e.style.setProperty('--bw', p.w + 'px'); else e.style.removeProperty('--bw');
+    if (p.h) e.style.setProperty('--bh', p.h + 'px'); else e.style.removeProperty('--bh');
+    e.classList.toggle('boxhidden', !!p.hide);
   }
 }
 
@@ -476,31 +495,39 @@ function setupEditor() {
   for (const k in PLACE) {
     const f = document.createElement('div');
     f.className = 'edframe';
-    f.innerHTML = `<b>${PLACE[k].label}</b><i title="Drag to resize"></i>`;
+    f.innerHTML = `<b>${PLACE[k].label}</b><i title="Drag to make it all bigger or smaller"></i><u class="ew" title="Drag to make it wider or narrower"></u><u class="ns" title="Drag to make it taller or shorter"></u>`;
     document.body.appendChild(f);
     frames[k] = f;
     let start = null;
     const save = () => {
       const p = placeOf(k);
-      const body = k === 'menu' ? { menuX: +p.x.toFixed(1), menuY: +p.y.toFixed(1), menuScale: +p.s.toFixed(2) } : { place: { [k]: { x: +p.x.toFixed(1), y: +p.y.toFixed(1), s: +p.s.toFixed(2) } } };
+      const wh = { w: p.w ? Math.round(p.w) : null, h: p.h ? Math.round(p.h) : null };
+      const body = k === 'menu' ? { menuX: +p.x.toFixed(1), menuY: +p.y.toFixed(1), menuScale: +p.s.toFixed(2), place: { menu: wh } } : { place: { [k]: { x: +p.x.toFixed(1), y: +p.y.toFixed(1), s: +p.s.toFixed(2), ...wh } } };
       fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ overlay: body }) });
     };
     const set = p => {
       const o = settings.overlay;
-      if (k === 'menu') { o.menuX = p.x; o.menuY = p.y; o.menuScale = p.s; } else { o.place = { ...(o.place || {}), [k]: p }; }
+      const { hide, ...keep } = p;
+      if (k === 'menu') { o.menuX = p.x; o.menuY = p.y; o.menuScale = p.s; o.place = { ...(o.place || {}), menu: { ...(o.place?.menu || {}), w: p.w, h: p.h } }; }
+      else o.place = { ...(o.place || {}), [k]: { ...(o.place?.[k] || {}), ...keep } };
       applyPlaces();
     };
     f.onpointerdown = ev => {
       ev.preventDefault();
       f.setPointerCapture(ev.pointerId);
       const r = document.getElementById(PLACE[k].id).getBoundingClientRect();
-      start = { mx: ev.clientX, my: ev.clientY, r, p: placeOf(k), resize: ev.target.tagName === 'I' };
+      start = { mx: ev.clientX, my: ev.clientY, r, p: placeOf(k), resize: ev.target.tagName === 'I', side: ev.target.tagName === 'U' ? ev.target.className : null };
       f.classList.add('drag');
     };
     f.onpointermove = ev => {
       if (!start) return;
       const dx = ev.clientX - start.mx, dy = ev.clientY - start.my, { r, p } = start;
-      if (start.resize) {
+      if (start.side) {
+        // the box's own width or height (the box is drawn at its size, so undo that for the real pixels)
+        const pb = PANEL[k] ? document.querySelector(PANEL[k]) : null, pr = pb ? pb.getBoundingClientRect() : r;
+        if (start.side === 'ew') set({ ...p, w: Math.max(120, Math.min(1900, (start.w0 ??= (p.w || pr.width / p.s)) + dx / p.s)) });
+        else set({ ...p, h: Math.max(30, Math.min(1000, (start.h0 ??= (p.h || pr.height / p.s)) + dy / p.s)) });
+      } else if (start.resize) {
         const s = Math.max(0.3, Math.min(3, p.s * (r.width + dx) / r.width));
         set({ ...p, s });
       } else {
@@ -516,6 +543,8 @@ function setupEditor() {
     for (const k in frames) {
       const r = document.getElementById(PLACE[k].id).getBoundingClientRect(), f = frames[k];
       f.style.display = r.width ? '' : 'none';
+      const hid = placeOf(k).hide;
+      f.classList.toggle('off', hid); f.querySelector('b').textContent = PLACE[k].label + (hid ? ' (hidden)' : '');
       Object.assign(f.style, { left: r.left - 6 + 'px', top: r.top - 6 + 'px', width: r.width + 4 + 'px', height: r.height + 4 + 'px' });
     }
     requestAnimationFrame(follow);
@@ -547,8 +576,8 @@ function drawMenu() {
   const el = document.getElementById('menu'), o = mo();
   // the layout changed (style, rows, speed, order): start again
   if ([o.menuStyle, o.menuRows, o.menuSeconds, o.menuSort].join('|') !== menuShape) return restartMenu();
-  const on = o.menu !== false && menuItems.length > 0, single = o.menuStyle === 'single';
-  el.className = (on ? 'on' : '') + (single ? ' single' : '') + (el.classList.contains('away') ? ' away' : '') + (single && litName && menuItems[menuPage]?.name === litName ? ' lit' : '');
+  const on = (o.menu !== false || EDITING) && menuItems.length > 0, single = o.menuStyle === 'single';
+  el.className = (on ? 'on' : '') + (single ? ' single' : '') + (o.menu === false ? ' boxhidden' : '') + (el.classList.contains('away') ? ' away' : '') + (single && litName && menuItems[menuPage]?.name === litName ? ' lit' : '');
   const v = (k, val) => el.style.setProperty(k, val);
   v('--m-x', (o.menuX ?? 2) + '%'); v('--m-y', (o.menuY ?? 50) + '%'); v('--m-scale', o.menuScale || 1);
   v('--m-bg', hexA(o.menuBg, (o.menuBgAlpha ?? 78) / 100)); v('--m-border', o.menuBorder || '#3a4a66');
