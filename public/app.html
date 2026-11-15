@@ -155,6 +155,13 @@ kbd { font-family: 'JetBrains Mono', monospace; font-size: 10px; border: 1px sol
 .quick .tile .tp span { font-size: 13px; }
 .quick .tile .tb.hov { display: block; }
 .quick .tile .tb:not(.on) { opacity: .5; }
+.zoomrow { display: grid; grid-template-columns: minmax(200px, 1fr) auto; gap: 16px; align-items: end; padding: 12px 14px; margin-bottom: 8px; border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--main) 40%, transparent); background: color-mix(in srgb, var(--main) 8%, var(--panel)); }
+.zoomrow label.sl { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); font-weight: 600; }
+.zoomrow label.sl span { display: flex; justify-content: space-between; }
+.zoomrow label.sl b { color: var(--text); font-variant-numeric: tabular-nums; }
+@media (max-width: 760px) { .zoomrow { grid-template-columns: 1fr; } }
+.ovwarn { color: var(--amber); }
 .boxes { display: flex; flex-direction: column; gap: 8px; }
 .boxrow { display: grid; grid-template-columns: minmax(140px, 1.1fr) auto repeat(3, minmax(120px, 1fr)) auto; gap: 14px; align-items: center; padding: 10px 12px; border: 1px solid var(--line); border-radius: 14px; background: color-mix(in srgb, var(--text) 3%, var(--panel)); }
 .boxrow.off { opacity: .6; }
@@ -885,6 +892,11 @@ ubIntro.start();
       <h2>Boxes on the overlay <span class="right"><button class="small ghost" id="boxShowAll">Show all</button></span></h2>
       <p class="hint" style="margin:0 0 12px">Show or hide each box on your stream, and make it wider, narrower, taller or shorter (the words fit inside). You can also drag the side handles of a box in the overlay above.
         <b>Auto</b> = the box's own size. Hidden boxes stay faded in the overlay above so you can still place them.</p>
+      <div class="zoomrow">
+        <label class="sl"><span>Size of everything <b id="zoomVal"></b></span><input type="range" min="50" max="300" step="5" data-m="zoom"></label>
+        <div class="row"><button class="small" data-zoom="100">100%</button><button class="small" data-zoom="150">150%</button><button class="small primary" data-zoom="200">200% (good for TikTok)</button></div>
+      </div>
+      <p class="hint" style="margin:0 0 12px">Makes every box bigger at once and keeps it sharp. Use this instead of making the overlay bigger in TikTok LIVE Studio (that stretches it and makes it blurry).</p>
       <div class="boxes" id="boxList"></div>
     </section>
     <section id="popSec">
@@ -1037,7 +1049,7 @@ ubIntro.start();
     <ol class="steps">
       <li>In LIVE Studio, under <b>Sources</b>, press <b>+</b> (Add source) and pick <b>Link</b>.</li>
       <li>Click in the address box and press <b>Ctrl + V</b>: the overlay's address is already copied.<br><code id="liveUrl"></code></li>
-      <li>Make it fill the whole screen (<b>Fit to screen</b>) and press <b>Add</b>. Any size works: the overlay scales itself to fit.</li>
+      <li>Make it fill the whole screen (<b>Fit to screen</b>, or 1920 × 1080 if it asks for a size) and press <b>Add</b>. Don't drag it bigger afterwards: that makes it blurry. To make the popups and lists bigger, use <b>Size of everything</b> on the Stream overlay tab.</li>
       <li>Drag it to the top of your sources so the popups show over the game.</li>
     </ol>
     <p class="hint">The address points back to this PC, so Unbound must be open while you stream. If the overlay shows as a tiny box or stops updating, add <code>?refresh=1</code> to the end of the address.</p>
@@ -1350,7 +1362,7 @@ $('autoConnect').onchange = () => api('/api/settings', { autoConnect: $('autoCon
 
 // the gift list's settings: every [data-m] field saves itself (sliders and colours as you move them)
 document.querySelectorAll('[data-m]').forEach(el => {
-  const send = () => { const k = el.dataset.m; const v = el.type === 'checkbox' ? el.checked : el.type === 'range' || el.type === 'number' ? +el.value : el.value; settings.overlay[k] = v; saveSettingsSoon({ overlay: { [k]: v } }); if (k === 'popColors' || k === 'popType') popFieldsShown(); if (k === 'menu') fillBoxes(); if (k === 'canvas') fitOverlayEditor(); };
+  const send = () => { const k = el.dataset.m; const v = el.type === 'checkbox' ? el.checked : el.type === 'range' || el.type === 'number' ? +el.value : el.value; settings.overlay[k] = v; saveSettingsSoon({ overlay: { [k]: v } }); if (k === 'popColors' || k === 'popType') popFieldsShown(); if (k === 'menu') fillBoxes(); if (k === 'canvas') fitOverlayEditor(); if (k === 'zoom') $('zoomVal').textContent = v + '%'; };
   el.onchange = send;
   if (el.type === 'range' || el.type === 'color' || el.type === 'text') el.oninput = send;
 });
@@ -1413,6 +1425,9 @@ function fillBoxes() {
     row.querySelector('[data-bv="s"]').textContent = Math.round(boxSize(k) * 100) + '%';
   });
 }
+document.querySelectorAll('[data-zoom]').forEach(b => b.onclick = () => {
+  settings.overlay.zoom = +b.dataset.zoom; saveSettingsSoon({ overlay: { zoom: settings.overlay.zoom } }); fillMenuSettings();
+});
 $('boxShowAll').onclick = () => {
   settings.overlay.menu = true;
   for (const b of BOXES) if (b.k !== 'menu') setBox(b.k, { hide: false });
@@ -1483,7 +1498,10 @@ function renderOvView() {
   if (!box) return;
   if (!v) { box.innerHTML = "Your streaming app hasn't opened the overlay yet (it shows its size here when it does)."; return; }
   const r = v.w / v.h, shape = Math.abs(r - 16 / 9) < 0.03 ? 'landscape (16:9)' : Math.abs(r - 9 / 16) < 0.03 ? 'portrait (9:16)' : v.h > v.w ? 'portrait-ish' : 'landscape-ish';
-  box.innerHTML = `Your overlay in your streaming app is <b>${v.w} × ${v.h}</b>, ${shape}. It's scaled to fit, so it looks just like the editor below.`;
+  // drawn small in the streaming app: stretching it there makes it blurry
+  const small = Math.max(v.w, v.h) < 1280;
+  box.innerHTML = `Your overlay in your streaming app is <b>${v.w} × ${v.h}</b>, ${shape}. It's scaled to fit, so it looks just like the editor below.`
+    + (small ? `<br><span class="ovwarn"><b>That's small, so it will look blurry if it's made bigger there.</b> In TikTok LIVE Studio, remove the source and add it again with <b>Fit to screen</b> (or set its size to 1920 × 1080 if it asks), and don't drag it bigger. To make things bigger, use <b>Size of everything</b> below.</span>` : '');
 }
 function fillMenuSettings() {
   startOverlayEditor();
@@ -1491,6 +1509,8 @@ function fillMenuSettings() {
   popFieldsShown();
   fillBoxes();
   renderOvView(); fitOverlayEditor();
+  if (document.activeElement !== document.querySelector('[data-m=zoom]')) document.querySelector('[data-m=zoom]').value = settings.overlay.zoom || 100;
+  $('zoomVal').textContent = (settings.overlay.zoom || 100) + '%';
   $('ovMenuOpen').href = `http://localhost:${location.port}/overlay`;
 }
 
@@ -1645,6 +1665,7 @@ function jumpAll() {
   go('Setting', 'Gift list on the overlay', () => setPage('overlay', { to: 'ovMenuBox' }));
   go('Setting', 'Move the overlay boxes', () => setPage('overlay', { to: 'ovWrap' }));
   go('Setting', 'Show / hide overlay boxes, width and height', () => setPage('overlay', { to: 'boxSec' }));
+  go('Setting', 'Size of everything on the overlay (bigger for TikTok)', () => setPage('overlay', { to: 'boxSec' }));
   go('Setting', 'Set up the overlay in TikTok LIVE Studio', () => $('ovLive').click());
   go('Setting', 'Play sounds in the app or the overlay', () => setPage('settings', { to: 'soundsIn' }));
   go('Setting', 'How long sounds play (longest)', () => setPage('settings', { to: 'soundMax' }));

@@ -1365,6 +1365,8 @@ const routes = {
             if (typeof b.overlay.showSender === 'boolean') o.showSender = b.overlay.showSender;
             // the overlay's shape: auto (the shape it has in your streaming app), landscape 1920 x 1080 or portrait 1080 x 1920
             if (['auto', 'landscape', 'portrait'].includes(b.overlay.canvas)) o.canvas = b.overlay.canvas;
+            // every box bigger or smaller at once (percent): for phones (TikTok) things need to be bigger
+            if (b.overlay.zoom !== undefined && Number.isFinite(+b.overlay.zoom)) o.zoom = Math.round(Math.max(50, Math.min(300, +b.overlay.zoom)));
             // the gift list's settings (anything starting "menu"), checked
             const menuKeys = Object.keys(b.overlay).filter(k => k.startsWith('menu'));
             // the other boxes' places (timer, block delete list, reset countdown): x, y (0-100) and size
