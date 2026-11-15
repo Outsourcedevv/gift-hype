@@ -174,15 +174,40 @@ GIFTS
   "Once per gift in a streak" = a streak of 5 Roses does the actions 5 times.
   Test tries it right away without going live.
 
+FINDING YOUR WAY
+  The tabs under the top bar: Games & gifts, Sounds, Stream overlay, Look & settings (Alt + 1 to 4).
+  "Find anything..." at the top (or Ctrl + K, or /) finds any game, type, sound or setting: type a few
+  letters, use the arrow keys and press Enter. Esc stops every sound that's playing.
+  The Live gifts and Quick sounds column stays on the right on every tab (you can hide it).
+
 SOUNDS
-  30 real meme sounds to start (fahh, bruh, vine boom, MLG airhorn, metal pipe, DaBaby "let's go", here comes the money, I need a hero...).
-  They download by themselves the first time Gift Hype opens (needs internet once).
-  Find more: type in "Find any sound" (e.g. "emotional damage"), press play to listen, Add to keep it.
+  109 real sounds to start, in groups: Edit audios & songs (Where have you been (edit), Can you feel my heart,
+  After dark, Sahara, Murder in my mind, Golden...), Brainrot (Chicken jockey, Tung tung tung sahur, Tralalero,
+  6 7, Skibidi...), Memes & reactions, Endings & drama, Game sounds, Minecraft and Phone & PC.
+  They download by themselves the first time Gift Hype opens (needs internet once). If one is missing,
+  press "Get the sound pack again" on the Sounds tab.
+  Sounds tab: click a sound to hear it, filter by name, pick a group, Tiles or List, Random.
+    Star a sound to put it in Quick sounds on the right and at the top of the picker.
+    The pencil gives any sound your own name.
+  A gift's sound: press the sound button on the gift to pick from every sound (with search and groups).
+    "Random" picks a different sound each time: from all sounds, your favourites or one group.
+  Find more: type in "Find any sound online" (e.g. "emotional damage"), press play to listen, Add to keep it.
   Add your own: drop .mp3 / .wav files on "Add your own sounds", or press "upload..." next to a gift.
   They're saved in the sounds\custom folder.
 
+LOOK & SETTINGS
+  Colours: Sky, Blaze, Mint, Punk, Egyptian, Grape, Mono, or "Your own" (pick the main colour, the
+  eye-catcher and a dark or light background). The stream popups use the same colours.
+  Layout: text size, corners (round / a little round / square), compact, the Live gifts column, animations.
+
+GIFT POPUPS (Stream overlay tab)
+  Style (dark, light, glass, neon glow, Minecraft), how they come in (bounce, slide, zoom, spin, fade),
+  seconds on screen, how many at once, only gifts worth at least so many coins, the word after the
+  name ("sent"), show who sent it / the picture / streaks, and your own colours.
+  "Send a test popup" shows one on your overlay straight away.
+
 ON STREAM (OBS / TikTok LIVE Studio)
-  Press "Set up in TikTok LIVE Studio" (Settings, Stream overlay): it copies the address, opens LIVE
+  Press "Set up in TikTok LIVE Studio" (Stream overlay tab): it copies the address, opens LIVE
   Studio and shows the 4 clicks to add it. Or by hand: TikTok LIVE Studio: add a Link source, OBS: add
   a Browser source, with
     http://gifthype.localtest.me:4747/overlay   size 1920 x 1080.
