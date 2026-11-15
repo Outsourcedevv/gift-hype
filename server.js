@@ -102,6 +102,9 @@ function normalizePop(o = {}) {
 }
 Object.assign(settings.overlay, normalizePop(settings.overlay));
 if (!['auto', 'landscape', 'portrait'].includes(settings.overlay.canvas)) settings.overlay.canvas = 'auto';
+// 2.8.0 drew the overlay shrunk to fit a 1920 x 1080 stage, and "Size of everything" was turned up to make up
+// for it. Now it's drawn at its real size again (Auto), so that's put back to 100% once.
+if (settings.overlayFit !== 2) { settings.overlayFit = 2; if (settings.overlay.canvas === 'auto') settings.overlay.zoom = 100; }
 // How the app itself looks: the custom theme's colours, text size, and the layout
 const THEME_IDS = ['unbound', 'sky', 'blaze', 'punk', 'egyptian', 'mint', 'grape', 'mono', 'custom'];
 function normalizeLook(l = {}) {

@@ -214,10 +214,11 @@ LOOK & SETTINGS
   Layout: text size, corners (round / a little round / square), compact, the Live gifts column, animations.
 
 BOXES ON THE OVERLAY (Stream overlay tab)
-  "Size of everything" makes every box bigger at once (200% is good for TikTok, where people watch on
-  phones) and keeps it sharp. Don't make the overlay bigger in TikTok LIVE Studio instead: that stretches
-  it and makes it blurry. Popups never cover the gift list: they move to its open side, or the list
-  fades while they show when there's no room.
+  "Fit everything to my screen" picks the biggest size where the gift list and the popups fit side by
+  side in your overlay's real size. "Size of everything" makes every box bigger or smaller at once, drawn sharp. Use it instead of
+  stretching the overlay in TikTok LIVE Studio (stretching makes it blurry). Popups never cover the gift
+  list: they move beside, above or below it. The list is never hidden for it (only if you tick "Fade out
+  during popups").
   Every box (gift popups, gift list, timer, block delete list, reset countdown) can be shown or hidden
   on your stream, and has its own Width, Height and Size. Auto = the box's own size. You can also drag
   a box's side handles in the overlay editor: the right one for width, the bottom one for height, the
@@ -237,9 +238,9 @@ ON STREAM (OBS / TikTok LIVE Studio)
   Studio and shows the 4 clicks to add it. Or by hand: TikTok LIVE Studio: add a Link source, OBS: add
   a Browser source, with
     http://gifthype.localtest.me:4747/overlay   and make it fill the whole screen (any size works).
-  The overlay is drawn at 1920 x 1080 (or 1080 x 1920 for a vertical stream) and scaled to fit, so it
-  looks the same as in the editor whatever size your streaming app gives it. The Stream overlay tab
-  shows the size your streaming app uses; "Overlay shape" is Auto (that shape), Landscape or Portrait.
+  The Stream overlay tab shows the size your streaming app gives the overlay, and the editor there is that
+  same size, so what you arrange is what your stream shows. "Overlay shape": Auto (real size, best), or a
+  1920 x 1080 / 1080 x 1920 stage shrunk or grown to fit.
   (localtest.me always points back to your own PC, so it is still only on this PC. TikTok LIVE Studio
   won't take a "localhost" address. In OBS http://localhost:4747/overlay works too.)
   If your streaming app doesn't hear the Unbound window, set "Play sounds in" to the OBS overlay.
