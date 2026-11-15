@@ -88,6 +88,7 @@ function normalizePop(o = {}) {
     const num = (v, lo, hi, def) => Number.isFinite(+v) && v !== '' && v !== null ? Math.max(lo, Math.min(hi, +v)) : def;
     const col = (v, def) => /^#[0-9a-f]{6}$/i.test(String(v)) ? String(v) : def;
     return {
+        popType: o.popType === 'burst' ? 'burst' : 'card',              // card, or the Dropper's burst (sun rays, big name)
         popSeconds: num(o.popSeconds, 1, 20, 4.5),                      // how long each one stays
         popMax: Math.round(num(o.popMax, 1, 8, 4)),                     // how many at once
         popAnim: ['bounce', 'slide', 'zoom', 'fade', 'spin', 'none'].includes(o.popAnim) ? o.popAnim : 'bounce',

@@ -883,19 +883,21 @@ ubIntro.start();
     <section id="popSec">
       <h2>Gift popups <span class="right"><button class="small ghost" id="popReset">Back to the standard look</button></span></h2>
       <p class="hint" style="margin:0 0 4px">How the popup looks when a gift comes in. Changes show in the overlay above straight away.</p>
+      <p class="hint" id="popBurstHint" style="margin:0 0 4px" hidden><b>Burst</b>: the gift on spinning sun rays with the name big and what it does under it, one at a time (the Dropper always uses it). With "Use my own colours", Name and What it does colour it.</p>
       <div class="chatgrid">
-        <label>Style<select data-m="popStyle"><option value="dark">Dark</option><option value="light">Light</option><option value="glass">Glass (see-through)</option><option value="neon">Neon glow</option><option value="minecraft">Minecraft</option></select></label>
-        <label>Comes in with<select data-m="popAnim"><option value="bounce">Bounce</option><option value="slide">Slide in</option><option value="zoom">Zoom</option><option value="spin">Spin</option><option value="fade">Fade</option><option value="none">Nothing (just shows)</option></select></label>
+        <label>Popup type<select data-m="popType"><option value="card">Card (standard)</option><option value="burst">Burst (like the Dropper)</option></select></label>
+        <label data-cardonly>Style<select data-m="popStyle"><option value="dark">Dark</option><option value="light">Light</option><option value="glass">Glass (see-through)</option><option value="neon">Neon glow</option><option value="minecraft">Minecraft</option></select></label>
+        <label data-cardonly>Comes in with<select data-m="popAnim"><option value="bounce">Bounce</option><option value="slide">Slide in</option><option value="zoom">Zoom</option><option value="spin">Spin</option><option value="fade">Fade</option><option value="none">Nothing (just shows)</option></select></label>
         <label>Seconds on screen<input type="number" min="1" max="20" step="0.5" data-m="popSeconds"></label>
-        <label>Most at once<input type="number" min="1" max="8" data-m="popMax"></label>
+        <label data-cardonly>Most at once<input type="number" min="1" max="8" data-m="popMax"></label>
         <label>Only gifts worth at least (coins)<input type="number" min="0" max="1000000" data-m="popMinCoins"></label>
-        <label>Word after the name<input type="text" maxlength="20" data-m="popWord" placeholder="sent"></label>
+        <label data-cardonly>Word after the name<input type="text" maxlength="20" data-m="popWord" placeholder="sent"></label>
         <label class="check" style="flex-direction:row"><input type="checkbox" data-m="showSender"> Show who sent it</label>
-        <label class="check" style="flex-direction:row"><input type="checkbox" data-m="popImage"> Show the gift's picture</label>
-        <label class="check" style="flex-direction:row"><input type="checkbox" data-m="popWiggle"> Wiggle the picture</label>
-        <label class="check" style="flex-direction:row"><input type="checkbox" data-m="popCount"> Show streaks (3×)</label>
+        <label data-cardonly class="check" style="flex-direction:row"><input type="checkbox" data-m="popImage"> Show the gift's picture</label>
+        <label data-cardonly class="check" style="flex-direction:row"><input type="checkbox" data-m="popWiggle"> Wiggle the picture</label>
+        <label data-cardonly class="check" style="flex-direction:row"><input type="checkbox" data-m="popCount"> Show streaks (3×)</label>
         <label class="check wide" style="flex-direction:row"><input type="checkbox" data-m="popColors"> Use my own colours (instead of the app's colour theme)</label>
-        <label data-popcol>Border<input type="color" data-m="popBorder"></label>
+        <label data-popcol data-cardonly>Border<input type="color" data-m="popBorder"></label>
         <label data-popcol>Name<input type="color" data-m="popName"></label>
         <label data-popcol>Text<input type="color" data-m="popText"></label>
         <label data-popcol>What it does<input type="color" data-m="popDoes"></label>
@@ -1341,7 +1343,7 @@ $('autoConnect').onchange = () => api('/api/settings', { autoConnect: $('autoCon
 
 // the gift list's settings: every [data-m] field saves itself (sliders and colours as you move them)
 document.querySelectorAll('[data-m]').forEach(el => {
-  const send = () => { const k = el.dataset.m; const v = el.type === 'checkbox' ? el.checked : el.type === 'range' || el.type === 'number' ? +el.value : el.value; settings.overlay[k] = v; saveSettingsSoon({ overlay: { [k]: v } }); if (k === 'popColors') document.querySelectorAll('[data-popcol]').forEach(l => l.hidden = !v); if (k === 'menu') fillBoxes(); };
+  const send = () => { const k = el.dataset.m; const v = el.type === 'checkbox' ? el.checked : el.type === 'range' || el.type === 'number' ? +el.value : el.value; settings.overlay[k] = v; saveSettingsSoon({ overlay: { [k]: v } }); if (k === 'popColors' || k === 'popType') popFieldsShown(); if (k === 'menu') fillBoxes(); };
   el.onchange = send;
   if (el.type === 'range' || el.type === 'color' || el.type === 'text') el.oninput = send;
 });
@@ -1410,7 +1412,14 @@ $('boxShowAll').onclick = () => {
   saveSettingsSoon({ overlay: { menu: true } });
   fillBoxes(); fillMenuSettings(); toast('Every box shows on your stream');
 };
-const POP_LOOK = { popSeconds: 4.5, popMax: 4, popAnim: 'bounce', popStyle: 'dark', popImage: true, popWiggle: true, popCount: true, popColors: false,
+// card-only settings hide for the burst (it has one look: sun rays, big name); own colours are name and text
+function popFieldsShown() {
+  const o = settings.overlay, burstOn = o.popType === 'burst';
+  document.querySelectorAll('[data-popcol]').forEach(l => l.hidden = !o.popColors);
+  document.querySelectorAll('[data-cardonly]').forEach(l => { if (burstOn) l.hidden = true; else if (!l.hasAttribute('data-popcol')) l.hidden = false; else l.hidden = !o.popColors; });
+  $('popBurstHint').hidden = !burstOn;
+}
+const POP_LOOK = { popType: 'card', popSeconds: 4.5, popMax: 4, popAnim: 'bounce', popStyle: 'dark', popImage: true, popWiggle: true, popCount: true, popColors: false,
   popBorder: '#4DB3EE', popName: '#4DB3EE', popText: '#FFFFFF', popDoes: '#FF6A3D', popWord: 'sent', popMinCoins: 0, showSender: true };
 $('popReset').onclick = async () => { Object.assign(settings.overlay, POP_LOOK); await api('/api/settings', { overlay: POP_LOOK }); fillMenuSettings(); toast('Popups back to the standard look'); };
 $('ovTest').onclick = async () => { try { await api('/api/overlay/test-popup', {}); toast('Test popup sent to the overlay'); } catch (e) { toast(e.message, true); } };
@@ -1450,7 +1459,7 @@ function startOverlayEditor() {
 function fillMenuSettings() {
   startOverlayEditor();
   document.querySelectorAll('[data-m]').forEach(el => { const v = settings.overlay[el.dataset.m]; if (el.type === 'checkbox') el.checked = v !== false; else if (v != null) el.value = v; });
-  document.querySelectorAll('[data-popcol]').forEach(l => l.hidden = !settings.overlay.popColors);
+  popFieldsShown();
   fillBoxes();
   $('ovMenuOpen').href = `http://localhost:${location.port}/overlay`;
 }

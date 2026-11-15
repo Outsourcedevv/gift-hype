@@ -221,6 +221,8 @@ BOXES ON THE OVERLAY (Stream overlay tab)
   place them. "Put the boxes back" resets places and sizes (shown / hidden stays as it is).
 
 GIFT POPUPS (Stream overlay tab)
+  Popup type: "Card" (the standard one) or "Burst (like the Dropper)": the gift on spinning sun rays,
+  the name big and what it does under it, one at a time. The Dropper always uses the burst.
   Style (dark, light, glass, neon glow, Minecraft), how they come in (bounce, slide, zoom, spin, fade),
   seconds on screen, how many at once, only gifts worth at least so many coins, the word after the
   name ("sent"), show who sent it / the picture / streaks, and your own colours.
