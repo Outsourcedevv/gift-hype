@@ -243,9 +243,17 @@ function stageShape() {
   const c = settings.overlay && settings.overlay.canvas;
   return c === 'portrait' || c === 'landscape' ? c : innerHeight > innerWidth ? 'portrait' : 'landscape';
 }
+// Auto (the standard): the overlay is the browser source's own size and everything is drawn at its real
+// size (the app's editor takes that same size). Landscape / Portrait: a 1920 x 1080 / 1080 x 1920 stage
+// scaled to fit the source.
 function fitStage() {
-  const st = document.getElementById('stage'), portrait = stageShape() === 'portrait';
-  const W = portrait ? 1080 : 1920, H = portrait ? 1920 : 1080, k = Math.min(innerWidth / W, innerHeight / H);
+  const st = document.getElementById('stage'), c = settings.overlay && settings.overlay.canvas;
+  if (c !== 'landscape' && c !== 'portrait') {
+    st.style.width = innerWidth + 'px'; st.style.height = innerHeight + 'px';
+    st.style.transform = 'translate(0px, 0px)';   // still a transform: the boxes' places are measured from the stage
+    return;
+  }
+  const portrait = c === 'portrait', W = portrait ? 1080 : 1920, H = portrait ? 1920 : 1080, k = Math.min(innerWidth / W, innerHeight / H);
   st.style.width = W + 'px'; st.style.height = H + 'px';
   st.style.transform = `translate(${(innerWidth - W * k) / 2}px, ${(innerHeight - H * k) / 2}px) scale(${k})`;
 }
@@ -301,12 +309,11 @@ function popHtml(e) {
     <div><div class="who">${o.showSender ? `<b>${esc(e.from)}</b> ${esc(word)} ` : ''}${e.count > 1 && o.popCount !== false ? `<span class="n">${e.count}×</span> ` : ''}${esc(e.gift)}</div>
     ${e.label ? `<div class="did">${esc(e.label)}</div>` : ''}</div>`;
 }
-// Popups never cover the gift list: if they would, the popups move sideways to the open side of the list
-// (measured from their places, not their animations); with no room for that, the list fades while they show.
-let awayTimer = null;
+// Popups never cover the gift list: they move sideways to the list's open side, or else above or below it
+// (measured from their places, not their animations). The list itself is never hidden for it.
 function avoidMenu() {
   const st = document.getElementById('stage'), stack = document.getElementById('stack'), m = document.getElementById('menu');
-  stack.style.marginLeft = '0px';
+  stack.style.marginLeft = stack.style.marginTop = '0px';
   if (EDITING || !m.classList.contains('on') || m.classList.contains('boxhidden') || !stack.children.length) return;
   const sr = st.getBoundingClientRect(), k = sr.width / st.offsetWidth, r = stack.getBoundingClientRect(), f = r.width / stack.offsetWidth;
   let a = null;
@@ -316,12 +323,17 @@ function avoidMenu() {
   }
   const b = m.getBoundingClientRect();
   if (!(a.l < b.right && b.left < a.r && a.t < b.bottom && b.top < a.b)) return;
-  const gap = 18 * k, listLeft = (b.left + b.right) / 2 < (sr.left + sr.right) / 2;
-  const d = listLeft ? b.right + gap - a.l : b.left - gap - a.r;
-  if (a.l + d >= sr.left && a.r + d <= sr.right) { stack.style.marginLeft = d / k + 'px'; return; }
-  m.classList.add('away');
-  clearTimeout(awayTimer);
-  awayTimer = setTimeout(() => m.classList.remove('away'), ((settings.overlay.popSeconds || 4.5) + 0.5) * 1000);
+  const gap = 18 * k, fitsX = d => a.l + d >= sr.left && a.r + d <= sr.right, fitsY = d => a.t + d >= sr.top && a.b + d <= sr.bottom;
+  const tries = [];
+  const right = b.right + gap - a.l, left = b.left - gap - a.r, down = b.bottom + gap - a.t, up = b.top - gap - a.b;
+  // the smallest move that fits on the screen wins
+  if (fitsX(right)) tries.push(['x', right]);
+  if (fitsX(left)) tries.push(['x', left]);
+  if (fitsY(down)) tries.push(['y', down]);
+  if (fitsY(up)) tries.push(['y', up]);
+  if (!tries.length) return;
+  const [axis, d] = tries.sort((p, q) => Math.abs(p[1]) - Math.abs(q[1]))[0];
+  if (axis === 'x') stack.style.marginLeft = d / k + 'px'; else stack.style.marginTop = d / k + 'px';
 }
 function popup(e) {
   if (e.dropper || settings.overlay.popType === 'burst') return burst(e);

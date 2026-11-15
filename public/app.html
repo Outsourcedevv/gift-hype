@@ -878,7 +878,7 @@ ubIntro.start();
       <p class="hint">In OBS or TikTok LIVE Studio add a <b>Browser</b> (or <b>Link</b>) source with that address and stretch it over the whole screen. Gift popups show on your stream.</p>
       <div class="row" style="margin-top:12px">
         <label class="field" style="flex-direction:row;align-items:center;gap:10px">Overlay shape
-          <select data-m="canvas"><option value="auto">Auto (the shape it is in your streaming app)</option><option value="landscape">Landscape 16:9 (1920 × 1080)</option><option value="portrait">Portrait 9:16 (1080 × 1920, vertical streams)</option></select></label>
+          <select data-m="canvas"><option value="auto">Auto: real size, as your streaming app has it (best)</option><option value="landscape">Landscape 1920 × 1080, shrunk or grown to fit</option><option value="portrait">Portrait 1080 × 1920, shrunk or grown to fit</option></select></label>
       </div>
       <p class="hint" id="ovView"></p>
       <div class="ovedit">
@@ -894,9 +894,9 @@ ubIntro.start();
         <b>Auto</b> = the box's own size. Hidden boxes stay faded in the overlay above so you can still place them.</p>
       <div class="zoomrow">
         <label class="sl"><span>Size of everything <b id="zoomVal"></b></span><input type="range" min="50" max="300" step="5" data-m="zoom"></label>
-        <div class="row"><button class="small" data-zoom="100">100%</button><button class="small" data-zoom="150">150%</button><button class="small primary" data-zoom="200">200% (good for TikTok)</button></div>
+        <div class="row"><button class="small primary" id="zoomFit" title="The biggest size where the gift list and the popups fit side by side in your overlay">Fit everything to my screen</button><button class="small" data-zoom="100">100%</button><button class="small" data-zoom="150">150%</button><button class="small" data-zoom="200">200%</button></div>
       </div>
-      <p class="hint" style="margin:0 0 12px">Makes every box bigger at once and keeps it sharp. Use this instead of making the overlay bigger in TikTok LIVE Studio (that stretches it and makes it blurry).</p>
+      <p class="hint" style="margin:0 0 12px">Makes every box bigger or smaller at once, drawn sharp at that size. Use this instead of stretching the overlay in TikTok LIVE Studio (stretching makes it blurry).</p>
       <div class="boxes" id="boxList"></div>
     </section>
     <section id="popSec">
@@ -1049,7 +1049,7 @@ ubIntro.start();
     <ol class="steps">
       <li>In LIVE Studio, under <b>Sources</b>, press <b>+</b> (Add source) and pick <b>Link</b>.</li>
       <li>Click in the address box and press <b>Ctrl + V</b>: the overlay's address is already copied.<br><code id="liveUrl"></code></li>
-      <li>Make it fill the whole screen (<b>Fit to screen</b>, or 1920 × 1080 if it asks for a size) and press <b>Add</b>. Don't drag it bigger afterwards: that makes it blurry. To make the popups and lists bigger, use <b>Size of everything</b> on the Stream overlay tab.</li>
+      <li>Make it fill the whole screen (<b>Fit to screen</b>) and press <b>Add</b>. To make the popups and lists bigger or smaller, use <b>Size of everything</b> on the Stream overlay tab rather than stretching the source (stretching makes it blurry).</li>
       <li>Drag it to the top of your sources so the popups show over the game.</li>
     </ol>
     <p class="hint">The address points back to this PC, so Unbound must be open while you stream. If the overlay shows as a tiny box or stops updating, add <code>?refresh=1</code> to the end of the address.</p>
@@ -1428,6 +1428,21 @@ function fillBoxes() {
 document.querySelectorAll('[data-zoom]').forEach(b => b.onclick = () => {
   settings.overlay.zoom = +b.dataset.zoom; saveSettingsSoon({ overlay: { zoom: settings.overlay.zoom } }); fillMenuSettings();
 });
+// The biggest "Size of everything" where the gift list (as tall as most of the screen at most) and the
+// popups fit side by side in the overlay's real size. Measured from the editor's own boxes.
+$('zoomFit').onclick = () => {
+  const d = $('ovFrame').contentDocument, m = d?.getElementById('menu'), pop = d?.querySelector('#stack .pop, #stack .burst');
+  const v = status.overlayView, c = settings.overlay.canvas;
+  const [W, H] = c === 'portrait' ? [1080, 1920] : c === 'landscape' ? [1920, 1080] : v ? [v.w, v.h] : [1920, 1080];
+  if (!m || !m.offsetWidth || !pop) return toast("Open the overlay editor above first, then try again", true);
+  const o = settings.overlay, sm = o.menuScale ?? 1, sp = boxSize('popups');
+  const listOn = o.menu !== false;
+  const byWidth = (W - 70) / ((listOn ? m.offsetWidth * sm : 0) + pop.offsetWidth * sp);
+  const byHeight = listOn ? (H * 0.8) / (m.offsetHeight * sm) : (H * 0.5) / (pop.offsetHeight * sp);
+  const z = Math.max(50, Math.min(300, Math.floor(Math.min(byWidth, byHeight) * 100 / 5) * 5));
+  settings.overlay.zoom = z; saveSettingsSoon({ overlay: { zoom: z } }); fillMenuSettings();
+  toast(`Size of everything: ${z}% (fits ${W} × ${H})`);
+};
 $('boxShowAll').onclick = () => {
   settings.overlay.menu = true;
   for (const b of BOXES) if (b.k !== 'menu') setBox(b.k, { hide: false });
@@ -1482,8 +1497,12 @@ function startOverlayEditor() {
   if (!stage) return;
   // the editor is the overlay's real stage size (1920 x 1080, or 1080 x 1920 portrait), scaled to fit here
   fitOverlayEditor = () => {
-    const portrait = ovShape() === 'portrait', W = portrait ? 1080 : 1920, H = portrait ? 1920 : 1080;
+    // Auto: the size your streaming app gives the overlay (it's drawn at its real size there); else the stage
+    const c = settings.overlay?.canvas, v = status.overlayView;
+    const [W, H] = c === 'portrait' ? [1080, 1920] : c === 'landscape' ? [1920, 1080] : v ? [v.w, v.h] : [1920, 1080];
+    const portrait = H > W;
     stage.classList.toggle('portrait', portrait);
+    stage.style.aspectRatio = `${W} / ${H}`;
     frame.style.width = W + 'px'; frame.style.height = H + 'px';
     const k = Math.min(stage.clientWidth / W, stage.clientHeight / H);
     frame.style.transform = `scale(${k})`; frame.style.left = (stage.clientWidth - W * k) / 2 + 'px'; frame.style.top = (stage.clientHeight - H * k) / 2 + 'px';
@@ -1499,9 +1518,10 @@ function renderOvView() {
   if (!v) { box.innerHTML = "Your streaming app hasn't opened the overlay yet (it shows its size here when it does)."; return; }
   const r = v.w / v.h, shape = Math.abs(r - 16 / 9) < 0.03 ? 'landscape (16:9)' : Math.abs(r - 9 / 16) < 0.03 ? 'portrait (9:16)' : v.h > v.w ? 'portrait-ish' : 'landscape-ish';
   // drawn small in the streaming app: stretching it there makes it blurry
-  const small = Math.max(v.w, v.h) < 1280;
-  box.innerHTML = `Your overlay in your streaming app is <b>${v.w} × ${v.h}</b>, ${shape}. It's scaled to fit, so it looks just like the editor below.`
-    + (small ? `<br><span class="ovwarn"><b>That's small, so it will look blurry if it's made bigger there.</b> In TikTok LIVE Studio, remove the source and add it again with <b>Fit to screen</b> (or set its size to 1920 × 1080 if it asks), and don't drag it bigger. To make things bigger, use <b>Size of everything</b> below.</span>` : '');
+  const auto = !['landscape', 'portrait'].includes(settings.overlay?.canvas);
+  box.innerHTML = `Your overlay in your streaming app is <b>${v.w} × ${v.h}</b>, ${shape}. ` + (auto
+    ? `Everything is drawn at its real size there, and the editor below is that same size, so what you see here is what your stream shows.`
+    : `It's a ${settings.overlay.canvas} stage scaled to fit that, as in the editor below.`);
 }
 function fillMenuSettings() {
   startOverlayEditor();
@@ -1665,7 +1685,7 @@ function jumpAll() {
   go('Setting', 'Gift list on the overlay', () => setPage('overlay', { to: 'ovMenuBox' }));
   go('Setting', 'Move the overlay boxes', () => setPage('overlay', { to: 'ovWrap' }));
   go('Setting', 'Show / hide overlay boxes, width and height', () => setPage('overlay', { to: 'boxSec' }));
-  go('Setting', 'Size of everything on the overlay (bigger for TikTok)', () => setPage('overlay', { to: 'boxSec' }));
+  go('Setting', 'Size of everything on the overlay', () => setPage('overlay', { to: 'boxSec' }));
   go('Setting', 'Set up the overlay in TikTok LIVE Studio', () => $('ovLive').click());
   go('Setting', 'Play sounds in the app or the overlay', () => setPage('settings', { to: 'soundsIn' }));
   go('Setting', 'How long sounds play (longest)', () => setPage('settings', { to: 'soundMax' }));
