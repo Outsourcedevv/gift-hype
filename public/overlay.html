@@ -250,17 +250,22 @@ function applySettings() {
 }
 
 const MAX = 4;
+// The Dropper's popup (and any game's, with Popup type "Burst"): one big popup at a time, the gift on
+// spinning sun rays, the name big and what it did under it
+function burstHtml(e) {
+  const o = settings.overlay, own = !e.dropper && o.popColors;
+  return `<div class="sun"><div class="rays"></div><div class="glow"></div>${e.image ? `<img src="${pic(e.image)}" alt="">` : ''}</div>
+    <div class="name"${own ? ` style="color:${esc(o.popName)}"` : ''}>${esc(o.showSender ? e.from : e.gift)}</div>
+    <div class="what ${esc(e.actionColor || 'white')}"${own ? ` style="color:${esc(o.popDoes)}"` : ''}>${esc(e.action || e.label || '')}</div>`;
+}
 function burst(e) {
-  // the Dropper: one big popup at a time, like the gift effects in the game
   const stack = document.getElementById('stack');
-  stack.querySelectorAll('.burst').forEach(b => b.remove());
+  stack.querySelectorAll('.burst:not(.demo)').forEach(b => b.remove());
   const el = document.createElement('div');
   el.className = 'burst';
-  el.innerHTML = `<div class="sun"><div class="rays"></div><div class="glow"></div>${e.image ? `<img src="${pic(e.image)}" alt="">` : ''}</div>
-    <div class="name">${esc(settings.overlay.showSender ? e.from : e.gift)}</div>
-    <div class="what ${esc(e.actionColor || 'white')}">${esc(e.action || e.label || '')}</div>`;
+  el.innerHTML = burstHtml(e);
   stack.prepend(el);
-  setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 400); }, 3600);
+  setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 400); }, e.dropper ? 3600 : (settings.overlay.popSeconds || 4.5) * 1000);
 }
 function popHtml(e) {
   const o = settings.overlay, word = o.popWord ?? 'sent';
@@ -269,7 +274,7 @@ function popHtml(e) {
     ${e.label ? `<div class="did">${esc(e.label)}</div>` : ''}</div>`;
 }
 function popup(e) {
-  if (e.dropper) return burst(e);
+  if (e.dropper || settings.overlay.popType === 'burst') return burst(e);
   const stack = document.getElementById('stack');
   const el = document.createElement('div');
   el.className = 'pop';
@@ -505,9 +510,13 @@ function setupEditor() {
     showChatDel({ items: [{ label: 'DIAMOND ORE', by: 'a viewer', left: 12, total: 20 }] });
     showReset({ active: true, secondsLeft: 42, total: 60, saveGift: { name: 'Glowing Jellyfish' } });
     const stack = document.getElementById('stack');
-    let el = stack.querySelector('.pop.demo');
-    if (!el) { el = document.createElement('div'); el.className = 'pop demo'; stack.prepend(el); }
-    const html = popHtml({ from: 'a viewer', gift: 'Rose', count: 3, label: 'Spawns a zombie', image: DEMO_ROSE });
+    // an example popup of the type picked (card or burst)
+    const isBurst = settings.overlay.popType === 'burst', cls = isBurst ? 'burst demo' : 'pop demo';
+    stack.querySelectorAll('.demo').forEach(d => { if (d.className !== cls) d.remove(); });
+    let el = stack.querySelector(isBurst ? '.burst.demo' : '.pop.demo');
+    if (!el) { el = document.createElement('div'); el.className = cls; stack.prepend(el); }
+    const ex = { from: 'a viewer', gift: 'Rose', count: 3, label: 'Spawns a zombie', image: DEMO_ROSE };
+    const html = isBurst ? burstHtml(ex) : popHtml(ex);
     if (el._html !== html) { el.innerHTML = html; el._html = html; }
   };
   demo(); setInterval(demo, 2000);
