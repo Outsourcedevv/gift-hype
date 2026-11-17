@@ -90,14 +90,26 @@ CHAT TELEPORT (Minecraft -> Chat Teleport)
   "Teleport now" ends the round straight away.
 
 CHUNK CHAT (Minecraft -> Chunk Chat)
-  Viewers type blocks in your LIVE chat (stone, diamond block, oak leaves, water...). Every 30 seconds
-  the whole chunk you're in turns into the block chat picked: every block from the bottom of the world
-  to the top, except air (so you're never buried) and the bedrock floor. You choose whether the block
-  typed MOST wins (each viewer has one vote per round; typing another block moves their vote) or the
-  LAST block typed. Nothing about the timer shows on stream, so you can add your own in TikTok LIVE
-  Studio; you only hear a sound when the chunk changes. To have Unbound show it, tick "Show the
-  timer and the winning block on stream": a box on the overlay (top right), plus a green bar and a
-  title in the game. The timer waits while you're not in the world.
+  Viewers type blocks in your LIVE chat. Every block in Minecraft works, typos and all (diamnd blok,
+  obsidain, oak leafs), with everyday names too (diamonds = diamond block, logs = oak logs, wool = white
+  wool). Every 30 seconds the whole chunk you're in turns into the block chat picked: every block from
+  the bottom of the world to the top, except air (so you're never buried) and the bedrock floor. You
+  choose whether the block typed MOST wins (each viewer has one vote per round; typing another block
+  moves their vote) or the LAST block typed. If the block that won can't fill a chunk (or doesn't
+  work), the next one chat typed is used, newest first, until one can. The timer waits while you're
+  not in the world.
+  On screen, each can be turned on or off:
+    - Timer box in Minecraft (on): "NEW CHUNK IN" and the seconds, then the new block's picture, its
+      name and how many blocks changed. Drag it on the Minecraft screen in the settings to move it or
+      change its size; its colours and words are under "Box look". In your own world it's drawn by a
+      small Unbound pack; on a server it's text above the hotbar.
+    - Chunk reveal on the stream overlay (on): every time the chunk changes the block drops in, lands,
+      shatters and its name pops up, with who picked it and how many blocks changed. "Test the reveal"
+      plays it; move, resize or hide it under Stream overlay -> Boxes on the overlay.
+    - Big title in Minecraft when it changes (on, used when the timer box is off).
+    - Timer on the stream overlay (off): the seconds, the block that's winning and the top picks.
+  "Timings and sounds": how long the result shows, a warning colour and tick in the last seconds, the
+  sound when it changes, and a burst of the new block round you.
   Some blocks can't be picked: what the gifts do (lava, air, cobwebs), blocks you'd fall through
   (chains, candles, torches, flowers, rails, ladders, signs, carpets, doors...), blocks with an inside
   (chests, furnaces, hoppers...), blocks that set themselves off (TNT, pistons, observers) and bedrock.

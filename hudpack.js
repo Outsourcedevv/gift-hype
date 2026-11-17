@@ -304,12 +304,28 @@ function buildPack({ cfg, version }) {
     return pack;
 }
 
+// A block's 3D picture as a PNG (32 x 32), for the stream overlay (Chunk Chat's reveal). From the open
+// world's Minecraft, else the newest one installed. null if there's no picture or no Minecraft.
+let iconReader = null;
+const pngCache = new Map();
+export function blockIconPng(id) {
+    if (!/^[a-z0-9_]+$/.test(id)) return null;
+    if (pngCache.has(id)) return pngCache.get(id);
+    let r = current?.reader;
+    if (!r) { try { if (iconReader === null) { const jar = findClientJar(); iconReader = jar ? makeIconReader(jar) : false; } r = iconReader || null; } catch { iconReader = false; } }
+    let out = null;
+    try { const ic = r && r.icon3d(id); if (ic) out = png(32, 32, ic); } catch { }
+    if (pngCache.size > 300) pngCache.clear();
+    pngCache.set(id, out);
+    return out;
+}
+
 // server.properties lines for the hidden server (Unbound serves the pack on its own port). cfg: Chat
 // Teleport's settings (where the box goes), version: the world's Minecraft (for the block pictures).
 export function hudProps(port, cfg, version) {
     current = buildPack({ cfg, version });
     return [`resource-pack=http://127.0.0.1:${port}/mc/gifthype-hud.zip`, `resource-pack-sha1=${current.sha1}`, `resource-pack-id=${current.id}`,
-        'require-resource-pack=false', 'resource-pack-prompt={"text":"Unbound: the Chat Teleport box"}'];
+        'require-resource-pack=false', 'resource-pack-prompt={"text":"Unbound: the Chat Teleport and Chunk Chat box"}'];
 }
 
 // The title text for the box. what: { left } for the countdown; { done: true, target, away } after a

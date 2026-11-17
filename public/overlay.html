@@ -201,6 +201,50 @@ body.preview { background: repeating-conic-gradient(#20242b 0 25%, #171a1f 0 50%
 .boxhidden { display: none !important; }
 body.editing .boxhidden { display: revert !important; opacity: .35; }
 body.editing #menu.boxhidden { display: block !important; }
+/* Chunk Chat's reveal: every time the chunk changes, the block drops in, lands and shatters, and its name pops up */
+#ccReveal { position: absolute; left: 50%; top: 45%; width: 760px; height: 560px; pointer-events: none; font-family: 'Monocraft', monospace; }
+#ccReveal:empty { display: none; }
+.rv { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.rv.out { animation: rvOut .55s cubic-bezier(.6, 0, .4, 1) forwards; }
+.rv .flash { position: absolute; left: 50%; top: 38%; width: 900px; height: 900px; margin: -450px 0 0 -450px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, .9), rgba(140, 255, 160, .35) 22%, rgba(80, 200, 120, 0) 55%); opacity: 0; animation: rvFlash .9s .32s ease-out both; }
+.rv .rings { position: absolute; left: 50%; top: 38%; }
+.rv .rings i { position: absolute; left: -60px; top: -60px; width: 120px; height: 120px; border-radius: 50%; border: 6px solid rgba(160, 255, 170, .85); opacity: 0;
+  animation: rvRing 1.1s cubic-bezier(.1, .7, .3, 1) both; }
+.rv .rings i:nth-child(1) { animation-delay: .33s; } .rv .rings i:nth-child(2) { animation-delay: .45s; border-color: rgba(255, 255, 255, .8); } .rv .rings i:nth-child(3) { animation-delay: .58s; border-width: 3px; }
+.rv .rays { position: absolute; left: 50%; top: 38%; width: 620px; height: 620px; margin: -310px 0 0 -310px; border-radius: 50%; opacity: 0;
+  background: repeating-conic-gradient(from 0deg, rgba(150, 255, 160, .5) 0deg 7deg, transparent 7deg 20deg);
+  -webkit-mask: radial-gradient(circle, #000 12%, transparent 66%); mask: radial-gradient(circle, #000 12%, transparent 66%);
+  animation: rvRays .6s .35s ease-out forwards, spin 9s .35s linear infinite; }
+.rv .blk { position: relative; width: 192px; height: 192px; margin-top: -40px; animation: rvDrop .62s cubic-bezier(.5, 0, .75, .3) both; }
+.rv .land { width: 100%; height: 100%; transform-origin: 50% 90%; animation: rvLand .5s .58s cubic-bezier(.2, 1.6, .4, 1) both; }
+.rv .blk img { opacity: 0; transition: opacity .1s; }
+.rv.noimg .bits i { background-color: #7fdc6a; background-image: none !important; }
+.rv.noimg .bits i:nth-child(3n) { background-color: #6b4a2c; } .rv.noimg .bits i:nth-child(3n+1) { background-color: #4e3520; }
+.rv .blk img, .rv .blk svg { width: 100%; height: 100%; image-rendering: pixelated; filter: drop-shadow(0 14px 18px rgba(0, 0, 0, .55)); animation: rvBob 2.4s 1.1s ease-in-out infinite; }
+.rv .bits { position: absolute; left: 50%; top: 38%; }
+.rv .bits i { position: absolute; left: -14px; top: -14px; width: 28px; height: 28px; background-size: 192px 192px; image-rendering: pixelated; opacity: 0;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, .4); animation: rvBit 1s .58s cubic-bezier(.15, .8, .3, 1) both; }
+.rv .tag { margin-top: 18px; font-size: 22px; font-weight: 700; letter-spacing: 6px; color: #d9ffe0; text-shadow: 2px 2px 0 #0d2b14; opacity: 0; animation: rvUp .45s .72s ease-out both; }
+.rv .name { margin-top: 6px; font-size: 62px; font-weight: 700; line-height: 1.05; color: #6dff7f; text-align: center; max-width: 900px; white-space: nowrap;
+  text-shadow: 4px 4px 0 #0b3a14, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 0 0 26px rgba(90, 255, 120, .6); }
+.rv .name.long { font-size: 46px; }
+.rv .name b { display: inline-block; font-weight: 700; opacity: 0; animation: rvLetter .42s cubic-bezier(.2, 1.8, .4, 1) both; }
+.rv .sub { margin-top: 10px; font-size: 20px; color: #fff; text-shadow: 2px 2px 0 #000; opacity: 0; animation: rvUp .45s 1.25s ease-out both; }
+.rv .sub span { color: #ffd84a; }
+@keyframes rvFlash { 0% { opacity: 0; transform: scale(.3); } 15% { opacity: 1; } to { opacity: 0; transform: scale(1.15); } }
+@keyframes rvRing { 0% { opacity: 0; transform: scale(.2); } 3% { opacity: 1; } to { opacity: 0; transform: scale(4.2); } }
+@keyframes rvRays { to { opacity: 1; } }
+@keyframes rvDrop { 0% { transform: translateY(-560px) rotate(-30deg) scale(.6); opacity: 0; } 25% { opacity: 1; } to { transform: translateY(0) rotate(0) scale(1); } }
+@keyframes rvLand { 0% { transform: scale(1.25, .7); } 55% { transform: scale(.92, 1.1); } to { transform: none; } }
+@keyframes rvBob { 0%, 100% { transform: translateY(0) rotate(-2deg); } 50% { transform: translateY(-10px) rotate(2deg); } }
+@keyframes rvBit { 0% { opacity: 0; transform: translate(0, 0) rotate(0) scale(1); } 2% { opacity: 1; } 70% { opacity: 1; } to { opacity: 0; transform: translate(var(--x), var(--y)) rotate(var(--r)) scale(.5); } }
+@keyframes rvUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes rvLetter { from { opacity: 0; transform: translateY(26px) scale(.4) rotate(-12deg); } to { opacity: 1; transform: none; } }
+@keyframes rvOut { to { opacity: 0; transform: scale(.85) translateY(-20px); filter: blur(4px); } }
+.rv.demo, .rv.demo * { animation: none !important; opacity: 1 !important; }
+.rv.demo .flash, .rv.demo .rings, .rv.demo .bits { display: none; }
+.rv.demo .rays { opacity: .6 !important; }
 /* the overlay editor (the app shows this page with ?edit): boxes to drag and resize */
 body.editing { background: #18202e; background-image: linear-gradient(rgba(255,255,255,.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.04) 1px, transparent 1px); background-size: 96px 96px; }
 .edframe { position: fixed; z-index: 50; border: 4px dashed #4db3ee; border-radius: 14px; cursor: move; touch-action: none; }
@@ -226,6 +270,7 @@ body.editing { background: #18202e; background-image: linear-gradient(rgba(255,2
 <div id="chatDel"></div>
 <div id="chunkChat"></div>
 <div id="menu"></div>
+<div id="ccReveal"></div>
 <div id="conn"></div>
 </div>
 <script>
@@ -483,6 +528,30 @@ function showChunkChat(s) {
   el.classList.toggle('urgent', s.left <= 5);
 }
 
+// ----- Chunk Chat's reveal: the block that the chunk turned into -----
+// a plain cube when Minecraft's own picture isn't there
+const CUBE = '<svg viewBox="0 0 32 32"><path d="M16 3 29 9.5 16 16 3 9.5z" fill="#7fdc6a"/><path d="M3 9.5 16 16v13L3 22.5z" fill="#6b4a2c"/><path d="M29 9.5 16 16v13l13-6.5z" fill="#4e3520"/></svg>';
+let revealTimer = null;
+function revealHtml(d, demo) {
+  const pic = `/mc/block/${encodeURIComponent(d.id || 'grass_block')}.png`, name = String(d.label || ''), long = name.length > 13;
+  const bits = demo ? '' : Array.from({ length: 18 }, (_, i) => {
+    const a = (i / 18) * Math.PI * 2 + Math.random() * .3, r = 170 + Math.random() * 160;
+    return `<i style="--x:${(Math.cos(a) * r).toFixed(0)}px;--y:${(Math.sin(a) * r * .8 + 60).toFixed(0)}px;--r:${Math.round(Math.random() * 540 - 270)}deg;background-image:url('${pic}');background-position:${-Math.floor(Math.random() * 6) * 28}px ${-Math.floor(Math.random() * 6) * 28}px"></i>`;
+  }).join('');
+  const letters = [...name].map((c, i) => c === ' ' ? ' ' : `<b style="animation-delay:${(0.8 + i * 0.04).toFixed(2)}s">${esc(c)}</b>`).join('');
+  const sub = [d.by ? `picked by <span>${esc(d.by)}</span>` : d.votes ? `<span>${d.votes}</span> vote${d.votes > 1 ? 's' : ''}` : '', d.count ? `<span>${Number(d.count).toLocaleString()}</span> blocks` : ''].filter(Boolean).join(' · ');
+  return `<div class="rv${demo ? ' demo' : ''}"><div class="flash"></div><div class="rays"></div><div class="rings"><i></i><i></i><i></i></div>
+    <div class="blk"><div class="land"><img src="${pic}" alt="" onload="this.style.opacity=1" onerror="this.closest('.rv').classList.add('noimg');this.outerHTML=CUBE"></div></div><div class="bits">${bits}</div>
+    <div class="tag">THE CHUNK IS NOW</div><div class="name${long ? ' long' : ''}">${letters}</div>${sub ? `<div class="sub">${sub}</div>` : ''}</div>`;
+}
+function showReveal(d) {
+  const box = document.getElementById('ccReveal');
+  clearTimeout(revealTimer);
+  box.innerHTML = revealHtml(d);
+  applyPlaces();
+  revealTimer = setTimeout(() => { box.firstChild?.classList.add('out'); revealTimer = setTimeout(() => { box.innerHTML = ''; }, 600); }, 4600);
+}
+
 // ----- the reset countdown (the Dropper) -----
 let resultTimer = null;
 function showReset(r) {
@@ -527,6 +596,7 @@ es.addEventListener('reset', e => { if (!EDITING) showReset(JSON.parse(e.data));
 es.addEventListener('wheel', e => spinSlots(JSON.parse(e.data)));
 es.addEventListener('chatdel', e => { if (!EDITING) showChatDel(JSON.parse(e.data)); });
 es.addEventListener('chunkchat', e => { if (!EDITING) showChunkChat(JSON.parse(e.data)); });
+es.addEventListener('chunkreveal', e => { if (!EDITING) showReveal(JSON.parse(e.data)); });
 es.addEventListener('menu', e => showMenu(JSON.parse(e.data)));
 
 // ----- where the boxes go: each has x, y (0 = left/top edge, 100 = right/bottom edge) and a size -----
@@ -537,6 +607,7 @@ const PLACE = {
   timer: { id: 'chunkChat', label: 'Timer', def: { x: 98, y: 4 } },
   chatdel: { id: 'chatDel', label: 'Block delete list', def: { x: 98, y: 40 } },
   reset: { id: 'resetBox', label: 'Reset countdown', def: { x: 2, y: 4 } },
+  reveal: { id: 'ccReveal', label: 'Chunk reveal', def: { x: 50, y: 45 } },
 };
 // "Size of everything" (the app's Stream overlay tab): every box bigger or smaller at once, drawn sharp at that size
 const zoomOf = () => Math.max(0.5, Math.min(3, ((settings.overlay && settings.overlay.zoom) || 100) / 100));
@@ -574,6 +645,8 @@ function setupEditor() {
     showChunkChat({ on: true, tag: 'TELEPORT IN', left: 23, total: 30, leader: { label: 'VILLAGE', votes: 3 }, top: [{ label: 'VILLAGE', votes: 3 }, { label: 'CHERRY GROVE', votes: 2 }, { label: 'SPAWNER', votes: 1 }] });
     showChatDel({ items: [{ label: 'DIAMOND ORE', by: 'a viewer', left: 12, total: 20 }] });
     showReset({ active: true, secondsLeft: 42, total: 60, saveGift: { name: 'Glowing Jellyfish' } });
+    const rv = document.getElementById('ccReveal');
+    if (!rv.querySelector('.rv.demo')) rv.innerHTML = revealHtml({ id: 'grass_block', label: 'GRASS BLOCK', by: 'a viewer', count: 23104 }, true);
     const stack = document.getElementById('stack');
     // an example popup of the type picked (card or burst)
     const isBurst = settings.overlay.popType === 'burst', cls = isBurst ? 'burst demo' : 'pop demo';
