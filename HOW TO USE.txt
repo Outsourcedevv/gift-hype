@@ -141,7 +141,8 @@ WIPEOUT (Minecraft -> Wipeout)
   level is two obstacles (three after level 80); the gold pad at the end of it is the level up, and the
   next level starts right after it, so you just keep running.
     - Touch anything RED and you're dead, back at the start of the level: spinners to jump over, cubes
-      sliding across, a wall coming at you (get past on the side lane), crushers slamming down, red
+      sliding across, waves of red walls coming down a corridor at you
+      (duck into a hole in the side while one goes past, then run to the next hole), crushers slamming down, red
       blocks sweeping past the zipline.
     - Punching gloves from the side (red and white wool) knock you off into the sea.
     - Red and white boxing gloves bounce you up: jump from glove to glove over the water.
@@ -149,7 +150,9 @@ WIPEOUT (Minecraft -> Wipeout)
       red blocks don't get you.
     - Pick the door: jump onto the ledge and walk into a door. The right one opens; a wrong one goes
       red and the ledge drops into the sea. The right door is picked again every try.
-    - Also: balance beams over the sea, tiles that flash red and disappear, fields of spinners.
+    - The vanishing bridge: once you step on it, it goes yellow, then red, then disappears. Run
+      across before it goes. It comes back a moment later.
+    - Also: tiles that flash red and disappear, fields of spinners.
   LEVEL 100 is the Tower: black and yellow, rising out of the sea. Steps spiral round the outside up to
     a landing, then the next steps start on the other side; a red arm sweeps round every landing (two
     on the last one). Get to the gold on the very top to win. Fall off and you land lower down (or in
@@ -157,8 +160,8 @@ WIPEOUT (Minecraft -> Wipeout)
   There are no checkpoints: fall in the sea (a wipeout) or touch red and the level starts again.
   Levels 1 to 80 take about 10 seconds, 81 to 100 a bit longer. The gifts are the Dropper's: levels up
   and down, punches (on/off), jail, the level slot machine, the reset countdown and the save.
-  ("Unbound Wipeout 1", the first Wipeout world, isn't used any more. You can delete it in Minecraft's
-  Singleplayer list.)
+  ("Unbound Wipeout 1" and "Unbound Wipeout 2", the older Wipeout worlds, aren't used any more. You
+  can delete them in Minecraft's Singleplayer list.)
 
 THE DROPPER (Minecraft -> Dropper)
   100 dropper levels, every one a place: Flower Meadow, Candy Land, Picnic Party, Desert Tomb, Coral
