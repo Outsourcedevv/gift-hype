@@ -135,22 +135,26 @@ CHAT BLOCK DELETE (Minecraft -> Block Delete Survival)
   block in the Try box to test it without TikTok; "Stop all countdowns" cancels them.
 
 WIPEOUT (Minecraft -> Wipeout)
-  100 obstacle courses in the sky, in a world of its own that Unbound makes (the first time it builds
-  the levels: a few minutes). The courses are white and blue concrete over warm sea water, with birch
-  wood stands on both sides (a different concrete design on each level).
-    - Anything RED knocks you off: spinners to jump over, cubes sliding across, a wall coming at you
-      (get past on the side lane), punching gloves from the side, crushers slamming down, red blocks
-      sweeping past the zipline.
+  100 levels in the sky, in a world of its own that Unbound makes (the first time it builds the
+  levels: under a minute). The whole course is one straight line of white and blue concrete over warm
+  sea water, with birch wood stands on both sides (a different concrete design on each level). Each
+  level is two obstacles (three after level 80); the gold pad at the end of it is the level up, and the
+  next level starts right after it, so you just keep running.
+    - Touch anything RED and you're dead, back at the start of the level: spinners to jump over, cubes
+      sliding across, a wall coming at you (get past on the side lane), crushers slamming down, red
+      blocks sweeping past the zipline.
+    - Punching gloves from the side (red and white wool) knock you off into the sea.
     - Red and white boxing gloves bounce you up: jump from glove to glove over the water.
     - The zipline: step on the gold pressure plate and you ride under the iron bars. Time it so the
-      red blocks don't knock you off.
+      red blocks don't get you.
     - Pick the door: jump onto the ledge and walk into a door. The right one opens; a wrong one goes
       red and the ledge drops into the sea. The right door is picked again every try.
     - Also: balance beams over the sea, tiles that flash red and disappear, fields of spinners.
-  Emerald pads are checkpoints: fall in the sea (a wipeout) and you're back at the last one. The gold
-  pad at the end takes you to the next level. Levels 1 to 80 take about 15 to 20 seconds, 81 to 100
-  about 25 to 40. You never take damage. The gifts are the Dropper's: levels up and down, punches
-  (on/off), jail, the level slot machine, the reset countdown and the save.
+  There are no checkpoints: fall in the sea (a wipeout) or touch red and the level starts again.
+  Levels 1 to 80 take about 10 seconds, 81 to 100 a bit longer. The gifts are the Dropper's: levels up
+  and down, punches (on/off), jail, the level slot machine, the reset countdown and the save.
+  ("Unbound Wipeout 1", the first Wipeout world, isn't used any more. You can delete it in Minecraft's
+  Singleplayer list.)
 
 THE DROPPER (Minecraft -> Dropper)
   100 dropper levels, every one a place: Flower Meadow, Candy Land, Picnic Party, Desert Tomb, Coral
