@@ -1291,6 +1291,51 @@ async function disconnectTikTok() {
     setStatus({ tiktok: 'offline', tiktokError: null });
 }
 
+// ---------- Play: everything ready, then Minecraft opens ----------
+let playJob = null;
+async function playWhenReady(g) {
+    connectMinecraft();
+    // the first time takes longest (Minecraft's server is downloaded, a new world is made), so it
+    // waits up to 30 minutes while it's still getting there (Java, the server and the game's files can be
+    // a few hundred MB), and stops at once if something's wrong
+    const deadline = Date.now() + 30 * 60 * 1000;
+    const FAIL = ['world open in singleplayer', 'java missing', 'world failed', 'crashed', 'world not found', 'no world picked', 'eula not accepted'];
+    const is = s => localState === s || status.minecraft === s;
+    while (status.minecraft !== 'connected' && Date.now() < deadline) {
+        if (FAIL.some(is)) break;
+        await sleep(500);
+    }
+    if (status.minecraft !== 'connected') {
+        const why = is('world open in singleplayer') ? 'That world is open in Minecraft singleplayer: close it (Save and Quit to Title), then press Play again'
+            : is('java missing') ? "Java couldn't be downloaded (the Activity log in Look & settings says why). Check the PC is online and press Play again"
+            : is('world not found') || is('no world picked') ? "Your world wasn't found. Pick your world again under Connects to, then press Play"
+            : is('eula not accepted') ? 'Tick the Minecraft EULA box first'
+            : is('crashed') ? `Minecraft's server stopped${localServer.problem() ? `: ${localServer.problem()}` : ''}. Press Play to try again; if it keeps happening, send the Activity log (Settings)`
+            : is('world failed') ? (/press Play/i.test(worldError) ? worldError : `${worldError || "Your world couldn't be opened"}. Press Play to try again`)
+            : localState === 'downloading' ? "Still downloading what Minecraft needs (Java, the server, only the first time). Wait a minute and press Play again"
+            : "Your world is still starting (the first time takes longest). Wait a minute and press Play again";
+        throw new Error(why);
+    }
+    // a level game's levels are built the first time (a few minutes): Minecraft opens once they are,
+    // so you never join an empty sky
+    const course = courseOf(g);
+    if (course && !course.built()) {
+        const until = Date.now() + 20 * 60 * 1000;
+        while (!course.built() && Date.now() < until) {
+            if (!courseBuilding && status.dropper !== 'ready') buildCourseWorld(course);
+            if (status.minecraft !== 'connected') throw new Error(`The world closed while ${course.name} was being built. Press Play to carry on (it picks up where it stopped)`);
+            await sleep(1000);
+        }
+        if (!course.built()) throw new Error(`${course.name[0].toUpperCase() + course.name.slice(1)} is still being built. Wait a minute and press Play again`);
+    }
+    let quick = true;
+    try { setupLauncher(worldVersion(worldOf(g))); }
+    catch (e) { quick = false; log(`Couldn't add "Unbound" to the launcher (${e.message}). In Minecraft: Multiplayer, then Unbound.`); }
+    openLauncher();
+    log(quick ? 'Minecraft launcher opened: press Play on "Unbound" and you go straight into your world.' : 'Minecraft launcher opened: play Minecraft, then Multiplayer, then Unbound.');
+    return { ok: true, quick };
+}
+
 // ---------- HTTP ----------
 
 function send(res, code, body, type = 'application/json') {
@@ -1538,38 +1583,20 @@ const routes = {
         return { ok: true };
     },
     // The Play button: open your world, wait until it's ready, then open Minecraft set to join it.
+    // Play: gets everything ready (downloads, the world, a level game's levels) and then opens Minecraft by
+    // itself. It answers straight away; how it's going is in status.play (the app's Play button shows it).
     'POST /api/minecraft/play': async () => {
         const g = activeGame();
         if (!g || g.connector !== 'minecraft' || !isSingle(g)) throw new Error('Pick Singleplayer world for this game first');
         if (!worldOf(g)) throw new Error('Pick your world first');
         if (!settings.mcEula) throw new Error('Tick the Minecraft EULA box first');
-        connectMinecraft();
-        // the first time takes longest (Minecraft's server is downloaded, a new world is made), so it
-        // waits up to 10 minutes while it's still getting there, and stops at once if something's wrong
-        const deadline = Date.now() + 10 * 60 * 1000;
-        const FAIL = ['world open in singleplayer', 'java missing', 'world failed', 'crashed', 'world not found', 'no world picked', 'eula not accepted'];
-        const is = s => localState === s || status.minecraft === s;
-        while (status.minecraft !== 'connected' && Date.now() < deadline) {
-            if (FAIL.some(is)) break;
-            await sleep(500);
+        if (!playJob) {
+            setStatus({ play: { state: 'getting ready' } });
+            playJob = playWhenReady(g)
+                .then(r => setStatus({ play: { state: 'opened', quick: r.quick, at: Date.now() } }), e => setStatus({ play: { state: 'failed', error: e.message, at: Date.now() } }))
+                .finally(() => { playJob = null; });
         }
-        if (status.minecraft !== 'connected') {
-            const why = is('world open in singleplayer') ? 'That world is open in Minecraft singleplayer: close it (Save and Quit to Title), then press Play again'
-                : is('java missing') ? "Java wasn't found. Open the Minecraft Launcher, play any version once (that downloads Java), then press Play again"
-                : is('world not found') || is('no world picked') ? "Your world wasn't found. Pick your world again under Connects to, then press Play"
-                : is('eula not accepted') ? 'Tick the Minecraft EULA box first'
-                : is('crashed') ? `Minecraft's server stopped${localServer.problem() ? `: ${localServer.problem()}` : ''}. Press Play to try again; if it keeps happening, send the Activity log (Settings)`
-                : is('world failed') ? (/press Play/i.test(worldError) ? worldError : `${worldError || "Your world couldn't be opened"}. Press Play to try again`)
-                : localState === 'downloading' ? "Still downloading Minecraft's server (only the first time). Wait a minute and press Play again"
-                : "Your world is still starting (the first time takes longest). Wait a minute and press Play again";
-            throw new Error(why);
-        }
-        let quick = true;
-        try { setupLauncher(worldVersion(worldOf(g))); }
-        catch (e) { quick = false; log(`Couldn't add "Unbound" to the launcher (${e.message}). In Minecraft: Multiplayer, then Unbound.`); }
-        openLauncher();
-        log(quick ? 'Minecraft launcher opened: press Play on "Unbound" and you go straight into your world.' : 'Minecraft launcher opened: play Minecraft, then Multiplayer, then Unbound.');
-        return { ok: true, quick };
+        return { ok: true, started: true };
     },
     'POST /api/minecraft/restart-world': async () => { await disconnectMinecraft(); await localServer.stop(); rconFor = null; connectMinecraft(); return { ok: true }; },
     'GET /api/minecraft/mobs': () => Object.entries(MOBS).map(([id, m]) => ({ id, name: m.name })),

@@ -2,6 +2,7 @@
 // .jar in .minecraft/versions). Each block becomes a flat 16x16 picture the way its side looks (grass gets
 // its green, leaves their colour); structures and biomes use a block that stands for them. Nothing is
 // downloaded or shared: the pictures only go into the pack your own game loads from Unbound.
+import { fileURLToPath } from 'node:url';
 import fs from 'fs';
 import path from 'path';
 import zlib from 'zlib';
@@ -72,10 +73,13 @@ function decodePng(buf) {
 
 // ---- which Minecraft to read ----
 const MC_DIR = path.join(process.env.APPDATA || '', '.minecraft');
+// (Unbound downloads a version's game files into data/client when Minecraft's launcher doesn't have them)
+const OWN = path.join(path.dirname(fileURLToPath(import.meta.url)), 'data', 'client');
 export function findClientJar(version) {
     const dir = path.join(MC_DIR, 'versions');
     const jarOf = v => path.join(dir, v, `${v}.jar`);
     if (version && fs.existsSync(jarOf(version))) return jarOf(version);
+    if (version && fs.existsSync(path.join(OWN, `${version}.jar`))) return path.join(OWN, `${version}.jar`);
     let best = null, bestTime = 0;     // otherwise the newest one installed (textures barely change)
     try {
         for (const v of fs.readdirSync(dir)) {
@@ -83,6 +87,8 @@ export function findClientJar(version) {
             try { const t = fs.statSync(j).mtimeMs; if (t > bestTime && fs.statSync(j).size > 10e6) { best = j; bestTime = t; } } catch { }
         }
     } catch { }
+    // none in the launcher: the newest Unbound downloaded
+    if (!best) try { for (const f of fs.readdirSync(OWN)) if (f.endsWith('.jar')) { const t = fs.statSync(path.join(OWN, f)).mtimeMs; if (t > bestTime) { best = path.join(OWN, f); bestTime = t; } } } catch { }
     return best;
 }
 

@@ -25,6 +25,12 @@ GAMES
     official server). In Minecraft go to Multiplayer and join "Unbound" (or localhost:25566).
     It's your world with your stuff; gifts happen instantly. Don't open it in Singleplayer at the
     same time. Closing Unbound saves and closes the world.
+  PLAY MINECRAFT: the Play Minecraft button gets everything ready by itself, then opens the
+    Minecraft launcher on a profile set to go straight in. The first time it downloads what's needed:
+    the right Java for that Minecraft version, Minecraft's official server and the game's own files
+    (a few hundred MB, a few minutes). After that it's quick. You can keep using Unbound while it
+    gets ready; the button shows what it's doing. It works for Parkour Paradise and Block Delete
+    with "Singleplayer world", and for the Dropper and Wipeout, which use their own worlds.
   SERVER: Minecraft -> "Server" runs commands on your server. Pick your server from the list:
     Unbound finds it on your PC and connects by itself, no password to type.
     If it says gift commands are off, press the pink button and restart that server once.

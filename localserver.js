@@ -114,9 +114,10 @@ export function addServerEntry(port) {
 }
 
 // Java 21+ : the one Minecraft's launcher downloaded, an installed JDK, or whatever "java" is.
-export function findJava() {
+export function findJava(ownDir = null) {
     const cands = [];
     const roots = [
+        ...(ownDir ? [ownDir] : []),
         path.join(process.env.LOCALAPPDATA || '', 'Packages', 'Microsoft.4297127D64EC6_8wekyb3d8bbwe', 'LocalCache', 'Local', 'runtime'),
         path.join(MC_DIR, 'runtime'),
         'C:\\Program Files\\Eclipse Adoptium', 'C:\\Program Files\\Java', 'C:\\Program Files\\Microsoft',
@@ -125,7 +126,7 @@ export function findJava() {
         let entries; try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
         for (const e of entries) {
             const p = path.join(dir, e.name);
-            if (e.isFile() && e.name.toLowerCase() === 'java.exe' && path.basename(dir).toLowerCase() === 'bin') cands.push(p);
+            if (e.isFile() && ['java.exe', 'java'].includes(e.name.toLowerCase()) && path.basename(dir).toLowerCase() === 'bin') cands.push(p);
             else if (e.isDirectory() && depth > 0) walk(p, depth - 1);
         }
     };
@@ -144,39 +145,103 @@ export function findJava() {
     return best;
 }
 
+// ---------- Downloads from Mojang (everything Play needs, only the first time) ----------
+// Mojang's servers: tried 3 times (a dropped connection is common), then a message that says what failed
+async function mojangGet(url, what, as, log) {
+    let last;
+    for (let i = 1; i <= 3; i++) {
+        try {
+            const r = await fetch(url);
+            if (!r.ok) throw new Error(`Mojang answered ${r.status}`);
+            return as === 'json' ? await r.json() : Buffer.from(await r.arrayBuffer());
+        } catch (e) {
+            last = e;
+            if (i < 3) { log(`Couldn't get ${what} from Mojang (${e.cause?.code || e.message}), trying again...`); await new Promise(res => setTimeout(res, 3000 * i)); }
+        }
+    }
+    throw new Error(`couldn't download ${what} from Mojang (${last.cause?.code || last.message}). Check the PC is online and nothing (antivirus, firewall, VPN) is blocking Unbound, then press Play again`);
+}
+const sha1 = buf => crypto.createHash('sha1').update(buf).digest('hex');
+// a version's details (its downloads and the Java it needs), kept for next time
+const infoCache = new Map();
+export async function versionInfo(version, log = () => {}) {
+    if (infoCache.has(version)) return infoCache.get(version);
+    const manifest = await mojangGet('https://piston-meta.mojang.com/mc/game/version_manifest_v2.json', "Minecraft's version list", 'json', log);
+    const entry = manifest.versions.find(v => v.id === version);
+    if (!entry) throw new Error(`Minecraft ${version} wasn't found on Mojang's server list`);
+    const info = await mojangGet(entry.url, `the Minecraft ${version} details`, 'json', log);
+    infoCache.set(version, info);
+    return info;
+}
+// a file from Mojang, checked against its sha1 (once more if it came damaged), written in one go
+async function download(url, wantSha1, file, what, log) {
+    let buf = await mojangGet(url, what, 'buffer', log);
+    if (wantSha1 && sha1(buf) !== wantSha1) buf = await mojangGet(url, what, 'buffer', log);
+    if (wantSha1 && sha1(buf) !== wantSha1) throw new Error(`the ${what} download was damaged twice, press Play to try again`);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file + '.part', buf);
+    fs.renameSync(file + '.part', file);
+    return file;
+}
+
 // The official server for that version, downloaded from Mojang once and checked against its sha1.
 export async function serverJar(dir, version, log) {
     const file = path.join(dir, `minecraft-server-${version}.jar`);
     if (fs.existsSync(file)) return file;
-    // Mojang's servers: tried 3 times (a dropped connection is common), then a message that says what failed
-    const get = async (url, what, as) => {
-        let last;
-        for (let i = 1; i <= 3; i++) {
-            try {
-                const r = await fetch(url);
-                if (!r.ok) throw new Error(`Mojang answered ${r.status}`);
-                return as === 'json' ? await r.json() : Buffer.from(await r.arrayBuffer());
-            } catch (e) {
-                last = e;
-                if (i < 3) { log(`Couldn't get ${what} from Mojang (${e.cause?.code || e.message}), trying again...`); await new Promise(res => setTimeout(res, 3000 * i)); }
-            }
-        }
-        throw new Error(`couldn't download ${what} from Mojang (${last.cause?.code || last.message}). Check the PC is online and nothing (antivirus, firewall, VPN) is blocking Unbound, then press Play again`);
-    };
-    const manifest = await get('https://piston-meta.mojang.com/mc/game/version_manifest_v2.json', "Minecraft's version list", 'json');
-    const entry = manifest.versions.find(v => v.id === version);
-    if (!entry) throw new Error(`Minecraft ${version} wasn't found on Mojang's server list`);
-    const info = await get(entry.url, `the Minecraft ${version} details`, 'json');
-    const dl = info.downloads?.server;
+    const dl = (await versionInfo(version, log)).downloads?.server;
     if (!dl) throw new Error(`There is no server download for ${version}`);
-    log(`Downloading the Minecraft ${version} server from Mojang (${Math.round(dl.size / 1e6)} MB)...`);
-    let buf = await get(dl.url, `the Minecraft ${version} server`);
-    if (crypto.createHash('sha1').update(buf).digest('hex') !== dl.sha1) buf = await get(dl.url, `the Minecraft ${version} server`);
-    if (crypto.createHash('sha1').update(buf).digest('hex') !== dl.sha1) throw new Error('the Minecraft server download was damaged twice, press Play to try again');
-    fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(file + '.part', buf);
-    fs.renameSync(file + '.part', file);
-    return file;
+    log(`Downloading the Minecraft ${version} server from Mojang (${Math.round(dl.size / 1e6)} MB, only the first time)...`);
+    return download(dl.url, dl.sha1, file, `the Minecraft ${version} server`, log);
+}
+
+// The game itself for that version (not to play: Unbound reads the block pictures from it), unless
+// Minecraft's launcher already has it. Kept in data/client.
+export async function clientJar(dir, version, log) {
+    if (fs.existsSync(path.join(MC_DIR, 'versions', version, `${version}.jar`))) return null;
+    const file = path.join(dir, `${version}.jar`);
+    if (fs.existsSync(file)) return file;
+    const dl = (await versionInfo(version, log)).downloads?.client;
+    if (!dl) return null;
+    log(`Downloading Minecraft ${version}'s game files for the block pictures (${Math.round(dl.size / 1e6)} MB, only the first time)...`);
+    return download(dl.url, dl.sha1, file, `Minecraft ${version}'s game files`, log);
+}
+
+// The Java this version needs (26.2 needs 25): one already on the PC if it's new enough, else Mojang's
+// own Java (the one the Minecraft launcher uses), downloaded once into data/java.
+const RUNTIMES = 'https://launchermeta.mojang.com/v1/products/java-runtime/2ec0cc96c44e5a76b9c8b7c39df7210883d12871/all.json';
+const PLATFORM = { 'win32-x64': 'windows-x64', 'win32-arm64': 'windows-arm64', 'win32-ia32': 'windows-x86', 'linux-x64': 'linux', 'linux-ia32': 'linux-i386', 'darwin-x64': 'mac-os', 'darwin-arm64': 'mac-os-arm64' };
+export async function javaFor(dir, version, log) {
+    const want = (await versionInfo(version, log)).javaVersion || { component: 'java-runtime-delta', majorVersion: 21 };
+    const have = findJava(dir);
+    if (have && have.v >= want.majorVersion) return have;
+    const platform = PLATFORM[`${process.platform}-${process.arch}`];
+    if (!platform) throw new Error(`Java ${want.majorVersion} is needed. Install it from adoptium.net, then press Play again`);
+    const list = await mojangGet(RUNTIMES, "Mojang's Java list", 'json', log);
+    const rt = list[platform]?.[want.component]?.[0];
+    if (!rt) throw new Error(`Java ${want.majorVersion} is needed. Install it from adoptium.net, then press Play again`);
+    const files = Object.entries((await mojangGet(rt.manifest.url, "Mojang's Java files", 'json', log)).files);
+    const root = path.join(dir, want.component);
+    const total = files.reduce((a, [, f]) => a + (f.downloads?.raw?.size || 0), 0);
+    log(`Downloading Java ${want.majorVersion} for Minecraft ${version} (${Math.round(total / 1e6)} MB, only the first time)...`);
+    fs.rmSync(root, { recursive: true, force: true });
+    let i = 0, got = 0, shown = 0;
+    const work = async () => {
+        while (i < files.length) {
+            const [rel, f] = files[i++], out = path.join(root, ...rel.split('/'));
+            if (f.type === 'directory') { fs.mkdirSync(out, { recursive: true }); continue; }
+            if (f.type !== 'file') continue;
+            await download(f.downloads.raw.url, f.downloads.raw.sha1, out, `Java (${path.basename(rel)})`, log);
+            if (f.executable) try { fs.chmodSync(out, 0o755); } catch { }
+            got += f.downloads.raw.size;
+            if (got / total >= shown + 0.25) { shown = Math.floor(got / total * 4) / 4; log(`Java: ${Math.round(shown * 100)}%`); }
+        }
+    };
+    await Promise.all(Array.from({ length: 8 }, work));
+    for (const [rel, f] of files) if (f.type === 'link') try { fs.symlinkSync(f.target, path.join(root, ...rel.split('/'))); } catch { }
+    const java = findJava(dir);
+    if (!java || java.v < want.majorVersion) throw new Error(`Java ${want.majorVersion} was downloaded but doesn't start. Press Play to try again`);
+    log(`Java ${java.v} is ready.`);
+    return java;
 }
 
 export const SERVER_PORT = +process.env.GIFTHYPE_MC_PORT || 25566;   // the env settings are only for testing
@@ -219,10 +284,14 @@ export function makeLocalServer({ dir, log, onState }) {
         try { version = worldVersion(w) || newVersion; } catch { }
         if (atLeast && (!version || olderVersion(version, atLeast))) version = atLeast;
         if (!version) return onState('world not found');
-        const java = findJava();
-        if (!java || java.v < 21) return onState('java missing');
+        // everything it needs, downloaded the first time: the Java this version needs, the server, and the
+        // game's files for the block pictures (not needed to play: carries on without them)
         onState('downloading');
+        let java;
+        try { java = await javaFor(path.join(dir, '..', 'java'), version, log); }
+        catch (e) { log(`Java: ${e.message}`); return onState('java missing'); }
         const jar = await serverJar(dir, version, log);
+        try { await clientJar(path.join(dir, '..', 'client'), version, log); } catch (e) { log(`Block pictures: ${e.message}`); }
         await closeLeftover();
         writeProps(props);
         fs.writeFileSync(path.join(dir, 'eula.txt'), '# Accepted in Unbound by the player: https://aka.ms/MinecraftEULA\neula=true\n');

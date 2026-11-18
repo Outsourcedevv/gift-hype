@@ -1761,8 +1761,8 @@ function renderStatus() {
       'no world picked': 'Minecraft: pick your world',
       'world not found': 'Minecraft: world not found',
       'eula not accepted': 'Minecraft: tick the EULA box',
-      'java missing': 'Minecraft: Java not found',
-      downloading: 'Getting Minecraft ready (first time only)…',
+      'java missing': "Minecraft: Java couldn't be downloaded",
+      downloading: 'Downloading Java and Minecraft (first time only)…',
       starting: 'Opening your world…',
       'world open in singleplayer': 'Close the world in singleplayer first',
       'world closed': 'Your world is closed',
@@ -1775,6 +1775,8 @@ function renderStatus() {
   } else if (c === 'keys') { dot = 'on'; text = 'Key presses ready'; }
   $('gmDot').className = 'dot ' + dot;
   $('gmText').textContent = text;
+  // while Play is getting everything ready, its button says what it's doing
+  if (playing_ && $('playMc')) $('playMc').textContent = /ready|connected/i.test(text) && !/building/i.test(text) ? 'Opening Minecraft…' : text;
   const mcs = $('mcState');
   if (mcs) mcs.textContent = text;
   const wsc = $('wsCount');
@@ -1988,11 +1990,25 @@ function renderPlay() {
     playing_ = true; renderPlay();
     try {
       await flushSave();
-      const r = await api('/api/minecraft/play', {});
-      toast(r.quick === false ? 'Minecraft is opening: play, then Multiplayer, then "Unbound"' : 'Minecraft is opening: press Play on "Unbound"');
-    } catch (e) { toast(e.message, true); }
-    playing_ = false; renderPlay();
+      await api('/api/minecraft/play', {});
+      toast('Getting everything ready. Minecraft opens by itself when it is (the first time downloads Java and the game, so it takes a few minutes)');
+    } catch (e) { toast(e.message, true); playing_ = false; renderPlay(); }
   };
+}
+// Play runs in the background on the app's side: this follows it through the status updates
+let playSeen_ = null;
+function followPlay() {
+  const p = status.play;
+  if (!p) return;
+  const key = p.state + ':' + (p.at || '');
+  if (key === playSeen_) return;
+  const first = playSeen_ === null;
+  playSeen_ = key;
+  const busy = p.state === 'getting ready';
+  if (busy !== playing_) { playing_ = busy; renderPlay(); if (busy) renderStatus(); }
+  if (first) return; // don't repeat an old result when the app is reopened
+  if (p.state === 'opened') toast(p.quick === false ? 'Minecraft is opening: play, then Multiplayer, then "Unbound"' : 'Minecraft is opening: press Play on "Unbound"');
+  else if (p.state === 'failed') toast(p.error || 'Minecraft could not be opened', true);
 }
 
 async function renderMinecraftBox() {
@@ -2785,7 +2801,7 @@ function applyState(s) {
     $('gName').value = game.name;
     renderTypes(); renderConnector(); renderRules(); renderPlay();
   }
-  renderStatus(); renderUpdate();
+  followPlay(); renderStatus(); renderUpdate();
   showView(view);
 }
 
@@ -2805,7 +2821,7 @@ async function init() {
 
   const es = new EventSource('/api/events');
   es.addEventListener('state', e => { saveTimer = null; applyState(JSON.parse(e.data)); });
-  es.addEventListener('status', e => { const was = ovShape(); status = JSON.parse(e.data); renderStatus(); renderUpdate(); renderOvView(); if (ovShape() !== was) fitOverlayEditor(); });
+  es.addEventListener('status', e => { const was = ovShape(); status = JSON.parse(e.data); renderStatus(); followPlay(); renderUpdate(); renderOvView(); if (ovShape() !== was) fitOverlayEditor(); });
   es.addEventListener('settings', e => { settings = JSON.parse(e.data); applyTheme(settings.theme); applyLook(); fillBoxes(); });
   es.addEventListener('games', e => { gamesList = JSON.parse(e.data); renderGames(); });
   es.addEventListener('sounds', e => { sounds = JSON.parse(e.data); renderSounds(); if (game) renderRules(); });
@@ -2814,7 +2830,7 @@ async function init() {
   es.addEventListener('stopSound', e => stopSound(JSON.parse(e.data).id));
   es.addEventListener('log', e => { const l = $('log'); l.textContent += (l.textContent ? '\n' : '') + JSON.parse(e.data); l.scrollTop = l.scrollHeight; });
   es.onerror = () => { $('ttText').textContent = 'App closed'; $('ttDot').className = 'dot'; };
-  es.onopen = () => { if (game) api('/api/state').then(s => { status = s.status; renderStatus(); }); };
+  es.onopen = () => { if (game) api('/api/state').then(s => { status = s.status; renderStatus(); followPlay(); }); };
 }
 init();
 </script>
