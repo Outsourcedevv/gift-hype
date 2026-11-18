@@ -1,16 +1,16 @@
 // Wipeout: a 100-level obstacle course in the sky that Unbound builds in its own world.
 //
-// Every level is a course of white and blue concrete floating high above warm sea water, with birch
-// wood stands on both sides (a different concrete design on each level). Emerald pads are checkpoints;
-// the gold pad at the end is the finish. Anything red knocks you off: spinners to jump over, cubes
-// sliding across, walls coming at you, punching gloves, crushers, red blocks sweeping past the
-// zipline. Red and white wool boxing gloves bounce you up. Fall in the water (a wipeout) and you're
-// back at your last checkpoint.
-//
-// Levels 1-80 take about 15-20 seconds, 81-100 about 25-40. Every level is designed here from a
+// The whole course is one straight line of white and blue concrete floating high above warm sea
+// water, with birch wood stands on both sides (a different concrete design on each level). Each level
+// is a short run of two obstacles (three after level 80) ending at a gold pad: step on it and you're
+// on the next level, which starts right after. There are no checkpoints: touch anything red (spinners
+// to jump over, cubes sliding across, walls coming at you, crushers, red blocks sweeping past the
+// zipline) and you're dead, back at the start of the level. The punching gloves knock you off; red and
+// white wool boxing gloves bounce you up. Fall in the water (a wipeout) and it's back to the start too.
+// Every level is designed here from a
 // seed, so the world always comes out the same.
 //
-// The game runs from a data pack in the world (levels, checkpoints, the moving obstacles, jail, the
+// The game runs from a data pack in the world (levels, the moving obstacles, jail, the
 // reset countdown, punches), the same way as the Dropper's, and Unbound sends gift actions as
 // function calls.
 
@@ -18,9 +18,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { SAVES_DIR } from './singleplayer.js';
 
-export const WIPEOUT_WORLD = 'Unbound Wipeout 1';
+export const WIPEOUT_WORLD = 'Unbound Wipeout 2';     // 2: one straight line, no checkpoints
 export const WIPEOUT_MC = '26.2';
-export const WIPEOUT_BUILD = 1;                  // bump when the levels change, to rebuild them
+export const WIPEOUT_BUILD = 3;                  // bump when the levels change, to rebuild them
 export const LEVELS = 100;
 
 // Settings for making the world the first time: nothing but the levels (and sea), warm ocean colours
@@ -33,7 +33,8 @@ export const WIPEOUT_PROPS = [
 // ---------- where things are ----------
 const F = 140;                       // your feet on the course (the floor blocks are at F-1)
 const SEA = 118;                     // the sea's top (water from SEA-3 to SEA, sand under it)
-const ORIGIN_X = 1000, ORIGIN_Z = 1000, SPACING_X = 120, ROW_GAP = 60;
+const ORIGIN_X = 1000, ORIGIN_Z = 1000, SEA_W = 60;     // the course runs north to south along x=1000; sea 60 each side
+const STAND_X = 12;                  // the stands' front row, either side of the middle
 const JAIL = [700, F, 700], WIN = [700, F, 800];
 const B = b => `minecraft:${b}`;
 const J = o => JSON.stringify(o);
@@ -86,7 +87,7 @@ function obstacle(type, ctx) {
             // where the arm is (a little behind it, so you're knocked the way it's going): every 0.75 blocks out
             const back = deg > 0 ? -18 : 18;
             for (let k = -R + 0.4; k <= R - 0.4; k += 0.75) {
-                o.tick.push(`execute as @e[tag=${id}] at @s rotated as @s positioned ^ ^ ^${k.toFixed(2)} positioned ~-0.5 ~-0.3 ~-0.5 if entity @a[tag=wo_in,dx=0,dy=0,dz=0] at @s rotated as @s rotated ~${back} 0 positioned ^ ^ ^${k.toFixed(2)} as @a[tag=wo_in,sort=nearest,limit=1] run function wipeout:hit {p:1}`);
+                o.tick.push(`execute as @e[tag=${id}] at @s rotated as @s positioned ^ ^ ^${k.toFixed(2)} positioned ~-0.5 ~-0.3 ~-0.5 if entity @a[tag=wo_in,dx=0,dy=0,dz=0] at @s rotated as @s rotated ~${back} 0 positioned ^ ^ ^${k.toFixed(2)} as @a[tag=wo_in,sort=nearest,limit=1] run function wipeout:zap`);
             }
             o.len = 2 * R + 3; o.secs += arms === 2 ? 0.8 : 0;
             break;
@@ -104,7 +105,7 @@ function obstacle(type, ctx) {
                 const sid = `${id}s${i}`;
                 o.spawn.push(display([id, sid, 'wo_arm'], sx + 0.5, F, sz + 0.5, 'red_concrete', 0.6, 0.55, 2 * R, { tx: -0.3, ty: 0.05, tz: -R, yaw: r.int(0, 179) }));
                 o.tick.push(`execute as @e[tag=${sid}] at @s run tp @s ~ ~ ~ ~${deg} ~`);
-                for (let k = -R + 0.4; k <= R - 0.4; k += 0.75) o.tick.push(`execute as @e[tag=${sid}] at @s rotated as @s positioned ^ ^ ^${k.toFixed(2)} positioned ~-0.5 ~-0.3 ~-0.5 if entity @a[tag=wo_in,dx=0,dy=0,dz=0] at @s rotated as @s rotated ~${deg > 0 ? -18 : 18} 0 positioned ^ ^ ^${k.toFixed(2)} as @a[tag=wo_in,sort=nearest,limit=1] run function wipeout:hit {p:1}`);
+                for (let k = -R + 0.4; k <= R - 0.4; k += 0.75) o.tick.push(`execute as @e[tag=${sid}] at @s rotated as @s positioned ^ ^ ^${k.toFixed(2)} positioned ~-0.5 ~-0.3 ~-0.5 if entity @a[tag=wo_in,dx=0,dy=0,dz=0] at @s rotated as @s rotated ~${deg > 0 ? -18 : 18} 0 positioned ^ ^ ^${k.toFixed(2)} as @a[tag=wo_in,sort=nearest,limit=1] run function wipeout:zap`);
             });
             o.len = 6 * R + 3; o.secs = 5.5;
             break;
@@ -136,7 +137,7 @@ function obstacle(type, ctx) {
                 const steps = [{ d: [v, 0, 0], t }, { d: [-v, 0, 0], t }], off = r.int(0, 2 * t - 1);
                 const start = posAt([lo - size - 1, F, cz], steps, off);
                 o.spawn.push(display([id, cid], ...start, 'red_concrete', size, size, size), `scoreboard players set @e[tag=${cid}] wo_ph ${off}`);
-                o.tick.push(...moveLines(cid, steps), hitBox(cid, size, size, size, 1));
+                o.tick.push(...moveLines(cid, steps), hitBox(cid, size, size, size));
             }
             o.len = L; o.secs = 1.2 + count * 0.9;
             break;
@@ -152,7 +153,7 @@ function obstacle(type, ctx) {
             const off = r.int(0, 2 * t + 19);
             const start = posAt([lo, F, z + L - 2], steps, off);
             o.spawn.push(display([id], ...start, 'red_concrete', w, 3, 1), `scoreboard players set @e[tag=${id}] wo_ph ${off}`);
-            o.tick.push(...moveLines(id, steps), hitBox(id, w, 3, 1, 1));
+            o.tick.push(...moveLines(id, steps), hitBox(id, w, 3, 1));
             o.len = L;
             break;
         }
@@ -174,7 +175,7 @@ function obstacle(type, ctx) {
                 o.spawn.push(display([id, pid], ...start, 'red_wool', 1.6, 1.6, 1.6),
                     display([id, pid, 'wo_cuff'], start[0] + (side > 0 ? 1.6 : -0.5), start[1] + 0.3, start[2] + 0.3, 'white_wool', 0.5, 1.0, 1.0),
                     `scoreboard players set @e[tag=${pid}] wo_ph ${off}`);
-                o.tick.push(...moveLines(pid, steps), hitBox(pid, 1.6, 1.6, 1.6, 2, `tag=${pid},tag=!wo_cuff`));
+                o.tick.push(...moveLines(pid, steps), hitBox(pid, 1.6, 1.6, 1.6, `tag=${pid},tag=!wo_cuff`, 'hit {p:2}'));
             }
             o.len = L; o.secs = 1.2 + count * 0.9;
             break;
@@ -190,7 +191,7 @@ function obstacle(type, ctx) {
                 const tot = wait + down + hold + up, off = Math.round(i * tot / count + r.int(0, 6)) % tot;
                 const start = posAt([lo, F + 3.8, cz], steps, off);
                 o.spawn.push(display([id, cid], ...start, 'red_concrete', w, 2, 2), `scoreboard players set @e[tag=${cid}] wo_ph ${off}`);
-                o.tick.push(...moveLines(cid, steps), hitBox(cid, w, 2, 2, 1));
+                o.tick.push(...moveLines(cid, steps), hitBox(cid, w, 2, 2));
                 o.blocks.push(`fill ${lo - 1} ${F} ${cz} ${lo - 1} ${F + 6} ${cz + 1} ${B('white_concrete')}`, `fill ${hi + 1} ${F} ${cz} ${hi + 1} ${F + 6} ${cz + 1} ${B('white_concrete')}`,
                     `fill ${lo - 1} ${F + 6} ${cz} ${hi + 1} ${F + 6} ${cz + 1} ${B('blue_concrete')}`);
             }
@@ -232,7 +233,7 @@ function obstacle(type, ctx) {
                 const travel = 6, v = sp(0.15, 0.3), t = Math.round(travel / v), steps = [{ d: [v, 0, 0], t }, { d: [-v, 0, 0], t }], off = r.int(0, 2 * t - 1);
                 const start = posAt([x - 3.5, F + 1.2, hz], steps, off);
                 o.spawn.push(display([id, hid], ...start, 'red_concrete', 1.5, 1.6, 1.2), `scoreboard players set @e[tag=${hid}] wo_ph ${off}`);
-                o.tick.push(...moveLines(hid, steps), hitBox(hid, 1.5, 1.6, 1.2, 1));
+                o.tick.push(...moveLines(hid, steps), hitBox(hid, 1.5, 1.6, 1.2));
             }
             o.len = G + 7; o.secs = 2.5 + G / 6.4;
             break;
@@ -309,11 +310,76 @@ function obstacle(type, ctx) {
     return o;
 }
 
+// ---------- level 100: the tower ----------
+// A black and yellow tower rising out of the sea: a column in the middle, round landings stacked up it
+// and a spiral of steps on the outside from each landing to the next (three quarters of the way round,
+// one block up a step). A red arm sweeps round every landing: jump it, then walk round to the next
+// steps. The gold on the very top wins the game.
+const TOWER = { floors: 4, rise: 12, ring: 6.5, outer: 9.5, column: 2.5, a0: 315 };
+function tower(ctx, z0) {
+    const { n, x, r } = ctx, T = TOWER;
+    const id = `o${n}_tower`, cx = x, cz = z0 + 18;
+    const o = { id, type: 'tower', blocks: [], spawn: [], tick: [], reroll: [], fns: {}, len: 0, secs: 45 };
+    const H = i => F - 1 + i * T.rise;                         // landing i's blocks (feet one above)
+    const top = H(T.floors);
+    const cells = [];
+    for (let dx = -10; dx <= 10; dx++) for (let dz = -10; dz <= 10; dz++) {
+        const rr = Math.hypot(dx, dz), deg = ((Math.atan2(dz, dx) * 180 / Math.PI) + 360) % 360;
+        cells.push({ x: cx + dx, z: cz + dz, rr, deg });
+    }
+    const col = (c, k) => B(k % 2 ? 'yellow_concrete' : 'black_concrete');
+    // the bridge from the start pad
+    o.blocks.push(...floorFill(x - 2, z0 + 6, x + 2, cz - 3, 'hazard'));
+    // the column, from the sea to the top, black with yellow bands
+    for (const c of cells.filter(c => c.rr < T.column)) {
+        o.blocks.push(`fill ${c.x} ${SEA + 1} ${c.z} ${c.x} ${top} ${c.z} ${B('black_concrete')}`);
+        for (let y = SEA + 3; y < top; y += 6) o.blocks.push(`fill ${c.x} ${y} ${c.z} ${c.x} ${y + 1} ${c.z} ${B('yellow_concrete')}`);
+    }
+    // the landings: yellow with a black rim (the top one is a whole disc with gold in the middle)
+    for (let i = 0; i <= T.floors; i++) for (const c of cells.filter(c => c.rr < T.ring && (i === T.floors || c.rr >= T.column))) {
+        const b = i === T.floors && Math.abs(c.x - cx) <= 2 && Math.abs(c.z - cz) <= 2 ? 'gold_block' : c.rr >= T.ring - 1 ? 'black_concrete' : (c.x + c.z) % 2 ? 'yellow_concrete' : 'black_concrete';
+        o.blocks.push(`setblock ${c.x} ${H(i)} ${c.z} ${B(i === T.floors || c.rr >= T.ring - 1 ? b : 'yellow_concrete')}`);
+    }
+    // the steps: from landing i, three quarters round on the outside, up to landing i+1
+    const steps = T.rise - 1, per = 270 / steps;
+    for (let i = 0; i < T.floors; i++) {
+        const a = (T.a0 + 90 * i) % 360;
+        for (const c of cells.filter(c => c.rr >= T.ring && c.rr < T.outer)) {
+            const rel = (c.deg - a + 360) % 360;
+            if (rel >= 270) continue;
+            const k = Math.floor(rel / per) + 1;
+            o.blocks.push(`setblock ${c.x} ${H(i) + k} ${c.z} ${col(c, k)}`);
+        }
+    }
+    // a red arm sweeping round each landing (faster going up; two on the last one)
+    for (let i = 0; i < T.floors; i++) {
+        const arms = i === T.floors - 1 ? 2 : 1, deg = (4 + i * 1.2) * (i % 2 ? -1 : 1), len = T.ring - T.column;
+        for (let a = 0; a < arms; a++) {
+            const aid = `${id}a${i}`;
+            o.spawn.push(display([id, aid, 'wo_arm'], cx + 0.5, H(i) + 1, cz + 0.5, 'red_concrete', 0.6, 0.55, len, { tx: -0.3, ty: 0.05, tz: T.column, yaw: a * 180 + r.int(0, 89) }));
+            if (a === 0) {
+                o.tick.push(`execute as @e[tag=${aid}] at @s run tp @s ~ ~ ~ ~${deg} ~`);
+                for (let k = T.column + 0.4; k <= T.ring - 0.4; k += 0.75)
+                    o.tick.push(`execute as @e[tag=${aid}] at @s rotated as @s positioned ^ ^ ^${k.toFixed(2)} positioned ~-0.5 ~-0.3 ~-0.5 if entity @a[tag=wo_in,dx=0,dy=0,dz=0] as @a[tag=wo_in,sort=nearest,limit=1] run function wipeout:zap`);
+            }
+        }
+    }
+    o.blocks.push(`kill @e[type=minecraft:text_display,tag=wo_sign,x=${cx},y=${top + 5},z=${cz},distance=..3]`,
+        `summon minecraft:text_display ${cx + 0.5} ${top + 5.2} ${cz + 0.5} {Tags:["wo_sign"],billboard:"vertical",scale:[3f,3f,3f],background:1711276032,text:{text:"FINISH",color:"gold",bold:true}}`);
+    o.len = cz + 10 - z0;
+    return { o, cx, cz, top };
+}
+
 // a slab of course at the floor, in this level's pattern
 function floorFill(x1, z1, x2, z2, style) {
     const out = [`fill ${x1} ${F - 1} ${z1} ${x2} ${F - 1} ${z2} ${B('white_concrete')}`];
     const blue = (a, b, c, e) => out.push(`fill ${a} ${F - 1} ${b} ${c} ${F - 1} ${e} ${B('blue_concrete')}`);
     if (style === 'lane') { blue(x1, z1, x2, z2); return out; }
+    if (style === 'hazard') {                       // black and yellow stripes (level 100)
+        out[0] = `fill ${x1} ${F - 1} ${z1} ${x2} ${F - 1} ${z2} ${B('black_concrete')}`;
+        for (let zz = z1; zz <= z2; zz++) for (let xx = x1; xx <= x2; xx++) if ((((xx + zz) % 4) + 4) % 4 < 2) out.push(`setblock ${xx} ${F - 1} ${zz} ${B('yellow_concrete')}`);
+        return out;
+    }
     if (style === 'edges' || style === 'zigzag') { blue(x1, z1, x1, z2); blue(x2, z1, x2, z2); }
     if (style === 'center') { const m = Math.floor((x1 + x2) / 2); blue(m, z1, m, z2); }
     if (style === 'stripes') for (let zz = z1; zz <= z2; zz++) if (((zz % 4) + 4) % 4 === 0) blue(x1, zz, x2, zz);
@@ -364,11 +430,12 @@ function moveLines(tag, steps) {
     }
     return out;
 }
-// touching a box (corner at the mover, sized sx sy sz) knocks you away from its middle
-function hitBox(tag, sx, sy, sz, p, sel = `tag=${tag}`) {
+// touching a box (corner at the mover, sized sx sy sz): red kills you (zap); a punching glove knocks
+// you away from its middle (hit)
+function hitBox(tag, sx, sy, sz, sel = `tag=${tag}`, what = 'zap') {
     const e = 0.1;
     return `execute as @e[${sel}] at @s positioned ~${e} ~${e} ~${e} if entity @a[tag=wo_in,dx=${+(sx - 1 - 2 * e).toFixed(2)},dy=${+(sy - 1 - 2 * e).toFixed(2)},dz=${+(sz - 1 - 2 * e).toFixed(2)}] `
-        + `positioned ~${+(sx / 2 - e).toFixed(2)} ~${+(sy / 2 - e).toFixed(2)} ~${+(sz / 2 - e).toFixed(2)} as @a[tag=wo_in,sort=nearest,limit=1] run function wipeout:hit {p:${p}}`;
+        + `positioned ~${+(sx / 2 - e).toFixed(2)} ~${+(sy / 2 - e).toFixed(2)} ~${+(sz / 2 - e).toFixed(2)} as @a[tag=wo_in,sort=nearest,limit=1] run function wipeout:${what}`;
 }
 
 // ---------- the levels ----------
@@ -381,39 +448,39 @@ let designs = null;
 function design() {
     if (designs) return designs;
     const out = [];
-    let rowZ = ORIGIN_Z, rowMax = 0;
+    let z0 = ORIGIN_Z;
     for (let n = 1; n <= LEVELS; n++) {
         const r = rngFor(n * 7919 + 13), d = (n - 1) / (LEVELS - 1);
-        const w = n <= 30 ? 5 : n <= 70 ? 4 : 3;
-        const target = n <= 80 ? [15, 20] : [25 + Math.round((n - 81) * 0.6), 32 + Math.round((n - 81) * 0.45)];
-        const col = (n - 1) % 10, x = ORIGIN_X + col * SPACING_X;
-        if (col === 0 && n > 1) { rowZ += rowMax + ROW_GAP; rowMax = 0; }
+        const w = n <= 30 ? 5 : n <= 70 ? 4 : 3, x = ORIGIN_X;
+        const count = n <= 80 ? 2 : 3;                          // obstacles in the level
         const style = FLOOR_STYLES[(n - 1) % FLOOR_STYLES.length], stand = STAND_STYLES[(n * 3) % STAND_STYLES.length];
         const ctx = { n, d, r, x, w, style, periods: new Set(), fnBase: `lvl/${n}` };
-        const z0 = rowZ;
-        const parts = [], cps = [];
+        const parts = [];
+        if (n === LEVELS) {                                     // the tower
+            const t = tower({ ...ctx, style: 'hazard' }, z0);
+            out.push({ n, x, z0, w: 5, style: 'hazard', stand, parts: [{ ...t.o, z: z0 + 6 }], finish: null, tower: t, length: t.o.len + 1, secs: t.o.secs,
+                name: 'The Tower', periods: [], kinds: ['tower'] });
+            break;
+        }
         let z = z0 + 6, secs = 1.5;                         // the start pad
         const pool = POOL.filter(t => n >= FIRST[t]);
         const used = [];
         // the new obstacle of this level goes in for sure (where one starts), the rest from the pool
         const fresh = POOL.find(t => FIRST[t] === n);
-        while (secs < target[0] || parts.length < 2) {
+        while (parts.length < count) {
             let t = (fresh && !used.includes(fresh)) ? fresh : r.pick(pool);
-            if (used[used.length - 1] === t) t = r.pick(pool);
-            if (t === 'zipline' && used.includes('zipline') && n <= 80) t = 'cubes';
+            if (used.includes(t)) t = r.pick(pool.filter(k => !used.includes(k)));
             const o = obstacle(t, { ...ctx, z });
-            if (secs + o.secs > target[1] + 1 && parts.length >= 2) break;
             parts.push({ ...o, z }); used.push(t);
             z += o.len;
             secs += o.secs;
-            // an emerald checkpoint after every obstacle (a short run of course before the next)
-            cps.push(z); z += 3; secs += 0.6;
+            if (parts.length < count) { z += 3; secs += 0.6; }      // a short run of course before the next
         }
-        const finish = z;                                      // the gold pad
-        const length = finish + 5 - z0;
-        rowMax = Math.max(rowMax, length);
-        out.push({ n, x, z0, w, style, stand, parts, cps, finish, length, secs: Math.round(secs), name: NAMES[(n * 7) % NAMES.length], periods: [...ctx.periods],
+        const finish = z;                                      // the gold pad (3 long), then the next level
+        const length = finish + 3 - z0;
+        out.push({ n, x, z0, w, style, stand, parts, finish, length, secs: Math.round(secs), name: NAMES[(n * 7) % NAMES.length], periods: [...ctx.periods],
             kinds: used });
+        z0 += length;
     }
     return designs = out;
 }
@@ -425,33 +492,35 @@ const levelStart = L => [L.x, F, L.z0 + 2];
 function levelCommands(L) {
     const { x, z0, w } = L, lo = x - Math.floor((w - 1) / 2), hi = lo + w - 1, end = L.z0 + L.length;
     const c = [];
-    // the sea under it all (and between the levels), with a sandy, coral-dotted floor
-    const sx1 = x - SPACING_X / 2, sx2 = x + SPACING_X / 2 - 1, sz1 = z0 - ROW_GAP / 2, sz2 = end + ROW_GAP / 2;
+    // the sea under it all, with a sandy, coral-dotted floor (each level fills its stretch of the line;
+    // the first and last go on a bit further)
+    const [sx1, sx2, sz1, sz2] = seaArea(L);
     for (let zz = sz1; zz <= sz2; zz += 60) {
         const z2 = Math.min(sz2, zz + 59);
         // (sandstone under the sand: sand over nothing would fall)
         c.push(`fill ${sx1} ${SEA - 5} ${zz} ${sx2} ${SEA - 5} ${z2} ${B('sandstone')}`, `fill ${sx1} ${SEA - 4} ${zz} ${sx2} ${SEA - 4} ${z2} ${B('sand')}`, `fill ${sx1} ${SEA - 3} ${zz} ${sx2} ${SEA} ${z2} ${B('water')}`);
     }
     const r = rngFor(L.n * 31 + 7);
-    for (let i = 0; i < 40; i++) {
+    for (let i = 0; i < Math.round(L.length * 0.6); i++) {
         const cx = r.int(sx1, sx2), cz = r.int(sz1, sz2);
         c.push(`setblock ${cx} ${SEA - 3} ${cz} ${B(r.pick(['brain_coral_block', 'tube_coral_block', 'fire_coral_block', 'horn_coral_block', 'bubble_coral_block', 'sea_lantern']))}`);
         if (r.chance(0.5)) c.push(`setblock ${cx} ${SEA - 2} ${cz} ${B(r.pick(['brain_coral[waterlogged=true]', 'tube_coral[waterlogged=true]', 'fire_coral[waterlogged=true]', 'horn_coral[waterlogged=true]', 'bubble_coral[waterlogged=true]', 'seagrass']))}`);
     }
-    // the start pad, the course parts with emerald checkpoints after each, the gold finish pad
+    // the start pad, the course parts (a short run of course between them), the gold pad at the end
     c.push(...floorFill(lo - 1, z0, hi + 1, z0 + 5, L.style));
     c.push(`fill ${lo - 1} ${F - 1} ${z0} ${hi + 1} ${F - 1} ${z0} ${B('blue_concrete')}`);
-    for (const p of L.parts) c.push(...p.blocks);
-    for (const cz of L.cps) c.push(`fill ${lo - 1} ${F - 1} ${cz} ${hi + 1} ${F - 1} ${cz + 2} ${B('emerald_block')}`);
-    c.push(`fill ${lo - 1} ${F - 1} ${L.finish} ${hi + 1} ${F - 1} ${L.finish + 4} ${B('gold_block')}`);
-    // the finish arch
-    c.push(`fill ${lo - 2} ${F} ${L.finish + 2} ${lo - 2} ${F + 4} ${L.finish + 2} ${B('white_concrete')}`, `fill ${hi + 2} ${F} ${L.finish + 2} ${hi + 2} ${F + 4} ${L.finish + 2} ${B('white_concrete')}`,
-        `fill ${lo - 2} ${F + 5} ${L.finish + 2} ${hi + 2} ${F + 5} ${L.finish + 2} ${B('blue_concrete')}`);
+    L.parts.forEach((p, i) => { if (i) c.push(...floorFill(lo, p.z - 3, hi, p.z - 1, L.style)); c.push(...p.blocks); });
+    if (L.tower) c.push(`fill ${lo - 1} ${F - 1} ${z0} ${hi + 1} ${F - 1} ${z0} ${B('yellow_concrete')}`);
+    if (!L.tower) c.push(`fill ${lo - 1} ${F - 1} ${L.finish} ${hi + 1} ${F - 1} ${L.finish + 2} ${B('gold_block')}`,
+    // the arch over the gold pad
+    `fill ${lo - 2} ${F} ${L.finish + 1} ${lo - 2} ${F + 4} ${L.finish + 1} ${B('white_concrete')}`, `fill ${hi + 2} ${F} ${L.finish + 1} ${hi + 2} ${F + 4} ${L.finish + 1} ${B('white_concrete')}`,
+        `fill ${lo - 2} ${F + 5} ${L.finish + 1} ${hi + 2} ${F + 5} ${L.finish + 1} ${B('blue_concrete')}`);
     // the stands: birch seats stepping up and back on both sides, birch log legs down into the sea, a
     // concrete design on the back wall and the seat fronts
-    const s1 = z0 - 2, s2 = end + 1, gapX = 7;
+    // (the stands run the whole way along, at the same place for every level)
+    const s1 = z0, s2 = end - 1;
     for (const side of [-1, 1]) {
-        const base = side < 0 ? lo - gapX : hi + gapX;          // the front row
+        const base = x + side * STAND_X;                         // the front row
         // the seats look at the course
         const facing = side < 0 ? 'east' : 'west';
         for (let t = 0; t < 4; t++) {
@@ -463,14 +532,18 @@ function levelCommands(L) {
         const back = base + side * 4;
         c.push(...standWall(back, F - 5, F + 1, s1, s2, L.stand));
         c.push(`fill ${base - side} ${F - 5} ${s1} ${base - side} ${F - 5} ${s2} ${B('birch_fence')}`);
-        for (let zz = s1; zz <= s2; zz += 6) for (let t = 0; t < 5; t++) c.push(`fill ${base + side * t} ${SEA + 1} ${zz} ${base + side * t} ${F - 9} ${zz} ${B('birch_log')}`);
+        for (let zz = s1 - (((s1 - ORIGIN_Z) % 6) + 6) % 6; zz <= s2; zz += 6) if (zz >= s1) for (let t = 0; t < 5; t++) c.push(`fill ${base + side * t} ${SEA + 1} ${zz} ${base + side * t} ${F - 9} ${zz} ${B('birch_log')}`);
     }
     // the level's number over the start, and the finish sign
     c.push(`kill @e[type=minecraft:text_display,tag=wo_sign,x=${x},y=${F + 3},z=${z0 + 3},distance=..3]`,
         `summon minecraft:text_display ${x + 0.5} ${F + 3.2} ${z0 + 3.5} {Tags:["wo_sign"],billboard:"vertical",scale:[2f,2f,2f],background:1711276032,text:[{text:"LEVEL ${L.n}",color:"white",bold:true},{text:"\\n${L.name}",color:"aqua"}]}`,
-        `kill @e[type=minecraft:text_display,tag=wo_sign,x=${x},y=${F + 6},z=${L.finish + 2},distance=..3]`,
-        `summon minecraft:text_display ${x + 0.5} ${F + 6.2} ${L.finish + 2.5} {Tags:["wo_sign"],billboard:"vertical",scale:[2.5f,2.5f,2.5f],background:1711276032,text:{text:"FINISH",color:"gold",bold:true}}`);
+        ...(L.tower ? [] : [`kill @e[type=minecraft:text_display,tag=wo_sign,x=${x},y=${F + 6},z=${L.finish + 1},distance=..3]`,
+            `summon minecraft:text_display ${x + 0.5} ${F + 6.2} ${L.finish + 1.5} {Tags:["wo_sign"],billboard:"vertical",scale:[2.5f,2.5f,2.5f],background:1711276032,text:{text:"LEVEL UP",color:"gold",bold:true}}`]));
     return c.filter(Boolean);
+}
+// the stretch of sea (and stands) a level builds: x1 x2 z1 z2
+function seaArea(L) {
+    return [L.x - SEA_W, L.x + SEA_W - 1, L.n === 1 ? L.z0 - 30 : L.z0, L.n === LEVELS ? L.z0 + L.length + 30 : L.z0 + L.length - 1];
 }
 // the seat front under each row: the level's concrete design
 function standFront(x, y, z1, z2, st, t) {
@@ -577,7 +650,7 @@ export async function buildWipeout(mc, { log = () => {}, progress = () => {}, fr
     for (let n = from; n <= to; n++) {
         const L = wipeoutLevel(n);
         // the level in strips of the course's length (forceloading less at once)
-        const x1 = L.x - SPACING_X / 2, x2 = L.x + SPACING_X / 2 - 1, z1 = L.z0 - ROW_GAP / 2, z2 = L.z0 + L.length + ROW_GAP / 2;
+        const [x1, x2, z1, z2] = seaArea(L);
         await area(x1, z1, x2, z2, Array.from({ length: levelParts(L).length }, (_, i) => `build/${n}_${i + 1}`));
         saveProgress(n);
         progress(n);
@@ -646,9 +719,7 @@ export function packFiles() {
         // a glove: bounce
         'execute as @a[tag=wo_in,tag=!wo_ride] at @s if block ~ ~-0.2 ~ #wipeout:glove unless score @s wo_bn matches 1.. unless score @s wo_jail matches 1.. run function wipeout:bounce',
         'execute as @a[scores={wo_bn=1..}] run function wipeout:bounce_tick',
-        // checkpoints (emerald) and the finish (gold)
-        'execute as @a[tag=wo_in] at @s if block ~ ~-0.2 ~ minecraft:emerald_block unless score @s wo_jail matches 1.. run function wipeout:checkpoint',
-        'execute as @a[tag=wo_in] at @s if block ~ ~-0.2 ~ minecraft:gold_block unless score @s wo_jail matches 1.. unless score @s wo_level matches 101.. run function wipeout:finish',
+        // (the gold pad at the end of the level you're on: in that level's tick)
         // in the sea, or landed on something below the course (the stands): a wipeout
         'execute as @a[tag=wo_in] at @s if block ~ ~ ~ minecraft:water unless score @s wo_jail matches 1.. run function wipeout:fail',
         'execute as @a[tag=wo_in] store result score @s wo_y run data get entity @s Pos[1] 10',
@@ -667,7 +738,7 @@ export function packFiles() {
         'tag @s add wo_in', 'gamemode adventure @s', 'clear @s',
         'execute unless score @s wo_level matches 1.. run scoreboard players set @s wo_level 1',
         'function wipeout:goto',
-        ...title('@s', 'WIPEOUT', '100 levels in the sky. Red knocks you off. Emerald saves your place.', 'aqua'),
+        ...title('@s', 'WIPEOUT', '100 levels in the sky. Red kills you. Gold is the next level.', 'aqua'),
     ]);
     fn('hud', [
         'effect give @s minecraft:night_vision infinite 0 true', 'effect give @s minecraft:saturation infinite 0 true', 'effect give @s minecraft:resistance infinite 4 true',
@@ -721,12 +792,20 @@ export function packFiles() {
             `scoreboard players set #lvl wo_v ${L.n}`,
             // this level's area stays loaded while you're on it (its moving parts are summoned once it is)
             'forceload remove all', `forceload add ${lo} ${L.z0} ${hi} ${zEnd}`,
-            `scoreboard players set @s wo_cx ${x}`, `scoreboard players set @s wo_cy ${y}`, `scoreboard players set @s wo_cz ${z}`, `scoreboard players set @s wo_cr ${z}`,
-            'function wipeout:respawn',
+            `scoreboard players set @s wo_cx ${x}`, `scoreboard players set @s wo_cy ${y}`, `scoreboard players set @s wo_cz ${z}`,
+            // just finished the level before: walk straight on (it starts right there); otherwise you're taken there
+            'execute unless entity @s[tag=wo_done] run function wipeout:respawn',
+            'execute if entity @s[tag=wo_done] run function wipeout:respawn_on',
             `title @s times 3 30 8`, `title @s title ${J({ text: `Level ${L.n}`, color: 'aqua', bold: true })}`, `title @s subtitle ${J({ text: L.name, color: 'white' })}`,
             ...(L.n > 1 && (L.n - 1) % 10 === 0 ? [`title @s times 5 50 12`, `title @s title ${J({ text: `${L.n - 1} LEVELS DONE!`, color: 'gold', bold: true })}`, `title @s subtitle ${J({ text: `${LEVELS - L.n + 1} to go`, color: 'yellow', bold: true })}`].map(l => `execute if entity @s[tag=wo_done] run ${l}`) : []),
         ]);
-        fn(`lvl/${L.n}/tick`, L.parts.flatMap(p => p.tick));
+        const glo = L.x - Math.floor((L.w - 1) / 2) - 1;
+        fn(`lvl/${L.n}/tick`, [
+            ...L.parts.flatMap(p => p.tick),
+            // the gold pad: on to the next level (on the tower: the gold on top wins)
+            L.tower ? `execute positioned ${L.tower.cx - 2} ${L.tower.top + 0.5} ${L.tower.cz - 2} as @a[tag=wo_in,dx=4,dy=2,dz=4] unless score @s wo_jail matches 1.. unless score @s wo_level matches 101.. run function wipeout:finish`
+                : `execute positioned ${glo} ${F - 0.5} ${L.finish} as @a[tag=wo_in,dx=${L.w + 1},dy=2,dz=2] unless score @s wo_jail matches 1.. unless score @s wo_level matches 101.. run function wipeout:finish`,
+        ]);
         fn(`lvl/${L.n}/ready`, [`execute if loaded ${lo} 0 ${L.z0} if loaded ${hi} 0 ${zEnd} if loaded ${lo} 0 ${zEnd} if loaded ${hi} 0 ${L.z0} run function wipeout:lvl/${L.n}/spawn`]);
         // the moving parts, summoned fresh each try (and the doors' right door picked again)
         fn(`lvl/${L.n}/spawn`, [
@@ -738,7 +817,7 @@ export function packFiles() {
         ]);
         for (const p of L.parts) for (const [name, lines] of Object.entries(p.fns)) fn(`lvl/${L.n}/${p.id}_${name}`, lines);
     }
-    // to your checkpoint (or the level's start), everything set up fresh
+    // to the level's start, everything set up fresh
     fn('respawn', [
         'ride @s dismount', 'tag @s remove wo_ride', 'effect clear @s minecraft:levitation', 'scoreboard players set @s wo_bn 0',
         'execute store result storage wipeout:c x int 1 run scoreboard players get @s wo_cx',
@@ -749,20 +828,17 @@ export function packFiles() {
         'scoreboard players operation #pend wo_v = #lvl wo_v',
     ]);
     fn('respawn_tp', ['$tp @s $(x).5 $(y) $(z).5 0 0', '$spawnpoint @s $(x) $(y) $(z) 0 0']);
+    // on from the level before without being moved: the start is saved and the moving parts summoned
+    fn('respawn_on', [
+        'execute store result storage wipeout:c x int 1 run scoreboard players get @s wo_cx',
+        'execute store result storage wipeout:c y int 1 run scoreboard players get @s wo_cy',
+        'execute store result storage wipeout:c z int 1 run scoreboard players get @s wo_cz',
+        'function wipeout:respawn_sp with storage wipeout:c',
+        'scoreboard players operation #pend wo_v = #lvl wo_v',
+    ]);
+    fn('respawn_sp', ['$spawnpoint @s $(x) $(y) $(z) 0 0']);
     fn('pending', ['execute store result storage wipeout:c n int 1 run scoreboard players get #pend wo_v', 'function wipeout:pending_n with storage wipeout:c']);
     fn('pending_n', ['$function wipeout:lvl/$(n)/ready']);
-    // standing on emerald: your place is saved (a new checkpoint further on says so)
-    fn('checkpoint', [
-        'execute store result score @s wo_nz run data get entity @s Pos[2]',
-        'execute if score @s wo_nz <= @s wo_cr run return 0',
-        'scoreboard players operation @s wo_cr = @s wo_nz', 'scoreboard players add @s wo_cr 2',
-        'execute store result score @s wo_cx run data get entity @s Pos[0]',
-        'execute store result score @s wo_cy run data get entity @s Pos[1]',
-        'scoreboard players operation @s wo_cz = @s wo_nz',
-        `title @s actionbar ${J({ text: 'CHECKPOINT!', color: 'green', bold: true })}`,
-        'playsound minecraft:block.note_block.chime master @s ~ ~ ~ 1 1.4',
-        'particle minecraft:happy_villager ~ ~0.5 ~ 0.6 0.3 0.6 0 20 force @s',
-    ]);
     // the finish: on to the next level
     fn('finish', [
         'playsound minecraft:ui.toast.challenge_complete master @s ~ ~ ~ 0.8 1.3',
@@ -771,16 +847,29 @@ export function packFiles() {
         'function wipeout:goto',
     ]);
     fn('done_clear', ['tag @a remove wo_done']);
-    // a wipeout: back to your checkpoint
+    // a wipeout (in the sea): back to the start of the level
     const quips = ['WIPEOUT!', 'SPLASH!', 'OOF!', 'IN THE DRINK!', 'BELLY FLOP!', 'SWIM BACK!'];
     fn('fail', [
-        'scoreboard players add @s wo_fails 1', 'scoreboard players add @s wo_lf 1',
         'playsound minecraft:entity.generic.splash master @s ~ ~ ~ 1 0.9', 'playsound minecraft:entity.player.hurt master @s ~ ~ ~ 0.5 1',
         'execute store result score #q wo_v run random value 0..5',
         ...quips.map((q, i) => `execute if score #q wo_v matches ${i} run title @s actionbar ${J({ text: q, color: 'aqua', bold: true })}`),
-        'function wipeout:respawn',
+        'function wipeout:again',
     ]);
-    // hit by something red: knocked away from it (an arrow with Punch from its side, no damage: you
+    fn('again', ['scoreboard players add @s wo_fails 1', 'scoreboard players add @s wo_lf 1', 'function wipeout:respawn']);
+    // touched something red: dead, back to the start of the level
+    const deaths = ['ZAPPED!', 'ELIMINATED!', 'SQUASHED!', 'TOO SLOW!', 'RED MEANS DEAD!', 'BONK!'];
+    fn('zap', [
+        'execute if score @s wo_cd matches 1.. run return 0',
+        'execute if score @s wo_jail matches 1.. run return 0',
+        'scoreboard players set @s wo_cd 10',
+        'particle minecraft:dust{color:[1.0,0.1,0.1],scale:2.0} ~ ~1 ~ 0.4 0.6 0.4 0 40 force',
+        'particle minecraft:poof ~ ~1 ~ 0.3 0.5 0.3 0.02 12 force',
+        'playsound minecraft:entity.player.death master @a ~ ~ ~ 1 1', 'playsound minecraft:entity.generic.explode master @s ~ ~ ~ 0.4 1.6',
+        'execute store result score #q wo_v run random value 0..5',
+        ...deaths.map((q, i) => `execute if score #q wo_v matches ${i} run title @s actionbar ${J({ text: q, color: 'red', bold: true })}`),
+        'function wipeout:again',
+    ]);
+    // a punching glove: knocked away from it (an arrow with Punch from its side, no damage: you
     // have Resistance). $(p): how hard (1 or 2).
     fn('hit', [
         'execute if score @s wo_cd matches 1.. run return 0',
