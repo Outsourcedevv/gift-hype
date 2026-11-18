@@ -150,17 +150,18 @@ WIPEOUT (Minecraft -> Wipeout)
       red blocks don't get you.
     - Pick the door: jump onto the ledge and walk into a door. The right one opens; a wrong one goes
       red and the ledge drops into the sea. The right door is picked again every try.
-    - The vanishing bridge: once you step on it, it goes yellow, then red, then disappears. Run
-      across before it goes. It comes back a moment later.
+    - The vanishing bridge: it comes and goes by itself. Blue and white, then yellow, then red, then
+      gone for 2 seconds. Wait for it to come back and run across before it goes.
     - Also: tiles that flash red and disappear, fields of spinners.
   LEVEL 100 is the Tower: black and yellow, rising out of the sea. Steps spiral round the outside up to
     a landing, then the next steps start on the other side; a red arm sweeps round every landing (two
     on the last one). Get to the gold on the very top to win. Fall off and you land lower down (or in
     the sea).
+  The next level's obstacles are already moving before you get there, so nothing pops in.
   There are no checkpoints: fall in the sea (a wipeout) or touch red and the level starts again.
   Levels 1 to 80 take about 10 seconds, 81 to 100 a bit longer. The gifts are the Dropper's: levels up
   and down, punches (on/off), jail, the level slot machine, the reset countdown and the save.
-  ("Unbound Wipeout 1" and "Unbound Wipeout 2", the older Wipeout worlds, aren't used any more. You
+  ("Unbound Wipeout 1", "2" and "3", the older Wipeout worlds, aren't used any more. You
   can delete them in Minecraft's Singleplayer list.)
 
 THE DROPPER (Minecraft -> Dropper)

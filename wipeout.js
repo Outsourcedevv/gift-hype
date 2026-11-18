@@ -18,9 +18,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { SAVES_DIR } from './singleplayer.js';
 
-export const WIPEOUT_WORLD = 'Unbound Wipeout 3';     // 3: waves with holes, the vanishing bridge
+export const WIPEOUT_WORLD = 'Unbound Wipeout 4';     // 4: easier cubes (the layout moved)
 export const WIPEOUT_MC = '26.2';
-export const WIPEOUT_BUILD = 4;                  // bump when the levels change, to rebuild them
+export const WIPEOUT_BUILD = 5;                  // bump when the levels change, to rebuild them
 export const LEVELS = 100;
 
 // Settings for making the world the first time: nothing but the levels (and sea), warm ocean colours
@@ -128,18 +128,21 @@ function obstacle(type, ctx) {
         }
         // ---- red cubes sliding across: run past one, stop, wait for the next ----
         case 'cubes': {
-            const count = Math.min(6, 2 + Math.floor(d * 4) + r.int(0, 1)), size = d > 0.55 && r.chance(0.5) ? 3 : 2;
-            const L = count * (size + 3) + 2;
+            // (kept fair: two-block cubes, four safe rows between them, slow enough to time, and each cube goes
+            // well off the course on both sides so there's a proper gap to run through)
+            const count = Math.min(4, 2 + Math.floor(d * 2) + (d > 0.3 ? r.int(0, 1) : 0)), size = 2, safe = 4;
+            const L = count * (size + safe) + 3;
             floorRow(lo, z, hi, z + L - 1);
-            const travel = w + size + 2, v = sp(0.12, 0.28), t = Math.max(8, Math.round(travel / v));
+            const travel = w + size + 6, v = sp(0.1, 0.19), t = Math.max(10, Math.round(travel / v));
             for (let i = 0; i < count; i++) {
-                const cz = z + 2 + i * (size + 3), cid = `${id}c${i}`;
-                const steps = [{ d: [v, 0, 0], t }, { d: [-v, 0, 0], t }], off = r.int(0, 2 * t - 1);
-                const start = posAt([lo - size - 1, F, cz], steps, off);
+                const cz = z + 3 + i * (size + safe), cid = `${id}c${i}`;
+                // spread out, so two cubes next to each other are never both in the way at once
+                const steps = [{ d: [v, 0, 0], t }, { d: [-v, 0, 0], t }], off = Math.round(i * 2 * t / count + r.int(0, Math.round(t / 4))) % (2 * t);
+                const start = posAt([lo - size - 3, F, cz], steps, off);
                 o.spawn.push(display([id, cid], ...start, 'red_concrete', size, size, size), `scoreboard players set @e[tag=${cid}] wo_ph ${off}`);
                 o.tick.push(...moveLines(cid, steps), hitBox(cid, size, size, size));
             }
-            o.len = L; o.secs = 1.2 + count * 0.9;
+            o.len = L; o.secs = 1.2 + count * 1.0;
             break;
         }
         // ---- waves: red walls come down a corridor at you, again and again. The corridor has holes in its
@@ -234,7 +237,7 @@ function obstacle(type, ctx) {
                 'tag @s add wo_ride',
                 `summon minecraft:item_display ${x + 0.5} ${F + 1.05} ${z + 1.5} {Tags:["wo_mv","wo_new","wo_zipv","${id}v"],teleport_duration:1}`,
                 display(['wo_new', 'wo_ziph', `${id}v`], x + 0.42, F + 2.85, z + 1.42, 'chain', 0.16, 1.15, 0.16),
-                'scoreboard players operation @e[tag=wo_new] wo_gen = #gen wo_v', 'scoreboard players set @e[tag=wo_new] wo_ph 0', 'tag @e[tag=wo_new] remove wo_new',
+                `scoreboard players set @e[tag=wo_new] wo_gen ${n}`, 'scoreboard players set @e[tag=wo_new] wo_ph 0', 'tag @e[tag=wo_new] remove wo_new',
                 `ride @s mount @e[tag=${id}v,tag=wo_zipv,limit=1]`,
                 'playsound minecraft:block.chain.place master @s ~ ~ ~ 1 0.8',
             ];
@@ -292,8 +295,8 @@ function obstacle(type, ctx) {
             o.len = wz + 3 - z; o.secs = 3 + (N - 3) * 0.6;
             break;
         }
-        // ---- a bridge over the sea that goes once you're on it: yellow, then red, then gone. Run! It comes
-        // back a moment later (and every try) ----
+        // ---- a bridge over the sea that comes and goes by itself: there, then yellow, then red, then gone,
+        // then back. Wait for it to come back and run across before it goes ----
         case 'beam': {
             const L = r.int(8, 12) + Math.round(d * 4), bw = d < 0.7 ? 2 : 1;
             floorRow(lo, z, hi, z);
@@ -303,23 +306,30 @@ function obstacle(type, ctx) {
             const all = c => `fill ${bx} ${F - 1} ${z + 1} ${bx + bw - 1} ${F - 1} ${z + L} ${B(c)}`;
             o.blocks.push(...normal);
             floorRow(lo, z + L + 1, hi, z + L + 1);
-            // how long you get: about walking pace early on, nearer a sprint later
-            const gone = Math.round(L * 20 / (4.0 + 1.4 * d)) + 12, yellow = Math.round(gone * 0.35), red = Math.round(gone * 0.7), mid = `${bx + bw / 2} ${F} ${z + L / 2}`;
-            const st = `#${id}`;
-            o.fns.restore = [...normal, `scoreboard players set ${st} wo_v 0`];
-            o.spawn.push(...normal, `scoreboard players set ${st} wo_v 0`);
+            // how long it's there: about walking pace early on, nearer a sprint later; then 2 seconds gone
+            const vis = Math.round(L * 20 / (4.0 + 1.4 * d)) + 16, yellow = Math.round(vis * 0.5), red = Math.round(vis * 0.8), P = vis + 40;
+            const ph = r.int(0, P - 1), at = k => (k + ph) % P, m = `#m${P}`, mid = `${bx + bw / 2} ${F} ${z + L / 2}`;
+            ctx.periods.add(P);
+            o.fns.normal = normal;
             o.tick.push(
-                `execute if score ${st} wo_v matches 0 positioned ${bx} ${F} ${z + 1} if entity @a[tag=wo_in,dx=${bw - 1},dy=1,dz=${L - 1}] run scoreboard players set ${st} wo_v 1`,
-                `execute if score ${st} wo_v matches 1.. run scoreboard players add ${st} wo_v 1`,
-                `execute if score ${st} wo_v matches ${yellow} run ${all('yellow_concrete')}`,
-                `execute if score ${st} wo_v matches ${yellow} run playsound minecraft:block.note_block.pling master @a ${mid} 1 1.2`,
-                `execute if score ${st} wo_v matches ${red} run ${all('red_concrete')}`,
-                `execute if score ${st} wo_v matches ${red} run playsound minecraft:block.note_block.pling master @a ${mid} 1 0.7`,
-                `execute if score ${st} wo_v matches ${gone} run ${all('air')}`,
-                `execute if score ${st} wo_v matches ${gone} run playsound minecraft:block.glass.break master @a ${mid} 1 0.8`,
-                `execute if score ${st} wo_v matches ${gone + 40}.. run function wipeout:${ctx.fnBase}/${id}_restore`,
+                `execute if score ${m} wo_v matches ${at(0)} run function wipeout:${ctx.fnBase}/${id}_normal`,
+                `execute if score ${m} wo_v matches ${at(0)} run playsound minecraft:block.note_block.chime master @a ${mid} 1 1.4`,
+                `execute if score ${m} wo_v matches ${at(yellow)} run ${all('yellow_concrete')}`,
+                `execute if score ${m} wo_v matches ${at(yellow)} run playsound minecraft:block.note_block.pling master @a ${mid} 1 1.2`,
+                `execute if score ${m} wo_v matches ${at(red)} run ${all('red_concrete')}`,
+                `execute if score ${m} wo_v matches ${at(red)} run playsound minecraft:block.note_block.pling master @a ${mid} 1 0.7`,
+                `execute if score ${m} wo_v matches ${at(vis)} run ${all('air')}`,
+                `execute if score ${m} wo_v matches ${at(vis)} run playsound minecraft:block.glass.break master @a ${mid} 1 0.8`,
             );
-            o.len = L + 2; o.secs = 1 + L / 4.5;
+            // when the level's set up: the bridge as it should be right now
+            const when = (k1, k2, cmd) => {                // for k in [k1, k2): the matching ${m} ranges
+                const a1 = at(k1), a2 = at(k2 - 1);
+                return a1 <= a2 ? [`execute if score ${m} wo_v matches ${a1}..${a2} run ${cmd}`]
+                    : [`execute if score ${m} wo_v matches ${a1}..${P - 1} run ${cmd}`, `execute if score ${m} wo_v matches 0..${a2} run ${cmd}`];
+            };
+            o.spawn.push(...when(0, yellow, `function wipeout:${ctx.fnBase}/${id}_normal`), ...when(yellow, red, all('yellow_concrete')),
+                ...when(red, vis, all('red_concrete')), ...when(vis, P, all('air')));
+            o.len = L + 2; o.secs = 1 + L / 4.5 + 1;
             break;
         }
         // ---- stepping tiles that flash red, then drop away, then come back ----
@@ -735,8 +745,8 @@ export function packFiles() {
         'execute unless score #punch wo_v matches 0..1 run scoreboard players set #punch wo_v 1',
         'execute unless score #shield wo_v matches 0.. run scoreboard players set #shield wo_v 0',
         'execute unless score #reset wo_v matches 0.. run scoreboard players set #reset wo_v 0',
-        'execute unless score #gen wo_v matches 0.. run scoreboard players set #gen wo_v 0',
         'scoreboard players set #pend wo_v 0',
+        'execute unless score #nxt wo_v matches -1.. run scoreboard players set #nxt wo_v -1',
         'execute unless data storage wipeout:s save run data modify storage wipeout:s save set value "Glowing Jellyfish"',
         `bossbar add wipeout:level ${J({ text: 'LEVEL 01 / 100', bold: true })}`, 'bossbar set wipeout:level color blue', 'bossbar set wipeout:level max 100', 'bossbar set wipeout:level visible true',
         `bossbar add wipeout:reset ${J({ text: 'Reset' })}`, 'bossbar set wipeout:reset color red', 'bossbar set wipeout:reset style notched_10',
@@ -749,8 +759,8 @@ export function packFiles() {
         'execute as @a[tag=!wo_in] run function wipeout:join',
         'scoreboard players add #t wo_v 1',
         ...periods.map(p => `scoreboard players operation #m${p} wo_v = #t wo_v`), ...periods.map(p => `scoreboard players operation #m${p} wo_v %= #P${p} wo_v`),
-        // moving parts left from another level (or another try): gone
-        'execute as @e[tag=wo_mv] unless score @s wo_gen = #gen wo_v run function wipeout:gone',
+        // moving parts of levels you're not on (or about to be on): gone. (wo_gen: the level they're on)
+        'execute as @e[tag=wo_mv] unless score @s wo_gen = #lvl wo_v unless score @s wo_gen = #nxt wo_v run function wipeout:gone',
         // this level's obstacles
         'execute if score #pend wo_v matches 1.. run function wipeout:pending',
         'execute if score #pend wo_v matches ..0 run function wipeout:level_tick',
@@ -821,15 +831,23 @@ export function packFiles() {
         ...levels.map(L => `execute if score @s wo_level matches ${L.n} run return run function wipeout:lvl/${L.n}`),
     ]);
     // each tick: the obstacles of the level being played (split in tens, so it's a few checks a tick)
-    fn('level_tick', Array.from({ length: 10 }, (_, k) => `execute if score #lvl wo_v matches ${k * 10 + 1}..${k * 10 + 10} run function wipeout:lt/${k}`));
-    for (let k = 0; k < 10; k++) fn(`lt/${k}`, levels.slice(k * 10, k * 10 + 10).map(L => `execute if score #lvl wo_v matches ${L.n} run return run function wipeout:lvl/${L.n}/tick`));
+    // (the next level's obstacles are already going too, so they're moving before you get there)
+    fn('level_tick', [
+        ...Array.from({ length: 10 }, (_, k) => `execute if score #lvl wo_v matches ${k * 10 + 1}..${k * 10 + 10} run function wipeout:lt/${k}`),
+        ...Array.from({ length: 10 }, (_, k) => `execute if score #nxt wo_v matches ${k * 10 + 1}..${k * 10 + 10} run function wipeout:ln/${k}`),
+    ]);
+    for (let k = 0; k < 10; k++) {
+        fn(`lt/${k}`, levels.slice(k * 10, k * 10 + 10).map(L => `execute if score #lvl wo_v matches ${L.n} run return run function wipeout:lvl/${L.n}/tick`));
+        fn(`ln/${k}`, levels.slice(k * 10, k * 10 + 10).map(L => `execute if score #nxt wo_v matches ${L.n} run return run function wipeout:lvl/${L.n}/tick`));
+    }
     for (const L of levels) {
         const [x, y, z] = levelStart(L);
-        const lo = L.x - Math.floor((L.w - 1) / 2) - 14, hi = L.x + 16, zEnd = L.z0 + L.length;
+        const N2 = levels[L.n] || L;                             // the next level (its area's loaded too)
+        const lo = L.x - 16, hi = L.x + 16, zEnd = N2.z0 + N2.length;
         fn(`lvl/${L.n}`, [
             'scoreboard players set @s wo_lf 0',
-            `scoreboard players set #lvl wo_v ${L.n}`,
-            // this level's area stays loaded while you're on it (its moving parts are summoned once it is)
+            `scoreboard players set #lvl wo_v ${L.n}`, `scoreboard players set #nxt wo_v ${L.n < LEVELS ? L.n + 1 : -1}`,
+            // this level's area and the next one's stay loaded while you're on it (their moving parts are summoned once they are)
             'forceload remove all', `forceload add ${lo} ${L.z0} ${hi} ${zEnd}`,
             `scoreboard players set @s wo_cx ${x}`, `scoreboard players set @s wo_cy ${y}`, `scoreboard players set @s wo_cz ${z}`,
             // just finished the level before: walk straight on (it starts right there); otherwise you're taken there
@@ -846,12 +864,21 @@ export function packFiles() {
                 : `execute positioned ${glo} ${F - 0.5} ${L.finish} as @a[tag=wo_in,dx=${L.w + 1},dy=2,dz=2] unless score @s wo_jail matches 1.. unless score @s wo_level matches 101.. run function wipeout:finish`,
         ]);
         fn(`lvl/${L.n}/ready`, [`execute if loaded ${lo} 0 ${L.z0} if loaded ${hi} 0 ${zEnd} if loaded ${lo} 0 ${zEnd} if loaded ${hi} 0 ${L.z0} run function wipeout:lvl/${L.n}/spawn`]);
-        // the moving parts, summoned fresh each try (and the doors' right door picked again)
+        // once it's all loaded: this level's moving parts (fresh after a wipeout or a gift; kept when you
+        // walk on from the level before, where they were already going), and the next level's
         fn(`lvl/${L.n}/spawn`, [
             'scoreboard players set #pend wo_v 0',
-            'scoreboard players add #gen wo_v 1',
+            `execute if score #pmode wo_v matches 1 run function wipeout:lvl/${L.n}/make`,
+            `execute if score #pmode wo_v matches 0 run function wipeout:lvl/${L.n}/ensure`,
+            ...(L.n < LEVELS ? [`function wipeout:lvl/${L.n + 1}/ensure`] : []),
+        ]);
+        fn(`lvl/${L.n}/ensure`, [`execute unless entity @e[tag=wo_lm,scores={wo_gen=${L.n}}] run function wipeout:lvl/${L.n}/make`]);
+        // the moving parts, summoned fresh (and the doors' right door picked again)
+        fn(`lvl/${L.n}/make`, [
+            `execute as @e[tag=wo_mv,scores={wo_gen=${L.n}}] run function wipeout:gone`,
             ...L.parts.flatMap(p => p.spawn),
-            'scoreboard players operation @e[tag=wo_new] wo_gen = #gen wo_v', 'tag @e[tag=wo_new] remove wo_new',
+            `summon minecraft:marker ${L.x} ${F} ${L.z0 + 1} {Tags:["wo_mv","wo_new","wo_lm"]}`,
+            `scoreboard players set @e[tag=wo_new] wo_gen ${L.n}`, 'tag @e[tag=wo_new] remove wo_new',
             ...L.parts.flatMap(p => p.reroll),
         ]);
         for (const p of L.parts) for (const [name, lines] of Object.entries(p.fns)) fn(`lvl/${L.n}/${p.id}_${name}`, lines);
@@ -864,7 +891,7 @@ export function packFiles() {
         'execute store result storage wipeout:c z int 1 run scoreboard players get @s wo_cz',
         'function wipeout:respawn_tp with storage wipeout:c',
         // the moving parts are summoned fresh (once the level's area is loaded)
-        'scoreboard players operation #pend wo_v = #lvl wo_v',
+        'scoreboard players set #pmode wo_v 1', 'scoreboard players operation #pend wo_v = #lvl wo_v',
     ]);
     fn('respawn_tp', ['$tp @s $(x).5 $(y) $(z).5 0 0', '$spawnpoint @s $(x) $(y) $(z) 0 0']);
     // on from the level before without being moved: the start is saved and the moving parts summoned
@@ -873,7 +900,7 @@ export function packFiles() {
         'execute store result storage wipeout:c y int 1 run scoreboard players get @s wo_cy',
         'execute store result storage wipeout:c z int 1 run scoreboard players get @s wo_cz',
         'function wipeout:respawn_sp with storage wipeout:c',
-        'scoreboard players operation #pend wo_v = #lvl wo_v',
+        'scoreboard players set #pmode wo_v 0', 'scoreboard players operation #pend wo_v = #lvl wo_v',
     ]);
     fn('respawn_sp', ['$spawnpoint @s $(x) $(y) $(z) 0 0']);
     fn('pending', ['execute store result storage wipeout:c n int 1 run scoreboard players get #pend wo_v', 'function wipeout:pending_n with storage wipeout:c']);
@@ -936,7 +963,7 @@ export function packFiles() {
     // the zipline's end: you're let go over the next platform
     fn('zip_end', ['execute on passengers run tag @s remove wo_ride', 'execute on passengers run ride @s dismount', 'execute at @s run kill @e[tag=wo_ziph,distance=..3]', 'kill @s']);
     const [wx, wy, wz] = WIN;
-    fn('win_tp', ['forceload remove all', `tp @s ${wx + 0.5} ${wy} ${wz + 0.5}`, `spawnpoint @s ${wx} ${wy} ${wz}`, 'scoreboard players set #lvl wo_v 0', 'scoreboard players set #pend wo_v 0']);
+    fn('win_tp', ['forceload remove all', `tp @s ${wx + 0.5} ${wy} ${wz + 0.5}`, `spawnpoint @s ${wx} ${wy} ${wz}`, 'scoreboard players set #lvl wo_v 0', 'scoreboard players set #nxt wo_v -1', 'scoreboard players set #pend wo_v 0']);
     fn('win', [
         'scoreboard players set @s wo_level 101', 'function wipeout:win_tp',
         ...title('@s', 'YOU BEAT WIPEOUT', 'All 100 levels!'),
