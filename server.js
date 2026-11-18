@@ -29,6 +29,7 @@ import { listWorlds, installPack, singleplayerCommands } from './singleplayer.js
 import { makeLocalServer, setupLauncher, openLauncher, worldVersion } from './localserver.js';
 import { checkForUpdate, applyUpdate, localVersion } from './updater.js';
 import { DROPPER_WORLD, DROPPER_MC, DROPPER_PROPS, DROPPER_ACTIONS, SECRET as DROPPER_LEVELS, installDropperPack, wheelAmounts, installDropperBuildPack, removeDropperBuildPack, dropperCommands, dropperAlertText, buildDropper, dropperBuilt, markDropperBuilt, dropperProgress } from './dropper.js';
+import { WIPEOUT_WORLD, WIPEOUT_MC, WIPEOUT_PROPS, WIPEOUT_ACTIONS, LEVELS as WIPEOUT_LEVELS, installWipeoutPack, installWipeoutBuildPack, removeWipeoutBuildPack, wipeoutCommands, buildWipeout, wipeoutBuilt, markWipeoutBuilt, wipeoutProgress } from './wipeout.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const DATA = path.join(ROOT, 'data');
@@ -255,12 +256,25 @@ const minecraftModes = (parkourRules = PARKOUR_RULES) => [
     { id: newId(), name: 'Block Delete Survival', rules: BLOCK_DELETE_RULES },
     { id: newId(), name: 'Parkour Paradise', rules: parkourRules },
     { id: newId(), name: 'Dropper', rules: DROPPER_RULES },
+    { id: newId(), name: 'Wipeout', rules: DROPPER_RULES },
     { id: newId(), name: 'Chunk Chat', rules: BLOCK_DELETE_RULES },
     { id: newId(), name: 'Chat Teleport', rules: BLOCK_DELETE_RULES },
 ];
-const isDropper = g => g?.connector === 'minecraft' && /dropper/i.test(currentMode(g)?.name || '');
-// the world gifts go to: the Dropper has its own, the other types use the world you picked
-const worldOf = g => isDropper(g) ? DROPPER_WORLD : g.minecraft.world;
+// The level games (Minecraft types with 100 levels in a world of their own, made by Unbound): the
+// Dropper (dropper.js) and Wipeout (wipeout.js, an obstacle course in the sky). The same gifts work
+// in both (levels up and down, punches, jail, the reset countdown and the save, the level slots).
+const COURSES = {
+    dropper: { name: 'the Dropper', ns: 'dropper', world: DROPPER_WORLD, mcv: DROPPER_MC, props: DROPPER_PROPS, actions: DROPPER_ACTIONS, levels: DROPPER_LEVELS,
+        installPack: installDropperPack, installBuild: installDropperBuildPack, removeBuild: removeDropperBuildPack, build: buildDropper, built: dropperBuilt,
+        markBuilt: markDropperBuilt, progress: dropperProgress, commands: dropperCommands, buildNote: `${DROPPER_LEVELS - 1} levels and a secret one (up to an hour, only the first time)` },
+    wipeout: { name: 'Wipeout', ns: 'wipeout', world: WIPEOUT_WORLD, mcv: WIPEOUT_MC, props: WIPEOUT_PROPS, actions: WIPEOUT_ACTIONS, levels: WIPEOUT_LEVELS,
+        installPack: installWipeoutPack, installBuild: installWipeoutBuildPack, removeBuild: removeWipeoutBuildPack, build: buildWipeout, built: wipeoutBuilt,
+        markBuilt: markWipeoutBuilt, progress: wipeoutProgress, commands: wipeoutCommands, buildNote: `${WIPEOUT_LEVELS} levels (a few minutes, only the first time)` },
+};
+const courseOf = g => g?.connector !== 'minecraft' ? null : /wipe ?out/i.test(currentMode(g)?.name || '') ? COURSES.wipeout : /dropper/i.test(currentMode(g)?.name || '') ? COURSES.dropper : null;
+const isDropper = g => !!courseOf(g);           // a level game (the Dropper or Wipeout)
+// the world gifts go to: a level game has its own, the other types use the world you picked
+const worldOf = g => courseOf(g)?.world || g.minecraft.world;
 const isSingle = g => isDropper(g) || !!g.minecraft.single;
 
 let games = loadGames();
@@ -327,12 +341,22 @@ if (!settings.levelSlots) {
     // the level slot machine is added to Dropper gift lists made before it existed
     for (const g of Object.values(games)) {
         let changed = false;
-        for (const m of g.modes) if (/dropper/i.test(m.name) && !m.rules.some(r => r.actions.some(a => a.type === 'levelWheel')) && !m.rules.some(r => r.gift === 'Hand Hearts')) {
+        for (const m of g.modes) if (/dropper|wipe ?out/i.test(m.name) && !m.rules.some(r => r.actions.some(a => a.type === 'levelWheel')) && !m.rules.some(r => r.gift === 'Hand Hearts')) {
             m.rules.push(...normalizeRules([DROPPER_RULES.find(r => r.actions[0].type === 'levelWheel')])); changed = true;
         }
         if (changed) saveGame(g);
     }
     settings.levelSlots = true; saveSettings();
+}
+if (!settings.wipeout) {
+    // the Wipeout type is added to Minecraft (with the Dropper's gifts)
+    for (const g of Object.values(games)) {
+        if (g.connector !== 'minecraft' || !/minecraft/i.test(g.name) || g.modes.some(m => /wipe ?out/i.test(m.name))) continue;
+        g.modes.push({ id: newId(), name: 'Wipeout', rules: normalizeRules(DROPPER_RULES) });
+        Object.assign(g, normalizeGame(g));
+        saveGame(g);
+    }
+    settings.wipeout = true; saveSettings();
 }
 if (!settings.dropper) {
     // the Dropper type is added to Minecraft
@@ -794,9 +818,10 @@ function nukeSizes(g) {
 // why the world last couldn't be opened (for the Play button's message)
 let worldError = '';
 function syncPack(g) {
-    if (isDropper(g)) {
-        try { if (installDropperPack()) { packNeedsReload = true; log('Dropper pack updated.'); } return 'singleplayer'; }
-        catch (e) { worldError = `Couldn't put the Dropper pack in place: ${e.message}`; log(worldError); return 'world failed'; }
+    const course = courseOf(g);
+    if (course) {
+        try { if (course.installPack()) { packNeedsReload = true; log(`${course.name[0].toUpperCase() + course.name.slice(1)} pack updated.`); } return 'singleplayer'; }
+        catch (e) { worldError = `Couldn't put the ${course.name} pack in place: ${e.message}`; log(worldError); return 'world failed'; }
     }
     if (!g.minecraft.world) return 'no world picked';
     try {
@@ -820,7 +845,7 @@ async function connectMinecraft() {
             // the Dropper world is made the first time on the Minecraft version its pack is written for
             // (DROPPER_MC; the launcher's "Unbound" install plays it). Not your newest world's version: a
             // newer Minecraft can change the pack's file formats (26.3 did) and then the world won't open.
-            const opts = isDropper(g) ? { version: DROPPER_MC, props: DROPPER_PROPS, atLeast: DROPPER_MC } : {};
+            const course = courseOf(g), opts = course ? { version: course.mcv, props: course.props, atLeast: course.mcv } : {};
             // the Chat Teleport box pack, from Unbound (block pictures from this world's Minecraft)
             let mcVersion = opts.version; try { mcVersion = worldVersion(world) || mcVersion; } catch { }
             // (Chunk Chat's box when that's the type playing: its size and 3D setting)
@@ -866,7 +891,7 @@ async function connectMinecraft() {
         });
         r.on('error', () => {});
         setStatus({ minecraft: 'connected' });
-        if (isDropper(g) && !dropperBuilt()) buildDropperWorld();
+        if (courseOf(g) && !courseOf(g).built()) buildCourseWorld(courseOf(g));
         if (!isSingle(g)) log(`Connected to Minecraft${g.minecraft.serverFolder ? ` (${path.basename(path.dirname(g.minecraft.serverFolder))})` : ` at ${target.host}:${target.port}`}.`);
     } catch (e) {
         if (rconFor !== key) return;
@@ -883,34 +908,35 @@ async function disconnectMinecraft() {
     if (r) await r.end().catch(() => {});
     setStatus({ minecraft: 'offline' });
 }
-// Builds the 100 Dropper levels into its world the first time it opens (about a minute).
-let dropperBuilding = false;
-async function buildDropperWorld() {
-    if (dropperBuilding) return;
-    dropperBuilding = true;
-    const start = dropperProgress() + 1;
-    log(start > 1 ? `Building the Dropper: carrying on from level ${start}...` : `Building the Dropper: ${DROPPER_LEVELS - 1} levels and a secret one (up to an hour, only the first time)...`);
-    setStatus({ dropper: `building ${start - 1}/${DROPPER_LEVELS}` });
+// Builds a level game's levels into its world the first time it opens.
+let courseBuilding = false;
+async function buildCourseWorld(course) {
+    if (courseBuilding) return;
+    courseBuilding = true;
+    const Name = course.name[0].toUpperCase() + course.name.slice(1), total = course.levels;
+    const start = course.progress() + 1;
+    log(start > 1 ? `Building ${course.name}: carrying on from level ${start}...` : `Building ${course.name}: ${course.buildNote}...`);
+    setStatus({ dropper: `building ${start - 1}/${total}` });
     try {
         // the building functions are a pack of their own, only in the world while it builds,
         // 20 levels at a time so the game never has to load all of them at once
         packNeedsReload = false;
-        for (let from = start; from <= DROPPER_LEVELS; from += 20) {
-            const to = Math.min(DROPPER_LEVELS, from + 19);
-            const buildPack = installDropperBuildPack(undefined, from, to);
+        for (let from = start; from <= total; from += 20) {
+            const to = Math.min(total, from + 19);
+            const buildPack = course.installBuild(undefined, from, to);
             await mc('reload');
             await mc(`datapack enable "${buildPack}"`).catch(() => {});
-            await buildDropper(mc, { from, to, log, progress: n => { if (n % 5 === 0 || n === 1) setStatus({ dropper: `building ${n}/${DROPPER_LEVELS}` }); } });
+            await course.build(mc, { from, to, log, progress: n => { if (n % 5 === 0 || n === 1) setStatus({ dropper: `building ${n}/${total}` }); } });
         }
-        markDropperBuilt();
-        removeDropperBuildPack();
+        course.markBuilt();
+        course.removeBuild();
         await mc('reload').catch(() => {});
         setStatus({ dropper: 'ready' });
-        log('The Dropper is built. Join Unbound in Minecraft to play.');
+        log(`${Name} is built. Join Unbound in Minecraft to play.`);
     } catch (e) {
         setStatus({ dropper: 'build stopped' });
-        log(`The Dropper build stopped (${e.message}). It starts again next time the world opens.`);
-    } finally { dropperBuilding = false; }
+        log(`The ${course.name} build stopped (${e.message}). It starts again next time the world opens.`);
+    } finally { courseBuilding = false; }
 }
 function mc(command) {
     // one command at a time, in order
@@ -1058,9 +1084,10 @@ function onChat(data) {
 
 async function runAction(game, a, ctx) {
     const times = Math.min(MAX_REPEAT, Math.max(1, (+a.times || 1) * (ctx.perCount ? ctx.count : 1)));
-    if (isDropper(game) && DROPPER_ACTIONS.has(a.type)) {
-        // the Dropper's own data pack does it, run as you
-        if (!rcon) return log('The Dropper world is not open yet.');
+    const course = courseOf(game);
+    if (course && course.actions.has(a.type)) {
+        // the level game's own data pack does it, run as you
+        if (!rcon) return log(`The ${course.name} world is not open yet.`);
         if (packNeedsReload) { packNeedsReload = false; await mc('reload'); }
         const who = /^\w{1,16}$/.test(ctx.player) ? `@a[name=${ctx.player},limit=1]` : '@a[limit=1]';
         if (a.type === 'levelWheel') {
@@ -1069,11 +1096,11 @@ async function runAction(game, a, ctx) {
             broadcast('wheel', { amounts, result, spinMs, from: ctx.from, gift: ctx.gift, image: ctx.image || null });
             log(`Level slots for ${ctx.from}: ${result > 0 ? '+' : ''}${result}`);
             await sleep(spinMs + 500);
-            await mc(`execute as ${who} at @s run function dropper:${result > 0 ? 'up' : 'down'} {n:${Math.abs(result)}}`).catch(e => log(`Level slots failed: ${e.message}`));
+            await mc(`execute as ${who} at @s run function ${course.ns}:${result > 0 ? 'up' : 'down'} {n:${Math.abs(result)}}`).catch(e => log(`Level slots failed: ${e.message}`));
             return;
         }
         const saveGift = rulesOf(game).find(r => r.actions.some(x => x.type === 'saveReset'))?.gift;
-        for (const c of dropperCommands(a, ctx.perCount ? Math.min(MAX_REPEAT, ctx.count) : 1, { saveGift })) {
+        for (const c of course.commands(a, ctx.perCount ? Math.min(MAX_REPEAT, ctx.count) : 1, { saveGift })) {
             await mc(`execute as ${who} at @s run ${c}`).catch(e => log(`${a.type} failed: ${e.message}`));
         }
         return;
