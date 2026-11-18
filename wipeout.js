@@ -20,7 +20,7 @@ import { SAVES_DIR } from './singleplayer.js';
 
 export const WIPEOUT_WORLD = 'Unbound Wipeout 4';     // 4: easier cubes (the layout moved)
 export const WIPEOUT_MC = '26.2';
-export const WIPEOUT_BUILD = 5;                  // bump when the levels change, to rebuild them
+export const WIPEOUT_BUILD = 6;                  // bump when the levels change, to rebuild them
 export const LEVELS = 100;
 
 // Settings for making the world the first time: nothing but the levels (and sea), warm ocean colours
@@ -248,15 +248,28 @@ function obstacle(type, ctx) {
                 `execute as @e[tag=${id}v,tag=wo_zipv,scores={wo_ph=${ticks}..}] run function wipeout:zip_end`,
                 `execute as @e[tag=${id}v,tag=wo_zipv] at @s unless entity @a[tag=wo_ride,distance=..1.5] run function wipeout:zip_end`,
             );
-            // red blocks sweeping side to side across the line
-            const count = Math.min(4, 1 + Math.floor(d * 3) + r.int(0, 1));
+            // red blocks sweeping side to side across the line. They're timed together, so there's always a
+            // moment to go that gets you past every one: the light on top of the start turns green then
+            const count = Math.min(3, 1 + Math.floor(d * 2.5));
+            const travel = 8, t = Math.round(travel / sp(0.1, 0.17)), v = travel / t, per = 2 * t;
+            const steps = [{ d: [v, 0, 0], t }, { d: [-v, 0, 0], t }];
+            const W = Math.max(5, Math.floor(2.0 / v) - 3);      // how long the green light stays on, each side of the best moment
+            let off0 = 0;
             for (let i = 0; i < count; i++) {
                 const hz = Math.round(z1 + (i + 1) * G / (count + 1)), hid = `${id}h${i}`;
-                const travel = 6, v = sp(0.15, 0.3), t = Math.round(travel / v), steps = [{ d: [v, 0, 0], t }, { d: [-v, 0, 0], t }], off = r.int(0, 2 * t - 1);
-                const start = posAt([x - 3.5, F + 1.2, hz], steps, off);
+                // when the rider gets to it, it's at one end (left or right, every other one)
+                const ti = Math.round((hz + 0.6 - (z + 1.5)) / speed) + 2, target = i % 2 ? t : 0, off = (((target - ti) % per) + per) % per;
+                if (!i) off0 = off;
+                const start = posAt([x - 4.75, F + 1.2, hz], steps, off);
                 o.spawn.push(display([id, hid], ...start, 'red_concrete', 1.5, 1.6, 1.2), `scoreboard players set @e[tag=${hid}] wo_ph ${off}`);
                 o.tick.push(...moveLines(hid, steps), hitBox(hid, 1.5, 1.6, 1.2));
             }
+            // the GO light (the middle of the top of the start): green while it's a good time to step on
+            const lo2 = off0 - W, hi2 = off0 + W, range = (a, b) => a < 0 ? [[a + per, per - 1], [0, b]] : b >= per ? [[a, per - 1], [0, b - per]] : [[a, b]];
+            o.tick.push(`scoreboard players set #${id}g wo_v 0`,
+                ...range(lo2, hi2).map(([a, b]) => `execute if entity @e[tag=${id}h0,scores={wo_ph=${a}..${b}}] run scoreboard players set #${id}g wo_v 1`),
+                `execute if score #${id}g wo_v matches 1 run setblock ${x} ${F + 5} ${z} ${B('lime_concrete')}`,
+                `execute if score #${id}g wo_v matches 0 run setblock ${x} ${F + 5} ${z} ${B('gray_concrete')}`);
             o.len = G + 7; o.secs = 2.5 + G / 6.4;
             break;
         }
