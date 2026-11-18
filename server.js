@@ -22,7 +22,7 @@ import { Rcon } from 'rcon-client';
 import { WebSocketServer } from 'ws';
 import { makePresets, MOBS, DELETE_BLOCKS, FILL_CHUNK, TELEPORT_TO, WHERE } from './minecraft-presets.js';
 import { makeChatTeleport, normalizeChatTeleport } from './chatteleport.js';
-import { hudPack, hudProps, hudInfo, hudSpot } from './hudpack.js';
+import { hudPack, hudProps, hudInfo, hudSpot, blockIconPng } from './hudpack.js';
 import { makeChunkChat, normalizeChunkChat } from './chunkchat.js';
 import { makeChatDelete, normalizeChatDelete } from './chatdelete.js';
 import { listWorlds, installPack, singleplayerCommands } from './singleplayer.js';
@@ -610,7 +610,7 @@ function findLiveStudio() {
 // ---------- Live updates (Server-Sent Events) ----------
 
 const clients = new Set();
-const OVERLAY_EVENTS = new Set(['alert', 'play', 'stopSound', 'reset', 'wheel', 'chatdel', 'chunkchat', 'settings', 'state', 'menu']);
+const OVERLAY_EVENTS = new Set(['alert', 'play', 'stopSound', 'reset', 'wheel', 'chatdel', 'chunkchat', 'chunkreveal', 'settings', 'state', 'menu']);
 const overlaySettings = () => ({ overlay: settings.overlay, theme: settings.theme, look: settings.look, soundsIn: settings.soundsIn });
 function broadcast(event, data) {
     const msg = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
@@ -823,11 +823,12 @@ async function connectMinecraft() {
             const opts = isDropper(g) ? { version: DROPPER_MC, props: DROPPER_PROPS, atLeast: DROPPER_MC } : {};
             // the Chat Teleport box pack, from Unbound (block pictures from this world's Minecraft)
             let mcVersion = opts.version; try { mcVersion = worldVersion(world) || mcVersion; } catch { }
-            const tpCfg = (isChatTeleport(g) ? currentMode(g).chatTeleport : (g.modes || []).find(m => /chat teleport/i.test(m.name || ''))?.chatTeleport) || normalizeChatTeleport({});
+            // (Chunk Chat's box when that's the type playing: its size and 3D setting)
+            const tpCfg = (isChunkChat(g) ? currentMode(g).chunkChat : isChatTeleport(g) ? currentMode(g).chatTeleport : (g.modes || []).find(m => /chat teleport/i.test(m.name || ''))?.chatTeleport) || normalizeChatTeleport({});
             try {
                 opts.props = [...(opts.props || []), ...hudProps(settings.port, tpCfg, mcVersion)];
                 const hi = hudInfo();
-                if (isChatTeleport(g)) log(hi?.pictures ? `Chat Teleport box: ${hi.pictures} ${hi.mode === '3d' ? '3D' : 'flat'} block pictures (from ${hi.jar}), for box size ${hi.size}%`
+                if (isChatTeleport(g) || isChunkChat(g)) log(hi?.pictures ? `${isChunkChat(g) ? 'Chunk Chat' : 'Chat Teleport'} box: ${hi.pictures} ${hi.mode === '3d' ? '3D' : 'flat'} block pictures (from ${hi.jar}), for box size ${hi.size}%`
                     : "Chat Teleport box: no block pictures (Minecraft's game files weren't found in .minecraft/versions; play this version once in the launcher)");
             } catch (e) { log(`Couldn't make the Chat Teleport box pack: ${e.message}`); }
             worldError = '';
@@ -1012,13 +1013,13 @@ let hudReopening = false;
 setInterval(async () => {
     try {
         const g = activeGame();
-        if (hudReopening || !isChatTeleport(g) || !isSingle(g) || !localServer.running() || localState !== 'ready') return;
-        const hi = hudInfo(), cfg = currentMode(g).chatTeleport;
+        if (hudReopening || !(isChatTeleport(g) || isChunkChat(g)) || !isSingle(g) || !localServer.running() || localState !== 'ready') return;
+        const hi = hudInfo(), cfg = isChunkChat(g) ? currentMode(g).chunkChat : currentMode(g).chatTeleport;
         if (!hi?.pictures || !cfg) return;
         if (hudSpot(cfg).size === hi.size && (cfg.icon3d === false ? 'flat' : '3d') === hi.mode) return;
         if (await onlinePlayer(g)) return;                  // wait till you leave
         hudReopening = true;
-        log('Chat Teleport box settings changed: reopening the world so Minecraft gets the new box (a few seconds)');
+        log('Box settings changed: reopening the world so Minecraft gets the new box (a few seconds)');
         await disconnectMinecraft();
         await localServer.stop();
         await connectMinecraft();
@@ -1038,7 +1039,7 @@ const chunkChat = makeChunkChat({
         const cfg = currentMode(g).chunkChat;
         if (!cfg?.on) return null;
         const player = g.minecraft.player || await onlinePlayer(g);
-        return player ? { cfg, player } : null;            // the timer waits while nobody's in the world
+        return player ? { cfg, player, pack: isSingle(g) } : null;            // the timer waits while nobody's in the world
     },
     fillChunk: async (player, block) => {
         const g = activeGame();
@@ -1335,6 +1336,8 @@ const routes = {
         return r;
     },
     'POST /api/chunkchat/now': async () => { await chunkChat.skip(); return { ok: true }; },
+    // plays Chunk Chat's reveal on the stream overlay (to see how it looks)
+    'POST /api/chunkchat/test-reveal': () => { broadcast('chunkreveal', { id: 'diamond_block', label: 'DIAMOND BLOCK', by: 'a viewer', votes: null, count: 23104 }); return { ok: true }; },
     // Chat Teleport: try something as if it was typed in chat, or teleport now
     'POST /api/chatteleport/try': async b => {
         const r = await chatTeleport.onChat(String(b.text || ''), 'You (test)');
@@ -1377,7 +1380,7 @@ const routes = {
                 const n = (v, lo, hi, d) => Number.isFinite(+v) && v !== null && v !== '' ? Math.max(lo, Math.min(hi, +v)) : d;
                 o.place = { ...(o.place || {}) };
                 // a change can be part of a box (e.g. only its width); a field sent as null goes back to normal
-                for (const k of ['popups', 'menu', 'timer', 'chatdel', 'reset']) {
+                for (const k of ['popups', 'menu', 'timer', 'chatdel', 'reset', 'reveal']) {
                     const p = b.overlay.place[k];
                     if (p === null) { delete o.place[k]; continue; }
                     if (!p || typeof p !== 'object') continue;
@@ -1564,7 +1567,7 @@ function allowed(req) {
     const host = String(req.headers.host || '').replace(/:\d+$/, '');
     if (overlayOnly(req)) {
         const p = new URL(req.url, 'http://x').pathname;
-        return req.method === 'GET' && (OVERLAY_PATHS.has(p) || p.startsWith('/sounds/') || /^\/fonts\/[\w-]+\.ttf$/.test(p));
+        return req.method === 'GET' && (OVERLAY_PATHS.has(p) || p.startsWith('/sounds/') || /^\/fonts\/[\w-]+\.ttf$/.test(p) || /^\/mc\/block\/[a-z0-9_]+\.png$/.test(p));
     }
     if (!['localhost', '127.0.0.1'].includes(host)) return false;
     const origin = req.headers.origin;
@@ -1613,6 +1616,13 @@ const server = http.createServer(async (req, res) => {
     if (STATIC[url.pathname]) return send(res, 200, fs.readFileSync(path.join(ROOT, 'public', STATIC[url.pathname])), 'text/html; charset=utf-8');
     if (url.pathname === '/icon.png') return send(res, 200, fs.readFileSync(path.join(ROOT, 'public', 'icon.png')), 'image/png');
     // the resource pack the hidden server hands to Minecraft (Chat Teleport's on-screen timer box)
+    // a block's 3D picture (Chunk Chat's reveal on the stream overlay)
+    if (req.method === 'GET' && /^\/mc\/block\/[a-z0-9_]+\.png$/.test(url.pathname)) {
+        const p = blockIconPng(url.pathname.slice('/mc/block/'.length, -4));
+        if (!p) return send(res, 404, { error: 'No picture' });
+        res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'max-age=3600' });
+        return res.end(p);
+    }
     if (req.method === 'GET' && url.pathname === '/mc/gifthype-hud.zip') {
         const p = hudPack();
         res.writeHead(200, { 'Content-Type': 'application/zip', 'Content-Length': p.data.length });

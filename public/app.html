@@ -1371,7 +1371,7 @@ const MENU_LOOK = { menuX: 2, menuY: 50, menuScale: 1, menuRows: 7, menuTitle: '
 // ----- Boxes on the overlay: show / hide, width, height and size of each one -----
 const BOXES = [
   { k: 'popups', name: 'Gift popups' }, { k: 'menu', name: 'Gift list' }, { k: 'timer', name: 'Timer (Chunk Chat / Chat Teleport)' },
-  { k: 'chatdel', name: 'Block delete list' }, { k: 'reset', name: 'Reset countdown (Dropper)' },
+  { k: 'chatdel', name: 'Block delete list' }, { k: 'reset', name: 'Reset countdown (Dropper)' }, { k: 'reveal', name: 'Chunk reveal (Chunk Chat)' },
 ];
 const boxPlace = k => (settings.overlay.place || {})[k] || {};
 const boxShown = k => k === 'menu' ? settings.overlay.menu !== false : !boxPlace(k).hide;
@@ -2154,30 +2154,78 @@ function giftImgHtml(r) {
 function renderChunkChat() {
   $('chatTitle').textContent = 'Chunk Chat';
   const m = curMode();
-  m.chunkChat ||= { on: true, seconds: 30, pick: 'most', blocked: '', show: false };
+  m.chunkChat ||= { on: true, seconds: 30, pick: 'most', blocked: '' };
   const c = m.chunkChat;
+  // settings from before 2.9.0 (one "show" switch) and anything not saved yet
+  for (const [k, v] of Object.entries({ showGame: true, showOverlay: c.show === true, reveal: true, revealGame: true, boxX: 0, boxY: 40, boxSize: 100, icon3d: true,
+    showPicture: true, showName: true, showDistance: true, resultSeconds: 4, warnAt: 5, warnSound: false, sound: 'anchor', particles: true, ...CC_LOOK })) c[k] ??= v;
+  const ck = (k, text) => `<label class="check wide" style="flex-direction:row"><input type="checkbox" data-k="${k}" ${c[k] ? 'checked' : ''}> <span>${text}</span></label>`;
   $('chatBox').innerHTML = `
     <label class="check"><input type="checkbox" data-k="on" ${c.on ? 'checked' : ''}> Chat picks the block your chunk turns into</label>
-    <p class="hint" style="margin-top:6px">Viewers type a block in the LIVE chat, like <b>stone</b>, <b>diamond block</b>, <b>oak leaves</b> or <b>water</b>. When the timer runs out, every block in the chunk you're in turns into it, from the bottom of the world to the top. Air stays air (you're never buried) and the bedrock floor stays. Blocks a gift does (lava, air, cobwebs), blocks you'd fall through (chains, candles, flowers, rails, ladders...) and blocks with an inside (chests, furnaces...) can't be picked. The timer waits while you're not in the world.</p>
+    <p class="hint" style="margin-top:6px">Viewers type a block in the LIVE chat: <b>every block in Minecraft</b> works, typos and all (<b>diamnd blok</b>, <b>obsidain</b>, <b>oak leafs</b>), and everyday names too (<b>diamonds</b> = diamond block, <b>logs</b> = oak logs, <b>wool</b> = white wool). When the timer runs out, every block in the chunk you're in turns into it, from the bottom of the world to the top. Air stays air (you're never buried) and the bedrock floor stays.
+      Only full blocks you can stand on can fill a chunk: not lava, air or cobwebs (gifts do those), not blocks you'd fall through (torches, flowers, rails...) and not blocks with an inside (chests, furnaces...). <b>If the block that won can't fill a chunk, the next one chat typed is used</b>, newest first, until one can. The timer waits while you're not in the world.</p>
     <div class="chatgrid" ${c.on ? '' : 'style="opacity:.55"'}>
       <label>Every (seconds)<input type="number" min="10" max="600" data-k="seconds" value="${c.seconds}"></label>
       <label>Which block wins<select data-k="pick"><option value="most" ${c.pick === 'most' ? 'selected' : ''}>The one typed most (one vote each)</option><option value="last" ${c.pick === 'last' ? 'selected' : ''}>The last one typed</option></select></label>
       <label class="wide">Other blocks chat can't pick<input type="text" data-k="blocked" value="${esc(c.blocked)}" placeholder="e.g. obsidian, ice"></label>
-      <label class="check wide" style="flex-direction:row"><input type="checkbox" data-k="show" ${c.show ? 'checked' : ''}> Show the timer and the winning block on stream (a box on the overlay, a bar and a title in the game). Leave it off to add your own in TikTok LIVE Studio.</label>
+      ${ck('showGame', 'Timer box in Minecraft, fixed on your screen: "NEW CHUNK IN" and the seconds, then the new block\'s picture, its name and how many blocks changed. In your own world Minecraft gets a small Unbound pack for it; on a server it\'s text above the hotbar')}
+      <div class="wide" id="tpBoxEdit"></div>
+      ${ck('icon3d', '3D block pictures (like the inventory; untick for flat). This and the box size reach Minecraft the next time you join the world')}
+      ${ck('reveal', '<b>Chunk reveal animation on the stream overlay</b> every time the chunk changes: the block drops in, lands, shatters and its name pops up (move or resize it under Stream overlay → Boxes)')}
+      ${ck('revealGame', 'Big title in Minecraft when the chunk changes (when the timer box is off; with the box on, the box shows it)')}
+      ${ck('showOverlay', 'Timer on the stream overlay too: the seconds, the block that\'s winning and the top picks (leave it off to add your own in TikTok LIVE Studio)')}
     </div>
+    <details class="tpgroup" id="tpLook">
+      <summary>Box look: colours, words, what it shows</summary>
+      <p class="hint">Colours and words change in Minecraft straight away. Words can use A–Z, 0–9 and ! . - ' (the box's pixel letters); leave one empty to show nothing there.</p>
+      <div class="tpprev" id="tpPrev"></div>
+      <div class="chatgrid">
+        ${[['colFill', 'Box'], ['colBorder', 'Border'], ['colStripe', 'Top stripe'], ['colShade', 'Bottom edge'], ['colLabel', '"New chunk in" words'], ['colDigits', 'Seconds'], ['colWarn', 'Last seconds'],
+            ['colName', 'Block name'], ['colAway', 'Blocks changed'], ['colNone', '"No block picked" words']]
+            .map(([k, l]) => `<label>${l}<input type="color" data-k="${k}" value="${c[k]}"></label>`).join('')}
+        ${[['txtTeleportIn', 'While counting down'], ['txtAway', 'After how many blocks'], ['txtTeleported', 'When it doesn\'t say how many'], ['txtNothing', 'When nobody picked a block']]
+            .map(([k, l]) => `<label>${l}<input type="text" maxlength="24" data-k="${k}" value="${esc(c[k])}"></label>`).join('')}
+        <label class="check" style="flex-direction:row"><input type="checkbox" data-k="showPicture" ${c.showPicture !== false ? 'checked' : ''}> Block picture</label>
+        <label class="check" style="flex-direction:row"><input type="checkbox" data-k="showName" ${c.showName !== false ? 'checked' : ''}> Block name</label>
+        <label class="check" style="flex-direction:row"><input type="checkbox" data-k="showDistance" ${c.showDistance !== false ? 'checked' : ''}> How many blocks changed</label>
+      </div>
+      <div class="row" style="margin-top:10px"><button class="small ghost" id="tpLookReset">Back to the standard look</button></div>
+    </details>
+    <details class="tpgroup">
+      <summary>Timings and sounds</summary>
+      <div class="chatgrid">
+        <label>Result shows for (seconds)<input type="number" min="1" max="15" data-k="resultSeconds" value="${c.resultSeconds}"></label>
+        <label>Last seconds warning (0 = off)<input type="number" min="0" max="30" data-k="warnAt" value="${c.warnAt}"></label>
+        <label>Sound when it changes<select data-k="sound">${[['anchor', 'Respawn anchor'], ['anvil', 'Anvil'], ['boom', 'Explosion'], ['level', 'Level up'], ['bell', 'Bell'], ['none', 'No sound']]
+            .map(([v, l]) => `<option value="${v}" ${c.sound === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+        <label class="check" style="flex-direction:row"><input type="checkbox" data-k="warnSound" ${c.warnSound ? 'checked' : ''}> Tick sound in the last seconds</label>
+        <label class="check" style="flex-direction:row"><input type="checkbox" data-k="particles" ${c.particles !== false ? 'checked' : ''}> A burst of the new block round you</label>
+      </div>
+    </details>
     <div class="row" style="margin-top:12px">
-      <input type="text" id="ccTry" placeholder="Try it: type a block, e.g. diamond block" style="flex:1;min-width:180px">
+      <input type="text" id="ccTry" placeholder="Try it: type a block, e.g. diamnd blok" style="flex:1;min-width:180px">
       <button class="small" id="ccTryGo">Try</button>
       <button class="small ghost" id="ccNow">Change the chunk now</button>
+      <button class="small ghost" id="ccReveal" title="Plays the chunk reveal on your stream overlay">Test the reveal</button>
     </div>`;
+  const boxWords = v => String(v).toUpperCase().replace(/[^A-Z0-9 !.'-]/g, '').replace(/\s+/g, ' ').trim().slice(0, 24);
   $('chatBox').querySelectorAll('[data-k]').forEach(el => {
     el.onchange = () => {
       const k = el.dataset.k;
       c[k] = el.type === 'checkbox' ? el.checked : el.type === 'number' ? +el.value : el.value;
+      if (k.startsWith('txt')) { c[k] = boxWords(el.value); el.value = c[k]; }
       queueSave();
-      if (k === 'on') renderChunkChat();
+      tpPreview(c, CC_LOOK, CC_SAMPLE);
+      if (k === 'on' || k === 'showGame') renderChunkChat();
     };
+    if (el.type === 'color') el.oninput = () => { c[el.dataset.k] = el.value; tpPreview(c, CC_LOOK, CC_SAMPLE); };
   });
+  $('tpLookReset').onclick = () => {
+    Object.assign(c, CC_LOOK, { showPicture: true, showName: true, showDistance: true });
+    queueSave(); renderChunkChat(); $('tpLook').open = true;
+  };
+  tpPreview(c, CC_LOOK, CC_SAMPLE);
+  if (c.showGame) tpBoxEditor(c, CC_LOOK); else $('tpBoxEdit').innerHTML = '';
   const tryIt = async () => {
     const text = $('ccTry').value.trim();
     if (!text) return;
@@ -2191,7 +2239,13 @@ function renderChunkChat() {
   $('ccTryGo').onclick = tryIt;
   $('ccTry').onkeydown = e => { if (e.key === 'Enter') tryIt(); };
   $('ccNow').onclick = async () => { try { await flushSave(); await api('/api/chunkchat/now', {}); toast('Changing the chunk…'); } catch (e) { toast(e.message, true); } };
+  $('ccReveal').onclick = async () => { try { await api('/api/chunkchat/test-reveal', {}); toast('The reveal is playing on your stream overlay'); } catch (e) { toast(e.message, true); } };
 }
+// Chunk Chat's box: Chat Teleport's look with green and its own words (the same as chunkchat.js CC_BOX)
+const CC_LOOK = { colFill: '#F4F8FC', colBorder: '#13304A', colStripe: '#55C26A', colShade: '#D5E0EA', colLabel: '#2E8B3E', colDigits: '#E8542A', colWarn: '#DC2626',
+  colName: '#13304A', colAway: '#1474B4', colNone: '#DC2626', colLoading: '#1474B4',
+  txtTeleportIn: 'NEW CHUNK IN', txtLoading: 'CHANGING...', txtNothing: 'NO BLOCK PICKED', txtAway: 'BLOCKS CHANGED', txtTeleported: 'CHUNK CHANGED!' };
+const CC_SAMPLE = { name: 'DIAMOND BLOCK', away: '23104', loading: false };
 
 // ----- Chat block delete (Minecraft types other than the Dropper) -----
 const isChatTeleportMode = () => game?.connector === 'minecraft' && /chat teleport/i.test(curMode().name || '');
@@ -2301,13 +2355,13 @@ function renderChatTeleport() {
 }
 // The Minecraft box editor: drag the box on a Minecraft screen, drag its corner to resize. Left/right is
 // free; up/down and size go in Minecraft's steps (20 and the box sizes), so it snaps there when you let go.
-function tpBoxEditor(c) {
+function tpBoxEditor(c, defaults = TP_LOOK) {
   const host = $('tpBoxEdit'); if (!host) return;
   host.innerHTML = `<div class="fswrap" id="mcWrap"><div class="mcstage" id="mcStage"><div class="cross">+</div><div class="hotbar"></div><div class="mcbox" id="mcBox"><div class="ln"></div><div class="big">27</div><i title="Drag to resize"></i></div></div><button class="small fsbtn" data-fs="mcWrap">⛶ Full screen</button></div>
     <p class="hint">Your Minecraft screen. <b>Drag the box</b> to move it, <b>drag its round corner</b> to change its size. Where it is changes straight away; a new size reaches Minecraft the next time you join the world.</p>`;
   const stage = $('mcStage'), box = $('mcBox');
   const SIZES = [75, 100, 125, 150, 200, 250];
-  const look = k => c[k] ?? TP_LOOK[k];
+  const look = k => c[k] ?? defaults[k];
   let live = null;                                    // while dragging: { x (GUI px from centre), y, s }
   const draw = () => {
     const k = stage.clientWidth / 480, p = live || { x: c.boxX * 1.5, y: -(c.boxY ?? 40), s: (c.boxSize || 100) / 100 };
@@ -2348,15 +2402,15 @@ const TP_LOOK = { colFill: '#F4F8FC', colBorder: '#13304A', colStripe: '#4DB3EE'
   colName: '#13304A', colAway: '#1474B4', colNone: '#DC2626', colLoading: '#1474B4',
   txtTeleportIn: 'TELEPORT IN', txtLoading: 'LOADING...', txtNothing: 'NOTHING FOUND', txtAway: 'BLOCKS AWAY', txtTeleported: 'TELEPORTED!' };
 // a rough preview of the box (the real one is pixel letters in Minecraft)
-function tpPreview(c) {
+function tpPreview(c, defaults = TP_LOOK, sample = { name: 'GRASS BLOCK', away: '83', loading: true }) {
   const el = $('tpPrev'); if (!el) return;
-  const v = k => c[k] ?? TP_LOOK[k];
+  const v = k => c[k] ?? defaults[k];
   const box = inner => `<div class="tpbox" style="background:${v('colFill')};border-color:${v('colBorder')};--stripe:${v('colStripe')};--shade:${v('colShade')}">${inner}</div>`;
   const line = (t, col, cls = 'ln') => t ? `<div class="${cls}" style="color:${col}">${esc(t)}</div>` : '';
-  const done = [c.showName !== false ? line('GRASS BLOCK', v('colName')) : '', c.showDistance !== false ? line(`83 ${v('txtAway')}`, v('colAway')) : ''].join('') || line(v('txtTeleported'), v('colAway'));
+  const done = [c.showName !== false ? line(sample.name, v('colName')) : '', c.showDistance !== false ? line(`${sample.away} ${v('txtAway')}`, v('colAway')) : ''].join('') || line(v('txtTeleported'), v('colAway'));
   el.innerHTML = box(`<div style="flex:1">${line(v('txtTeleportIn'), v('colLabel'))}${line('27', v('colDigits'), 'big')}</div>`)
     + box(`<div style="flex:1">${line(v('txtTeleportIn'), v('colLabel'))}${line('3', v('colWarn'), 'big')}</div>`)
-    + (c.showLoading !== false ? box(`<div style="flex:1">${line(v('txtLoading'), v('colLoading'))}</div>`) : '')
+    + (sample.loading && c.showLoading !== false ? box(`<div style="flex:1">${line(v('txtLoading'), v('colLoading'))}</div>`) : '')
     + box(`${c.showPicture !== false ? '<div class="cube"></div>' : ''}<div style="text-align:left">${done}</div>`)
     + box(`<div style="flex:1">${line(v('txtNothing'), v('colNone'))}</div>`);
 }

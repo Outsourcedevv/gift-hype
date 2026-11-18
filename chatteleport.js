@@ -116,7 +116,7 @@ const ORE_WORDS = { diamond: 'diamond_ores', iron: 'iron_ores', gold: 'gold_ores
 let CATALOG = null;
 function catalog() {
     if (CATALOG) return CATALOG;
-    const out = [], add = (name, make, rank) => out.push({ name, words: name.split('_'), make, rank });
+    const out = [], add = (name, make, rank) => out.push({ name, words: name.split('_'), make, rank, block: rank >= 2 });
     for (const n of PLACE_NAMES) if (n.length > 5) add(n, endCentre, 0);
     for (const n of SHIP_NAMES) if (n.length > 5) add(n, endShip, 0);
     for (const [n, sid] of Object.entries(STRUCTURE_NAMES)) add(n, () => structureTarget(sid), 0);
@@ -160,12 +160,13 @@ function wordCost(q, n) {
 }
 // The closest name to what was typed: every typed word has to fit a word of the name (any order);
 // the fewer typos and extra words, the better. Chat like "lol" or "ok" never fits anything.
-function closest(text) {
+function closest(text, blocksOnly = false) { return closestIn(text, blocksOnly ? catalog().filter(e => e.block) : catalog()); }
+function closestIn(text, entries) {
     const q = String(text || '').toLowerCase().replace(/^[!/#.]+/, '').replace(/^minecraft:/, '').replace(/[^a-z ]+/g, ' ').trim().split(/\s+/).filter(w => w && !['the', 'a', 'an', 'to', 'tp', 'go', 'me', 'nearest', 'closest', 'block', 'please', 'pls'].includes(w));
     if (!q.length || q.join('').length < 3 || q.length > 6 || q.some(w => CHAT_WORDS.has(w))) return null;
     let best = null;
     const joined = q.join(''), consider = (cost, e) => { if (!best || cost < best.cost) best = { cost, e }; };
-    for (const e of catalog()) {
+    for (const e of entries) {
         // the whole thing with the spaces taken out ("strong hold", "dep dark")
         if (joined.length >= 5 && joined[0] === e.name[0]) { const flat = e.name.replace(/_/g, ''), m = allowedTypos(joined, flat), t = flat === joined ? 0 : typos(joined, flat, m); if (t <= m) consider(0.3 + t + e.rank * 0.05 + e.name.length * 0.001, e); }
         if (e.words.length < q.length) continue;
@@ -177,7 +178,8 @@ function closest(text) {
             used.add(bi); cost += bc;
         }
         if (cost == null) continue;
-        cost += (e.words.length - q.length) * 0.7 + e.rank * 0.05 + e.name.length * 0.001 - (e.words.at(-1) === 'block' && !q.includes('block') ? 0.15 : 0);
+        // (ties go to the plain colour or wood: white wool, oak planks)
+        cost += (e.words.length - q.length) * 0.7 + e.rank * 0.05 + e.name.length * 0.001 - (e.words.at(-1) === 'block' && !q.includes('block') ? 0.15 : 0) - (/^(white|oak)_/.test(e.name) ? 0.01 : 0);
         consider(cost, e);
     }
     return best && best.cost < 4 ? best.e.make() : null;
@@ -189,6 +191,33 @@ export function targetOf(text) {
     if (CHAT_WORDS.has(String(text || '').toLowerCase().replace(/[^a-z]/g, ''))) return null;      // "fire", "rose"...: chat, not a pick
     return exactTarget(text) || closest(text);
 }
+// Blocks only (Chunk Chat): every block in Minecraft and groups like "logs", typos and all.
+// -> { key, kind: 'block', filter: 'minecraft:<id>' or '#minecraft:<tag>', label } or null
+export function blockTargetOf(text) {
+    if (CHAT_WORDS.has(String(text || '').toLowerCase().replace(/[^a-z]/g, ''))) return null;
+    const guesses = blockGuesses(text);
+    if (guesses) {
+        const words = guesses.filter(g => g.id).map(g => g.id);
+        for (const w of words) if (ORE_WORDS[w]) return blockTarget('#' + ORE_WORDS[w]);
+        for (const w of words) if (BLOCK_NAMES[w]) return blockTarget(BLOCK_NAMES[w]);
+        for (const g of guesses) {
+            if (g.tag) return blockTarget('#' + g.tag);
+            if (g.id && BLOCKS.has(g.id)) return blockTarget(g.id);
+        }
+    }
+    return closest(text, true);
+}
+export const ALL_BLOCKS = LISTS.blocks;
+// The closest single block (no groups), typos and all: 'minecraft:<id>' or null
+export function plainBlockOf(text) {
+    const guesses = blockGuesses(text);
+    for (const g of guesses || []) if (g.id && BLOCKS.has(g.id)) return g.id;
+    let best = null;
+    const keep = CATALOG_PLAIN ||= catalog().filter(e => e.rank === 3);
+    const t = closestIn(text, keep);
+    return t ? t.filter.replace(/^minecraft:/, '') : best;
+}
+let CATALOG_PLAIN = null;
 function exactTarget(text) {
     const guesses = blockGuesses(text);
     if (!guesses) return null;
