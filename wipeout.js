@@ -18,9 +18,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { SAVES_DIR } from './singleplayer.js';
 
-export const WIPEOUT_WORLD = 'Unbound Wipeout 2';     // 2: one straight line, no checkpoints
+export const WIPEOUT_WORLD = 'Unbound Wipeout 3';     // 3: waves with holes, the vanishing bridge
 export const WIPEOUT_MC = '26.2';
-export const WIPEOUT_BUILD = 3;                  // bump when the levels change, to rebuild them
+export const WIPEOUT_BUILD = 4;                  // bump when the levels change, to rebuild them
 export const LEVELS = 100;
 
 // Settings for making the world the first time: nothing but the levels (and sea), warm ocean colours
@@ -64,7 +64,7 @@ const STAND_STYLES = [
 // Each makes: the blocks (built once), the moving parts (summoned when you get to the level), what they
 // do every tick, what happens each try (the doors' right door), and how long it takes to get past.
 // x: the middle of the course, z: where it starts, w: the course's width. Returns { len, secs, ... }.
-const SECS = { spinner: 3.2, gloves: 3, cubes: 1.8, wall: 4, punch: 1.8, zipline: 5.5, doors: 3.2, beam: 2.4, blink: 3.6, crusher: 1.8, spinfield: 4 };
+const SECS = { spinner: 3.2, gloves: 3, cubes: 1.8, wall: 6, punch: 1.8, zipline: 5.5, doors: 3.2, beam: 2.4, blink: 3.6, crusher: 1.8, spinfield: 4 };
 const FIRST = { spinner: 1, gloves: 1, cubes: 1, beam: 2, doors: 3, wall: 4, zipline: 6, punch: 8, crusher: 14, blink: 18, spinfield: 30 };
 
 let uid = 0;
@@ -142,19 +142,38 @@ function obstacle(type, ctx) {
             o.len = L; o.secs = 1.2 + count * 0.9;
             break;
         }
-        // ---- a wall coming down the course at you: get past it on the side lane ----
+        // ---- waves: red walls come down a corridor at you, again and again. The corridor has holes in its
+        // sides: duck into one while a wave goes past, then run to the next before the next wave ----
         case 'wall': {
-            const L = r.int(12, 16), side = r.chance(0.5) ? 1 : -1, lane = 2;
+            const S = 5, holes = 3 + Math.floor(d * 2) + r.int(0, 1), L = (holes + 1) * S + 1;
             floorRow(lo, z, hi, z + L - 1);
-            const lx1 = side > 0 ? hi + 1 : lo - lane, lx2 = side > 0 ? hi + lane : lo - 1;
-            o.blocks.push(...floorFill(lx1, z, lx2, z + L - 1, 'lane'));
-            const v = sp(0.12, 0.22), t = Math.round((L - 2) / v);
-            const steps = [{ d: [0, 0, -v], t }, { d: [0, 0, 0], t: 10 }, { d: [0, 0, v], t }, { d: [0, 0, 0], t: 10 }];
-            const off = r.int(0, 2 * t + 19);
-            const start = posAt([lo, F, z + L - 2], steps, off);
-            o.spawn.push(display([id], ...start, 'red_concrete', w, 3, 1), `scoreboard players set @e[tag=${id}] wo_ph ${off}`);
-            o.tick.push(...moveLines(id, steps), hitBox(id, w, 3, 1));
-            o.len = L;
+            // the corridor's sides (white, blue on top)
+            for (const wx of [lo - 1, hi + 1]) o.blocks.push(`fill ${wx} ${F} ${z} ${wx} ${F + 2} ${z + L - 1} ${B('white_concrete')}`, `fill ${wx} ${F + 3} ${z} ${wx} ${F + 3} ${z + L - 1} ${B('blue_concrete')}`);
+            // the holes: an opening in the side and a little room behind it (two deep, two long)
+            let side = r.chance(0.5) ? 1 : -1;
+            for (let i = 0; i < holes; i++) {
+                const hz = z + S * (i + 1) - 1, open = side > 0 ? hi + 1 : lo - 1, inner = open + side, back = open + 2 * side;
+                o.blocks.push(
+                    `fill ${Math.min(open, inner)} ${F - 1} ${hz} ${Math.max(open, inner)} ${F - 1} ${hz + 1} ${B('blue_concrete')}`,
+                    `fill ${open} ${F} ${hz} ${open} ${F + 2} ${hz + 1} ${B('air')}`,
+                    `fill ${inner} ${F} ${hz - 1} ${inner} ${F + 2} ${hz - 1} ${B('white_concrete')}`, `fill ${inner} ${F} ${hz + 2} ${inner} ${F + 2} ${hz + 2} ${B('white_concrete')}`,
+                    `fill ${back} ${F} ${hz - 1} ${back} ${F + 2} ${hz + 2} ${B('white_concrete')}`,
+                    `fill ${Math.min(open, back)} ${F + 3} ${hz - 1} ${Math.max(open, back)} ${F + 3} ${hz + 2} ${B('blue_concrete')}`,
+                    `fill ${open} ${F + 3} ${hz} ${open} ${F + 3} ${hz + 1} ${B('light_blue_concrete')}`,
+                );
+                if (r.chance(0.6)) side = -side;
+            }
+            // the waves: from the far end back to the start, then round again
+            const travel = L - 1, t = Math.round(travel / sp(0.17, 0.28)), v = travel / t, pause = Math.round(14 - 8 * d);
+            const steps = [{ d: [0, 0, -v], t }, { d: [0, 0, travel], t: 1 }, { d: [0, 0, 0], t: pause }];
+            const waves = d < 0.4 ? 1 : 2, tot = t + 1 + pause;
+            for (let j = 0; j < waves; j++) {
+                const wid = `${id}w${j}`, off = Math.round(j * tot / waves + r.int(0, 10)) % tot;
+                const start = posAt([lo, F, z + L - 1], steps, off);
+                o.spawn.push(display([id, wid], ...start, 'red_concrete', w, 3, 1), `scoreboard players set @e[tag=${wid}] wo_ph ${off}`);
+                o.tick.push(...moveLines(wid, steps), hitBox(wid, w, 3, 1));
+            }
+            o.len = L; o.secs = 1.5 + holes * 1.3;
             break;
         }
         // ---- punching gloves from the side: wait for a punch, then run past ----
@@ -273,14 +292,34 @@ function obstacle(type, ctx) {
             o.len = wz + 3 - z; o.secs = 3 + (N - 3) * 0.6;
             break;
         }
-        // ---- a narrow beam over the sea ----
+        // ---- a bridge over the sea that goes once you're on it: yellow, then red, then gone. Run! It comes
+        // back a moment later (and every try) ----
         case 'beam': {
-            const L = r.int(8, 12) + Math.round(d * 4), bw = d < 0.35 ? 2 : 1;
+            const L = r.int(8, 12) + Math.round(d * 4), bw = d < 0.7 ? 2 : 1;
             floorRow(lo, z, hi, z);
-            const bx = d > 0.5 && r.chance(0.5) ? x + r.int(-1, 1) : x;
-            for (let k = 1; k <= L; k++) o.blocks.push(`fill ${bx} ${F - 1} ${z + k} ${bx + bw - 1} ${F - 1} ${z + k} ${B(k % 2 ? 'white_concrete' : 'blue_concrete')}`);
+            const bx = d > 0.5 && r.chance(0.5) ? x + r.int(-1, 0) : x;
+            const normal = [];
+            for (let k = 1; k <= L; k++) normal.push(`fill ${bx} ${F - 1} ${z + k} ${bx + bw - 1} ${F - 1} ${z + k} ${B(k % 2 ? 'white_concrete' : 'blue_concrete')}`);
+            const all = c => `fill ${bx} ${F - 1} ${z + 1} ${bx + bw - 1} ${F - 1} ${z + L} ${B(c)}`;
+            o.blocks.push(...normal);
             floorRow(lo, z + L + 1, hi, z + L + 1);
-            o.len = L + 2; o.secs = 1 + L / 5;
+            // how long you get: about walking pace early on, nearer a sprint later
+            const gone = Math.round(L * 20 / (4.0 + 1.4 * d)) + 12, yellow = Math.round(gone * 0.35), red = Math.round(gone * 0.7), mid = `${bx + bw / 2} ${F} ${z + L / 2}`;
+            const st = `#${id}`;
+            o.fns.restore = [...normal, `scoreboard players set ${st} wo_v 0`];
+            o.spawn.push(...normal, `scoreboard players set ${st} wo_v 0`);
+            o.tick.push(
+                `execute if score ${st} wo_v matches 0 positioned ${bx} ${F} ${z + 1} if entity @a[tag=wo_in,dx=${bw - 1},dy=1,dz=${L - 1}] run scoreboard players set ${st} wo_v 1`,
+                `execute if score ${st} wo_v matches 1.. run scoreboard players add ${st} wo_v 1`,
+                `execute if score ${st} wo_v matches ${yellow} run ${all('yellow_concrete')}`,
+                `execute if score ${st} wo_v matches ${yellow} run playsound minecraft:block.note_block.pling master @a ${mid} 1 1.2`,
+                `execute if score ${st} wo_v matches ${red} run ${all('red_concrete')}`,
+                `execute if score ${st} wo_v matches ${red} run playsound minecraft:block.note_block.pling master @a ${mid} 1 0.7`,
+                `execute if score ${st} wo_v matches ${gone} run ${all('air')}`,
+                `execute if score ${st} wo_v matches ${gone} run playsound minecraft:block.glass.break master @a ${mid} 1 0.8`,
+                `execute if score ${st} wo_v matches ${gone + 40}.. run function wipeout:${ctx.fnBase}/${id}_restore`,
+            );
+            o.len = L + 2; o.secs = 1 + L / 4.5;
             break;
         }
         // ---- stepping tiles that flash red, then drop away, then come back ----
