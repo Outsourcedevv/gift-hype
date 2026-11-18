@@ -25,6 +25,12 @@ GAMES
     official server). In Minecraft go to Multiplayer and join "Unbound" (or localhost:25566).
     It's your world with your stuff; gifts happen instantly. Don't open it in Singleplayer at the
     same time. Closing Unbound saves and closes the world.
+  PLAY MINECRAFT: the Play Minecraft button gets everything ready by itself, then opens the
+    Minecraft launcher on a profile set to go straight in. The first time it downloads what's needed:
+    the right Java for that Minecraft version, Minecraft's official server and the game's own files
+    (a few hundred MB, a few minutes). After that it's quick. You can keep using Unbound while it
+    gets ready; the button shows what it's doing. It works for Parkour Paradise and Block Delete
+    with "Singleplayer world", and for the Dropper and Wipeout, which use their own worlds.
   SERVER: Minecraft -> "Server" runs commands on your server. Pick your server from the list:
     Unbound finds it on your PC and connects by itself, no password to type.
     If it says gift commands are off, press the pink button and restart that server once.
@@ -127,6 +133,24 @@ CHAT BLOCK DELETE (Minecraft -> Block Delete Survival)
   reaches (just your chunk up to 7x7 chunks), how long each viewer waits before picking again, how many
   countdowns can run at once, and the blocks chat can never delete (bedrock is on that list). Type a
   block in the Try box to test it without TikTok; "Stop all countdowns" cancels them.
+
+WIPEOUT (Minecraft -> Wipeout)
+  100 obstacle courses in the sky, in a world of its own that Unbound makes (the first time it builds
+  the levels: a few minutes). The courses are white and blue concrete over warm sea water, with birch
+  wood stands on both sides (a different concrete design on each level).
+    - Anything RED knocks you off: spinners to jump over, cubes sliding across, a wall coming at you
+      (get past on the side lane), punching gloves from the side, crushers slamming down, red blocks
+      sweeping past the zipline.
+    - Red and white boxing gloves bounce you up: jump from glove to glove over the water.
+    - The zipline: step on the gold pressure plate and you ride under the iron bars. Time it so the
+      red blocks don't knock you off.
+    - Pick the door: jump onto the ledge and walk into a door. The right one opens; a wrong one goes
+      red and the ledge drops into the sea. The right door is picked again every try.
+    - Also: balance beams over the sea, tiles that flash red and disappear, fields of spinners.
+  Emerald pads are checkpoints: fall in the sea (a wipeout) and you're back at the last one. The gold
+  pad at the end takes you to the next level. Levels 1 to 80 take about 15 to 20 seconds, 81 to 100
+  about 25 to 40. You never take damage. The gifts are the Dropper's: levels up and down, punches
+  (on/off), jail, the level slot machine, the reset countdown and the save.
 
 THE DROPPER (Minecraft -> Dropper)
   100 dropper levels, every one a place: Flower Meadow, Candy Land, Picnic Party, Desert Tomb, Coral

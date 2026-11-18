@@ -1,0 +1,963 @@
+// Wipeout: a 100-level obstacle course in the sky that Unbound builds in its own world.
+//
+// Every level is a course of white and blue concrete floating high above warm sea water, with birch
+// wood stands on both sides (a different concrete design on each level). Emerald pads are checkpoints;
+// the gold pad at the end is the finish. Anything red knocks you off: spinners to jump over, cubes
+// sliding across, walls coming at you, punching gloves, crushers, red blocks sweeping past the
+// zipline. Red and white wool boxing gloves bounce you up. Fall in the water (a wipeout) and you're
+// back at your last checkpoint.
+//
+// Levels 1-80 take about 15-20 seconds, 81-100 about 25-40. Every level is designed here from a
+// seed, so the world always comes out the same.
+//
+// The game runs from a data pack in the world (levels, checkpoints, the moving obstacles, jail, the
+// reset countdown, punches), the same way as the Dropper's, and Unbound sends gift actions as
+// function calls.
+
+import fs from 'node:fs';
+import path from 'node:path';
+import { SAVES_DIR } from './singleplayer.js';
+
+export const WIPEOUT_WORLD = 'Unbound Wipeout 1';
+export const WIPEOUT_MC = '26.2';
+export const WIPEOUT_BUILD = 1;                  // bump when the levels change, to rebuild them
+export const LEVELS = 100;
+
+// Settings for making the world the first time: nothing but the levels (and sea), warm ocean colours
+export const WIPEOUT_PROPS = [
+    'level-type=minecraft\\:flat',
+    'generator-settings={"layers":[{"block":"minecraft:air","height":1}],"biome":"minecraft:warm_ocean"}',
+    'generate-structures=false', 'difficulty=peaceful', 'gamemode=adventure', 'allow-flight=true',
+];
+
+// ---------- where things are ----------
+const F = 140;                       // your feet on the course (the floor blocks are at F-1)
+const SEA = 118;                     // the sea's top (water from SEA-3 to SEA, sand under it)
+const ORIGIN_X = 1000, ORIGIN_Z = 1000, SPACING_X = 120, ROW_GAP = 60;
+const JAIL = [700, F, 700], WIN = [700, F, 800];
+const B = b => `minecraft:${b}`;
+const J = o => JSON.stringify(o);
+
+// ---------- a seeded random ----------
+function rngFor(seed) {
+    let a = seed >>> 0;
+    const next = () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    return { next, int: (lo, hi) => lo + Math.floor(next() * (hi - lo + 1)), pick: list => list[Math.floor(next() * list.length)], chance: p => next() < p };
+}
+
+// ---------- the look ----------
+// The course: white with blue, a different pattern on different levels
+const FLOOR_STYLES = ['edges', 'stripes', 'checker', 'center', 'zigzag'];
+// The stands' concrete designs (the back wall and the seat fronts)
+const STAND_STYLES = [
+    { name: 'waves', cols: ['blue_concrete', 'white_concrete', 'light_blue_concrete'] },
+    { name: 'checker', cols: ['blue_concrete', 'white_concrete'] },
+    { name: 'stripes', cols: ['light_blue_concrete', 'white_concrete', 'blue_concrete', 'white_concrete'] },
+    { name: 'diamonds', cols: ['cyan_concrete', 'white_concrete', 'blue_concrete'] },
+    { name: 'bands', cols: ['blue_concrete', 'light_blue_concrete', 'white_concrete'] },
+    { name: 'dots', cols: ['white_concrete', 'blue_concrete'] },
+    { name: 'arrows', cols: ['blue_concrete', 'white_concrete', 'cyan_concrete'] },
+];
+
+// ---------- the obstacles ----------
+// Each makes: the blocks (built once), the moving parts (summoned when you get to the level), what they
+// do every tick, what happens each try (the doors' right door), and how long it takes to get past.
+// x: the middle of the course, z: where it starts, w: the course's width. Returns { len, secs, ... }.
+const SECS = { spinner: 3.2, gloves: 3, cubes: 1.8, wall: 4, punch: 1.8, zipline: 5.5, doors: 3.2, beam: 2.4, blink: 3.6, crusher: 1.8, spinfield: 4 };
+const FIRST = { spinner: 1, gloves: 1, cubes: 1, beam: 2, doors: 3, wall: 4, zipline: 6, punch: 8, crusher: 14, blink: 18, spinfield: 30 };
+
+let uid = 0;
+function obstacle(type, ctx) {
+    const { n, d, r, x, z, w } = ctx;            // d: 0 (level 1) to 1 (level 100)
+    const id = `o${n}_${++uid}`;
+    const o = { id, type, blocks: [], spawn: [], tick: [], reroll: [], fns: {}, len: 0, secs: SECS[type] };
+    const lo = x - Math.floor((w - 1) / 2), hi = lo + w - 1;     // the course's edges (x)
+    const floorRow = (x1, z1, x2, z2) => o.blocks.push(...floorFill(x1, z1, x2, z2, ctx.style));
+    const sp = (lo2, hi2) => +(lo2 + (hi2 - lo2) * d).toFixed(3);   // a speed from easy to hard
+    switch (type) {
+        // ---- a round platform with an arm (or two) sweeping round at your ankles: jump it ----
+        case 'spinner': {
+            const R = r.int(5, 6) + (d > 0.5 ? 1 : 0), cz = z + R + 1;
+            disc(o, x, cz, R + 1, ctx.style);
+            o.blocks.push(`setblock ${x} ${F} ${cz} ${B('red_concrete')}`);
+            const arms = d > 0.3 && r.chance(0.35 + d * 0.4) ? 2 : 1, deg = sp(4, 7.5) * (r.chance(0.5) ? 1 : -1);
+            for (let a = 0; a < arms; a++) o.spawn.push(display([id, 'wo_arm'], x + 0.5, F, cz + 0.5, 'red_concrete', 0.6, 0.55, 2 * R, { tx: -0.3, ty: 0.05, tz: -R, yaw: a * 90 + r.int(0, 89) }));
+            o.tick.push(`execute as @e[tag=${id}] at @s run tp @s ~ ~ ~ ~${deg} ~`);
+            // where the arm is (a little behind it, so you're knocked the way it's going): every 0.75 blocks out
+            const back = deg > 0 ? -18 : 18;
+            for (let k = -R + 0.4; k <= R - 0.4; k += 0.75) {
+                o.tick.push(`execute as @e[tag=${id}] at @s rotated as @s positioned ^ ^ ^${k.toFixed(2)} positioned ~-0.5 ~-0.3 ~-0.5 if entity @a[tag=wo_in,dx=0,dy=0,dz=0] at @s rotated as @s rotated ~${back} 0 positioned ^ ^ ^${k.toFixed(2)} as @a[tag=wo_in,sort=nearest,limit=1] run function wipeout:hit {p:1}`);
+            }
+            o.len = 2 * R + 3; o.secs += arms === 2 ? 0.8 : 0;
+            break;
+        }
+        // ---- several spinners in a field (later levels) ----
+        case 'spinfield': {
+            const R = 4, cz = z + R + 1, gap = 2 * R + 2;
+            const spots = [[x - R - 1, cz], [x + R + 1, cz + gap - 2], [x - R - 1, cz + 2 * gap - 4]];
+            for (const [sx, sz] of spots) disc(o, sx, sz, R + 1, ctx.style);
+            floorRow(x - 2 * R - 2, cz + R, x + 2 * R + 2, cz + R);           // little bridges between them
+            floorRow(x - 2 * R - 2, cz + gap + R - 2, x + 2 * R + 2, cz + gap + R - 2);
+            spots.forEach(([sx, sz], i) => {
+                o.blocks.push(`setblock ${sx} ${F} ${sz} ${B('red_concrete')}`);
+                const deg = sp(5, 8) * (i % 2 ? -1 : 1);
+                const sid = `${id}s${i}`;
+                o.spawn.push(display([id, sid, 'wo_arm'], sx + 0.5, F, sz + 0.5, 'red_concrete', 0.6, 0.55, 2 * R, { tx: -0.3, ty: 0.05, tz: -R, yaw: r.int(0, 179) }));
+                o.tick.push(`execute as @e[tag=${sid}] at @s run tp @s ~ ~ ~ ~${deg} ~`);
+                for (let k = -R + 0.4; k <= R - 0.4; k += 0.75) o.tick.push(`execute as @e[tag=${sid}] at @s rotated as @s positioned ^ ^ ^${k.toFixed(2)} positioned ~-0.5 ~-0.3 ~-0.5 if entity @a[tag=wo_in,dx=0,dy=0,dz=0] at @s rotated as @s rotated ~${deg > 0 ? -18 : 18} 0 positioned ^ ^ ^${k.toFixed(2)} as @a[tag=wo_in,sort=nearest,limit=1] run function wipeout:hit {p:1}`);
+            });
+            o.len = 6 * R + 3; o.secs = 5.5;
+            break;
+        }
+        // ---- boxing gloves over the water: land on them and they bounce you up and on ----
+        case 'gloves': {
+            const count = r.int(2, 3) + (d > 0.5 ? 1 : 0);
+            let zc = z + 1;
+            floorRow(lo, z, hi, z);
+            for (let i = 0; i < count; i++) {
+                const gap = r.int(2, 3) + (d > 0.6 ? 1 : 0);
+                zc += gap;
+                const off = d > 0.4 ? r.int(-1, 1) * Math.min(2, Math.floor(w / 2)) : 0;
+                glove(o, x + off, zc);
+                zc += 4;
+            }
+            zc += r.int(2, 3);
+            o.len = zc - z; o.secs = 1 + count * 0.9;
+            break;
+        }
+        // ---- red cubes sliding across: run past one, stop, wait for the next ----
+        case 'cubes': {
+            const count = Math.min(6, 2 + Math.floor(d * 4) + r.int(0, 1)), size = d > 0.55 && r.chance(0.5) ? 3 : 2;
+            const L = count * (size + 3) + 2;
+            floorRow(lo, z, hi, z + L - 1);
+            const travel = w + size + 2, v = sp(0.12, 0.28), t = Math.max(8, Math.round(travel / v));
+            for (let i = 0; i < count; i++) {
+                const cz = z + 2 + i * (size + 3), cid = `${id}c${i}`;
+                const steps = [{ d: [v, 0, 0], t }, { d: [-v, 0, 0], t }], off = r.int(0, 2 * t - 1);
+                const start = posAt([lo - size - 1, F, cz], steps, off);
+                o.spawn.push(display([id, cid], ...start, 'red_concrete', size, size, size), `scoreboard players set @e[tag=${cid}] wo_ph ${off}`);
+                o.tick.push(...moveLines(cid, steps), hitBox(cid, size, size, size, 1));
+            }
+            o.len = L; o.secs = 1.2 + count * 0.9;
+            break;
+        }
+        // ---- a wall coming down the course at you: get past it on the side lane ----
+        case 'wall': {
+            const L = r.int(12, 16), side = r.chance(0.5) ? 1 : -1, lane = 2;
+            floorRow(lo, z, hi, z + L - 1);
+            const lx1 = side > 0 ? hi + 1 : lo - lane, lx2 = side > 0 ? hi + lane : lo - 1;
+            o.blocks.push(...floorFill(lx1, z, lx2, z + L - 1, 'lane'));
+            const v = sp(0.12, 0.22), t = Math.round((L - 2) / v);
+            const steps = [{ d: [0, 0, -v], t }, { d: [0, 0, 0], t: 10 }, { d: [0, 0, v], t }, { d: [0, 0, 0], t: 10 }];
+            const off = r.int(0, 2 * t + 19);
+            const start = posAt([lo, F, z + L - 2], steps, off);
+            o.spawn.push(display([id], ...start, 'red_concrete', w, 3, 1), `scoreboard players set @e[tag=${id}] wo_ph ${off}`);
+            o.tick.push(...moveLines(id, steps), hitBox(id, w, 3, 1, 1));
+            o.len = L;
+            break;
+        }
+        // ---- punching gloves from the side: wait for a punch, then run past ----
+        case 'punch': {
+            const count = Math.min(5, 2 + Math.floor(d * 3) + r.int(0, 1)), L = count * 4 + 2, side = r.chance(0.5) ? 1 : -1;
+            floorRow(lo, z, hi, z + L - 1);
+            const wallX = side > 0 ? hi + 1 : lo - 1;
+            o.blocks.push(`fill ${wallX} ${F} ${z} ${wallX} ${F + 3} ${z + L - 1} ${B('white_concrete')}`, `fill ${wallX} ${F + 3} ${z} ${wallX} ${F + 3} ${z + L - 1} ${B('blue_concrete')}`);
+            const reach = w + 0.4, out = Math.max(3, Math.round(reach / sp(0.55, 0.9))), back = Math.round(reach / 0.15);
+            const wait = Math.round(40 - 24 * d) + r.int(0, 10);
+            const vo = +(reach / out).toFixed(3), vb = +(reach / back).toFixed(3);
+            for (let i = 0; i < count; i++) {
+                const pz = z + 2 + i * 4, pid = `${id}p${i}`;
+                const steps = [{ d: [0, 0, 0], t: wait }, { d: [-side * vo, 0, 0], t: out }, { d: [0, 0, 0], t: 6 }, { d: [side * vb, 0, 0], t: back }];
+                const tot = wait + out + 6 + back, off = Math.round(i * tot / count + r.int(0, 8)) % tot;
+                const fx = side > 0 ? wallX - 0.1 : wallX - 0.5;        // resting: tucked into the wall
+                const start = posAt([fx, F + 0.4, pz], steps, off);
+                o.spawn.push(display([id, pid], ...start, 'red_wool', 1.6, 1.6, 1.6),
+                    display([id, pid, 'wo_cuff'], start[0] + (side > 0 ? 1.6 : -0.5), start[1] + 0.3, start[2] + 0.3, 'white_wool', 0.5, 1.0, 1.0),
+                    `scoreboard players set @e[tag=${pid}] wo_ph ${off}`);
+                o.tick.push(...moveLines(pid, steps), hitBox(pid, 1.6, 1.6, 1.6, 2, `tag=${pid},tag=!wo_cuff`));
+            }
+            o.len = L; o.secs = 1.2 + count * 0.9;
+            break;
+        }
+        // ---- crushers: red blocks slamming down onto the course ----
+        case 'crusher': {
+            const count = Math.min(5, 2 + Math.floor(d * 3)), L = count * 4 + 2;
+            floorRow(lo, z, hi, z + L - 1);
+            for (let i = 0; i < count; i++) {
+                const cz = z + 2 + i * 4, cid = `${id}k${i}`;
+                const drop = 3.6, down = Math.max(3, Math.round(drop / sp(0.5, 0.9))), up = Math.round(drop / 0.12), hold = 10, wait = Math.round(30 - 15 * d) + r.int(0, 8);
+                const steps = [{ d: [0, 0, 0], t: wait }, { d: [0, -drop / down, 0], t: down }, { d: [0, 0, 0], t: hold }, { d: [0, drop / up, 0], t: up }];
+                const tot = wait + down + hold + up, off = Math.round(i * tot / count + r.int(0, 6)) % tot;
+                const start = posAt([lo, F + 3.8, cz], steps, off);
+                o.spawn.push(display([id, cid], ...start, 'red_concrete', w, 2, 2), `scoreboard players set @e[tag=${cid}] wo_ph ${off}`);
+                o.tick.push(...moveLines(cid, steps), hitBox(cid, w, 2, 2, 1));
+                o.blocks.push(`fill ${lo - 1} ${F} ${cz} ${lo - 1} ${F + 6} ${cz + 1} ${B('white_concrete')}`, `fill ${hi + 1} ${F} ${cz} ${hi + 1} ${F + 6} ${cz + 1} ${B('white_concrete')}`,
+                    `fill ${lo - 1} ${F + 6} ${cz} ${hi + 1} ${F + 6} ${cz + 1} ${B('blue_concrete')}`);
+            }
+            o.len = L; o.secs = 1.2 + count * 0.9;
+            break;
+        }
+        // ---- the zipline: step on the plate and you ride under the bars, past the red blocks ----
+        case 'zipline': {
+            const G = r.int(12, 16) + Math.round(d * 6), z1 = z + 3, z2 = z1 + G;
+            floorRow(lo, z, hi, z + 2);
+            floorRow(lo, z2 + 1, hi, z2 + 3);
+            o.blocks.push(`setblock ${x} ${F} ${z + 1} ${B('light_weighted_pressure_plate')}`,
+                `fill ${x} ${F + 4} ${z + 1} ${x} ${F + 4} ${z2 + 1} ${B('iron_bars')}`,
+                `fill ${x - 1} ${F} ${z} ${x - 1} ${F + 4} ${z} ${B('white_concrete')}`, `fill ${x + 1} ${F} ${z} ${x + 1} ${F + 4} ${z} ${B('white_concrete')}`,
+                `fill ${x - 1} ${F + 5} ${z} ${x + 1} ${F + 5} ${z} ${B('blue_concrete')}`,
+                `fill ${x - 1} ${F} ${z2 + 2} ${x - 1} ${F + 4} ${z2 + 2} ${B('white_concrete')}`, `fill ${x + 1} ${F} ${z2 + 2} ${x + 1} ${F + 4} ${z2 + 2} ${B('white_concrete')}`,
+                `fill ${x - 1} ${F + 5} ${z2 + 2} ${x + 1} ${F + 5} ${z2 + 2} ${B('blue_concrete')}`);
+            const speed = 0.32, ticks = Math.round((z2 + 1.5 - (z + 1.5)) / speed);
+            // riding: the plate starts it (the "seat" is invisible, a chain is your handle)
+            o.fns.zip = [
+                'tag @s add wo_ride',
+                `summon minecraft:item_display ${x + 0.5} ${F + 1.05} ${z + 1.5} {Tags:["wo_mv","wo_new","wo_zipv","${id}v"],teleport_duration:1}`,
+                display(['wo_new', 'wo_ziph', `${id}v`], x + 0.42, F + 2.85, z + 1.42, 'chain', 0.16, 1.15, 0.16),
+                'scoreboard players operation @e[tag=wo_new] wo_gen = #gen wo_v', 'scoreboard players set @e[tag=wo_new] wo_ph 0', 'tag @e[tag=wo_new] remove wo_new',
+                `ride @s mount @e[tag=${id}v,tag=wo_zipv,limit=1]`,
+                'playsound minecraft:block.chain.place master @s ~ ~ ~ 1 0.8',
+            ];
+            o.tick.push(
+                `execute positioned ${x} ${F} ${z + 1} as @a[tag=wo_in,tag=!wo_ride,dx=0,dy=0,dz=0] unless score @s wo_jail matches 1.. at @s run function wipeout:${ctx.fnBase}/${id}_zip`,
+                `execute as @e[tag=${id}v] at @s run tp @s ~ ~ ~${speed}`,
+                `scoreboard players add @e[tag=${id}v,tag=wo_zipv] wo_ph 1`,
+                `execute as @e[tag=${id}v,tag=wo_zipv,scores={wo_ph=${ticks}..}] run function wipeout:zip_end`,
+                `execute as @e[tag=${id}v,tag=wo_zipv] at @s unless entity @a[tag=wo_ride,distance=..1.5] run function wipeout:zip_end`,
+            );
+            // red blocks sweeping side to side across the line
+            const count = Math.min(4, 1 + Math.floor(d * 3) + r.int(0, 1));
+            for (let i = 0; i < count; i++) {
+                const hz = Math.round(z1 + (i + 1) * G / (count + 1)), hid = `${id}h${i}`;
+                const travel = 6, v = sp(0.15, 0.3), t = Math.round(travel / v), steps = [{ d: [v, 0, 0], t }, { d: [-v, 0, 0], t }], off = r.int(0, 2 * t - 1);
+                const start = posAt([x - 3.5, F + 1.2, hz], steps, off);
+                o.spawn.push(display([id, hid], ...start, 'red_concrete', 1.5, 1.6, 1.2), `scoreboard players set @e[tag=${hid}] wo_ph ${off}`);
+                o.tick.push(...moveLines(hid, steps), hitBox(hid, 1.5, 1.6, 1.2, 1));
+            }
+            o.len = G + 7; o.secs = 2.5 + G / 6.4;
+            break;
+        }
+        // ---- pick the door: one opens, the others punch you back into the sea ----
+        case 'doors': {
+            const N = d < 0.25 ? 3 : r.chance(0.5) ? 4 : 3, DW = N * 3 + 1, dlo = x - Math.floor(DW / 2), gap = 2 + (d > 0.5 ? 1 : 0);
+            floorRow(lo, z, hi, z);
+            const lz = z + 1 + gap, wz = lz + 2;                  // the ledge, then the doors' wall
+            o.blocks.push(...floorFill(dlo, lz, dlo + DW - 1, lz + 1, 'edges'),
+                `fill ${dlo} ${F} ${wz} ${dlo + DW - 1} ${F + 3} ${wz} ${B('white_concrete')}`,
+                `fill ${dlo} ${F + 4} ${wz} ${dlo + DW - 1} ${F + 4} ${wz} ${B('blue_concrete')}`);
+            o.blocks.push(...floorFill(dlo, wz + 1, dlo + DW - 1, wz + 2, 'edges'));
+            o.reroll.push(`execute store result score #${id} wo_v run random value 1..${N}`);
+            o.fns.ledge = floorFill(dlo, lz, dlo + DW - 1, lz + 1, 'edges');
+            for (let j = 1; j <= N; j++) {
+                const dx = dlo + 1 + (j - 1) * 3;
+                const door = c => `fill ${dx} ${F} ${wz} ${dx + 1} ${F + 2} ${wz} ${B(c)}`;
+                o.blocks.push(door('blue_concrete'), `setblock ${dx} ${F + 3} ${wz} ${B('light_blue_concrete')}`, `setblock ${dx + 1} ${F + 3} ${wz} ${B('light_blue_concrete')}`);
+                // a wrong door goes red and the ledge drops away under you (into the sea)
+                o.fns[`door${j}`] = [
+                    `execute if score #${id} wo_v matches ${j} run return run function wipeout:${ctx.fnBase}/${id}_open${j}`,
+                    'execute if score @s wo_cd matches 1.. run return 0',
+                    'scoreboard players set @s wo_cd 20',
+                    door('red_concrete'), `schedule function wipeout:${ctx.fnBase}/${id}_shut${j} 20t`,
+                    `fill ${dlo} ${F - 1} ${lz} ${dlo + DW - 1} ${F - 1} ${lz + 1} ${B('air')}`, `schedule function wipeout:${ctx.fnBase}/${id}_ledge 30t`,
+                    `title @s actionbar ${J({ text: 'WRONG DOOR!', color: 'red', bold: true })}`,
+                    `playsound minecraft:block.anvil.land master @a ${dx + 1} ${F + 1} ${wz} 0.8 1.4`,
+                ];
+                o.fns[`open${j}`] = [door('air'), `playsound minecraft:block.iron_door.open master @a ${dx + 1} ${F + 1} ${wz} 1 1`, `playsound minecraft:entity.player.levelup master @s ~ ~ ~ 0.6 1.6`, `schedule function wipeout:${ctx.fnBase}/${id}_shut${j} 50t`];
+                o.fns[`shut${j}`] = [
+                    `execute positioned ${dx} ${F} ${wz} if entity @a[dx=1,dy=2,dz=0] run return run schedule function wipeout:${ctx.fnBase}/${id}_shut${j} 10t`,
+                    door('blue_concrete'),
+                ];
+                o.tick.push(`execute positioned ${dx} ${F} ${wz - 0.7} as @a[tag=wo_in,dx=1,dy=1,dz=0] unless score @s wo_jail matches 1.. run function wipeout:${ctx.fnBase}/${id}_door${j}`);
+            }
+            o.len = wz + 3 - z; o.secs = 3 + (N - 3) * 0.6;
+            break;
+        }
+        // ---- a narrow beam over the sea ----
+        case 'beam': {
+            const L = r.int(8, 12) + Math.round(d * 4), bw = d < 0.35 ? 2 : 1;
+            floorRow(lo, z, hi, z);
+            const bx = d > 0.5 && r.chance(0.5) ? x + r.int(-1, 1) : x;
+            for (let k = 1; k <= L; k++) o.blocks.push(`fill ${bx} ${F - 1} ${z + k} ${bx + bw - 1} ${F - 1} ${z + k} ${B(k % 2 ? 'white_concrete' : 'blue_concrete')}`);
+            floorRow(lo, z + L + 1, hi, z + L + 1);
+            o.len = L + 2; o.secs = 1 + L / 5;
+            break;
+        }
+        // ---- stepping tiles that flash red, then drop away, then come back ----
+        case 'blink': {
+            const count = r.int(4, 6) + Math.round(d * 2), P = 60 - Math.round(d * 20);
+            floorRow(lo, z, hi, z);
+            let tz = z + 2;
+            for (let i = 0; i < count; i++) {
+                const tx = x - 1 + (i % 2 ? r.int(0, 1) : -r.int(0, 1)), tile = c => `fill ${tx} ${F - 1} ${tz} ${tx + 2} ${F - 1} ${tz + 1} ${B(c)}`;
+                const on = Math.round(P * 0.55), warn = Math.round(P * 0.75), phase = Math.round(i * P / count * (r.chance(0.5) ? 1 : 0.5)) % P;
+                const at = k => (k + phase) % P;
+                o.blocks.push(tile(i % 2 ? 'blue_concrete' : 'white_concrete'));
+                o.tick.push(
+                    `execute if score #m${P} wo_v matches ${at(on)} run ${tile('red_concrete')}`,
+                    `execute if score #m${P} wo_v matches ${at(warn)} run ${tile('air')}`,
+                    `execute if score #m${P} wo_v matches ${at(0)} run ${tile(i % 2 ? 'blue_concrete' : 'white_concrete')}`,
+                );
+                o.spawn.push(tile(i % 2 ? 'blue_concrete' : 'white_concrete'));
+                ctx.periods.add(P);
+                tz += 3;
+            }
+            floorRow(lo, tz, hi, tz);
+            o.len = tz - z + 1; o.secs = 1.5 + count * 0.55;
+            break;
+        }
+    }
+    return o;
+}
+
+// a slab of course at the floor, in this level's pattern
+function floorFill(x1, z1, x2, z2, style) {
+    const out = [`fill ${x1} ${F - 1} ${z1} ${x2} ${F - 1} ${z2} ${B('white_concrete')}`];
+    const blue = (a, b, c, e) => out.push(`fill ${a} ${F - 1} ${b} ${c} ${F - 1} ${e} ${B('blue_concrete')}`);
+    if (style === 'lane') { blue(x1, z1, x2, z2); return out; }
+    if (style === 'edges' || style === 'zigzag') { blue(x1, z1, x1, z2); blue(x2, z1, x2, z2); }
+    if (style === 'center') { const m = Math.floor((x1 + x2) / 2); blue(m, z1, m, z2); }
+    if (style === 'stripes') for (let zz = z1; zz <= z2; zz++) if (((zz % 4) + 4) % 4 === 0) blue(x1, zz, x2, zz);
+    if (style === 'checker') for (let zz = z1; zz <= z2; zz++) for (let xx = x1; xx <= x2; xx++) if ((((xx + zz) % 2) + 2) % 2 === 0 && (zz % 2 === 0)) out.push(`setblock ${xx} ${F - 1} ${zz} ${B('blue_concrete')}`);
+    if (style === 'zigzag') for (let zz = z1; zz <= z2; zz++) { const k = ((zz % 6) + 6) % 6, xx = x1 + Math.min(k, 6 - k); if (xx <= x2) out.push(`setblock ${xx} ${F - 1} ${zz} ${B('blue_concrete')}`); }
+    return out;
+}
+// a round platform (radius R) with a blue rim
+function disc(o, cx, cz, R, style) {
+    for (let dz = -R; dz <= R; dz++) {
+        const h = Math.floor(Math.sqrt(R * R - dz * dz + 0.5));
+        o.blocks.push(`fill ${cx - h} ${F - 1} ${cz + dz} ${cx + h} ${F - 1} ${cz + dz} ${B(Math.abs(dz) % 3 === 0 && style !== 'center' ? 'white_concrete' : 'white_concrete')}`);
+        o.blocks.push(`setblock ${cx - h} ${F - 1} ${cz + dz} ${B('blue_concrete')}`, `setblock ${cx + h} ${F - 1} ${cz + dz} ${B('blue_concrete')}`);
+    }
+    o.blocks.push(`fill ${cx - R} ${F - 1} ${cz} ${cx + R} ${F - 1} ${cz} ${B('blue_concrete')}`, `fill ${cx} ${F - 1} ${cz - R} ${cx} ${F - 1} ${cz + R} ${B('blue_concrete')}`);
+}
+// a boxing glove made of red and white wool, its top at the course's height (z: its back)
+function glove(o, gx, gz) {
+    o.blocks.push(
+        `fill ${gx - 1} ${F - 2} ${gz} ${gx + 1} ${F - 1} ${gz + 3} ${B('red_wool')}`,          // the fist
+        `fill ${gx - 1} ${F - 2} ${gz} ${gx + 1} ${F - 1} ${gz} ${B('white_wool')}`,            // the cuff
+        `setblock ${gx + 2} ${F - 2} ${gz + 2} ${B('red_wool')}`,                                // the thumb
+        `fill ${gx - 1} ${F - 3} ${gz + 1} ${gx + 1} ${F - 3} ${gz + 2} ${B('red_wool')}`,
+    );
+}
+// a moving block: a block display (its corner at x y z), sized sx sy sz
+function display(tags, x, y, z, block, sx, sy, sz, { tx = 0, ty = 0, tz = 0, yaw = 0 } = {}) {
+    const f = v => `${+(+v).toFixed(3)}f`;
+    // (always with a decimal point: Minecraft puts whole-number positions in the middle of the block)
+    return `summon minecraft:block_display ${(+x).toFixed(3)} ${(+y).toFixed(3)} ${(+z).toFixed(3)} {Tags:${J(['wo_mv', 'wo_new', ...tags])},Rotation:[${yaw}f,0f],teleport_duration:1,block_state:{Name:"${B(block)}"},`
+        + `transformation:{left_rotation:[0f,0f,0f,1f],right_rotation:[0f,0f,0f,1f],translation:[${f(tx)},${f(ty)},${f(tz)}],scale:[${f(sx)},${f(sy)},${f(sz)}]}}`;
+}
+// where a mover is after `phase` ticks of its steps
+function posAt(p, steps, phase) {
+    const q = [...p], tot = steps.reduce((a, s) => a + s.t, 0);
+    let left = ((phase % tot) + tot) % tot;
+    for (const s of steps) { const k = Math.min(left, s.t); for (let i = 0; i < 3; i++) q[i] += s.d[i] * k; left -= k; if (!left) break; }
+    return q.map(v => +v.toFixed(3));
+}
+// the tick lines that move it: a count of ticks (wo_ph) and a move for each step
+function moveLines(tag, steps) {
+    const tot = steps.reduce((a, s) => a + s.t, 0), out = [`scoreboard players add @e[tag=${tag}] wo_ph 1`, `scoreboard players set @e[tag=${tag},scores={wo_ph=${tot}..}] wo_ph 0`];
+    let a = 0;
+    for (const s of steps) {
+        const b = a + s.t - 1;
+        if (s.d.some(v => v)) out.push(`execute as @e[tag=${tag},scores={wo_ph=${a}..${b}}] at @s run tp @s ~${+s.d[0].toFixed(4)} ~${+s.d[1].toFixed(4)} ~${+s.d[2].toFixed(4)}`);
+        a = b + 1;
+    }
+    return out;
+}
+// touching a box (corner at the mover, sized sx sy sz) knocks you away from its middle
+function hitBox(tag, sx, sy, sz, p, sel = `tag=${tag}`) {
+    const e = 0.1;
+    return `execute as @e[${sel}] at @s positioned ~${e} ~${e} ~${e} if entity @a[tag=wo_in,dx=${+(sx - 1 - 2 * e).toFixed(2)},dy=${+(sy - 1 - 2 * e).toFixed(2)},dz=${+(sz - 1 - 2 * e).toFixed(2)}] `
+        + `positioned ~${+(sx / 2 - e).toFixed(2)} ~${+(sy / 2 - e).toFixed(2)} ~${+(sz / 2 - e).toFixed(2)} as @a[tag=wo_in,sort=nearest,limit=1] run function wipeout:hit {p:${p}}`;
+}
+
+// ---------- the levels ----------
+const NAMES = ['Splash Zone', 'Spin Cycle', 'Glove Love', 'Cube Rush', 'Door Dash', 'Wall Street', 'Zip It', 'Knock Knock', 'Sky Sweep', 'Bounce House', 'Red Alert', 'Tight Rope',
+    'Big Splash', 'Punch Line', 'Crush Hour', 'Blink Twice', 'Seaside Sprint', 'Wet and Wild', 'Sweeper Keeper', 'High Tide', 'Deep End', 'Belly Flop', 'Cannonball', 'Wave Rider',
+    'Final Fling', 'No Way Through', 'Lucky Door', 'Slip and Slide', 'Over the Edge', 'Tidal Turn'];
+const POOL = ['spinner', 'gloves', 'cubes', 'beam', 'doors', 'wall', 'zipline', 'punch', 'crusher', 'blink', 'spinfield'];
+
+let designs = null;
+function design() {
+    if (designs) return designs;
+    const out = [];
+    let rowZ = ORIGIN_Z, rowMax = 0;
+    for (let n = 1; n <= LEVELS; n++) {
+        const r = rngFor(n * 7919 + 13), d = (n - 1) / (LEVELS - 1);
+        const w = n <= 30 ? 5 : n <= 70 ? 4 : 3;
+        const target = n <= 80 ? [15, 20] : [25 + Math.round((n - 81) * 0.6), 32 + Math.round((n - 81) * 0.45)];
+        const col = (n - 1) % 10, x = ORIGIN_X + col * SPACING_X;
+        if (col === 0 && n > 1) { rowZ += rowMax + ROW_GAP; rowMax = 0; }
+        const style = FLOOR_STYLES[(n - 1) % FLOOR_STYLES.length], stand = STAND_STYLES[(n * 3) % STAND_STYLES.length];
+        const ctx = { n, d, r, x, w, style, periods: new Set(), fnBase: `lvl/${n}` };
+        const z0 = rowZ;
+        const parts = [], cps = [];
+        let z = z0 + 6, secs = 1.5;                         // the start pad
+        const pool = POOL.filter(t => n >= FIRST[t]);
+        const used = [];
+        // the new obstacle of this level goes in for sure (where one starts), the rest from the pool
+        const fresh = POOL.find(t => FIRST[t] === n);
+        while (secs < target[0] || parts.length < 2) {
+            let t = (fresh && !used.includes(fresh)) ? fresh : r.pick(pool);
+            if (used[used.length - 1] === t) t = r.pick(pool);
+            if (t === 'zipline' && used.includes('zipline') && n <= 80) t = 'cubes';
+            const o = obstacle(t, { ...ctx, z });
+            if (secs + o.secs > target[1] + 1 && parts.length >= 2) break;
+            parts.push({ ...o, z }); used.push(t);
+            z += o.len;
+            secs += o.secs;
+            // an emerald checkpoint after every obstacle (a short run of course before the next)
+            cps.push(z); z += 3; secs += 0.6;
+        }
+        const finish = z;                                      // the gold pad
+        const length = finish + 5 - z0;
+        rowMax = Math.max(rowMax, length);
+        out.push({ n, x, z0, w, style, stand, parts, cps, finish, length, secs: Math.round(secs), name: NAMES[(n * 7) % NAMES.length], periods: [...ctx.periods],
+            kinds: used });
+    }
+    return designs = out;
+}
+export const wipeoutLevels = () => design();
+export const wipeoutLevel = n => design()[n - 1];
+const levelStart = L => [L.x, F, L.z0 + 2];
+
+// ---------- building a level ----------
+function levelCommands(L) {
+    const { x, z0, w } = L, lo = x - Math.floor((w - 1) / 2), hi = lo + w - 1, end = L.z0 + L.length;
+    const c = [];
+    // the sea under it all (and between the levels), with a sandy, coral-dotted floor
+    const sx1 = x - SPACING_X / 2, sx2 = x + SPACING_X / 2 - 1, sz1 = z0 - ROW_GAP / 2, sz2 = end + ROW_GAP / 2;
+    for (let zz = sz1; zz <= sz2; zz += 60) {
+        const z2 = Math.min(sz2, zz + 59);
+        // (sandstone under the sand: sand over nothing would fall)
+        c.push(`fill ${sx1} ${SEA - 5} ${zz} ${sx2} ${SEA - 5} ${z2} ${B('sandstone')}`, `fill ${sx1} ${SEA - 4} ${zz} ${sx2} ${SEA - 4} ${z2} ${B('sand')}`, `fill ${sx1} ${SEA - 3} ${zz} ${sx2} ${SEA} ${z2} ${B('water')}`);
+    }
+    const r = rngFor(L.n * 31 + 7);
+    for (let i = 0; i < 40; i++) {
+        const cx = r.int(sx1, sx2), cz = r.int(sz1, sz2);
+        c.push(`setblock ${cx} ${SEA - 3} ${cz} ${B(r.pick(['brain_coral_block', 'tube_coral_block', 'fire_coral_block', 'horn_coral_block', 'bubble_coral_block', 'sea_lantern']))}`);
+        if (r.chance(0.5)) c.push(`setblock ${cx} ${SEA - 2} ${cz} ${B(r.pick(['brain_coral[waterlogged=true]', 'tube_coral[waterlogged=true]', 'fire_coral[waterlogged=true]', 'horn_coral[waterlogged=true]', 'bubble_coral[waterlogged=true]', 'seagrass']))}`);
+    }
+    // the start pad, the course parts with emerald checkpoints after each, the gold finish pad
+    c.push(...floorFill(lo - 1, z0, hi + 1, z0 + 5, L.style));
+    c.push(`fill ${lo - 1} ${F - 1} ${z0} ${hi + 1} ${F - 1} ${z0} ${B('blue_concrete')}`);
+    for (const p of L.parts) c.push(...p.blocks);
+    for (const cz of L.cps) c.push(`fill ${lo - 1} ${F - 1} ${cz} ${hi + 1} ${F - 1} ${cz + 2} ${B('emerald_block')}`);
+    c.push(`fill ${lo - 1} ${F - 1} ${L.finish} ${hi + 1} ${F - 1} ${L.finish + 4} ${B('gold_block')}`);
+    // the finish arch
+    c.push(`fill ${lo - 2} ${F} ${L.finish + 2} ${lo - 2} ${F + 4} ${L.finish + 2} ${B('white_concrete')}`, `fill ${hi + 2} ${F} ${L.finish + 2} ${hi + 2} ${F + 4} ${L.finish + 2} ${B('white_concrete')}`,
+        `fill ${lo - 2} ${F + 5} ${L.finish + 2} ${hi + 2} ${F + 5} ${L.finish + 2} ${B('blue_concrete')}`);
+    // the stands: birch seats stepping up and back on both sides, birch log legs down into the sea, a
+    // concrete design on the back wall and the seat fronts
+    const s1 = z0 - 2, s2 = end + 1, gapX = 7;
+    for (const side of [-1, 1]) {
+        const base = side < 0 ? lo - gapX : hi + gapX;          // the front row
+        // the seats look at the course
+        const facing = side < 0 ? 'east' : 'west';
+        for (let t = 0; t < 4; t++) {
+            const sx = base + side * t, sy = F - 5 + t;
+            c.push(`fill ${sx} ${F - 8} ${s1} ${sx} ${sy - 2} ${s2} ${B('birch_planks')}`);
+            c.push(...standFront(sx, sy - 1, s1, s2, L.stand, t));
+            c.push(`fill ${sx} ${sy} ${s1} ${sx} ${sy} ${s2} ${B(`birch_stairs[facing=${facing}]`)}`);
+        }
+        const back = base + side * 4;
+        c.push(...standWall(back, F - 5, F + 1, s1, s2, L.stand));
+        c.push(`fill ${base - side} ${F - 5} ${s1} ${base - side} ${F - 5} ${s2} ${B('birch_fence')}`);
+        for (let zz = s1; zz <= s2; zz += 6) for (let t = 0; t < 5; t++) c.push(`fill ${base + side * t} ${SEA + 1} ${zz} ${base + side * t} ${F - 9} ${zz} ${B('birch_log')}`);
+    }
+    // the level's number over the start, and the finish sign
+    c.push(`kill @e[type=minecraft:text_display,tag=wo_sign,x=${x},y=${F + 3},z=${z0 + 3},distance=..3]`,
+        `summon minecraft:text_display ${x + 0.5} ${F + 3.2} ${z0 + 3.5} {Tags:["wo_sign"],billboard:"vertical",scale:[2f,2f,2f],background:1711276032,text:[{text:"LEVEL ${L.n}",color:"white",bold:true},{text:"\\n${L.name}",color:"aqua"}]}`,
+        `kill @e[type=minecraft:text_display,tag=wo_sign,x=${x},y=${F + 6},z=${L.finish + 2},distance=..3]`,
+        `summon minecraft:text_display ${x + 0.5} ${F + 6.2} ${L.finish + 2.5} {Tags:["wo_sign"],billboard:"vertical",scale:[2.5f,2.5f,2.5f],background:1711276032,text:{text:"FINISH",color:"gold",bold:true}}`);
+    return c.filter(Boolean);
+}
+// the seat front under each row: the level's concrete design
+function standFront(x, y, z1, z2, st, t) {
+    const out = [];
+    for (let zz = z1; zz <= z2; zz++) out.push([zz, st.cols[patternIndex(st.name, zz, t) % st.cols.length]]);
+    return runs(out, (a, b, col) => `fill ${x} ${y} ${a} ${x} ${y} ${b} ${B(col)}`);
+}
+// the back wall: the concrete design all the way up
+function standWall(x, y1, y2, z1, z2, st) {
+    const out = [];
+    for (let y = y1; y <= y2; y++) {
+        const row = [];
+        for (let zz = z1; zz <= z2; zz++) row.push([zz, st.cols[patternIndex(st.name, zz, y - y1) % st.cols.length]]);
+        out.push(...runs(row, (a, b, col) => `fill ${x} ${y} ${a} ${x} ${y} ${b} ${B(col)}`));
+    }
+    return out;
+}
+function patternIndex(name, z, y) {
+    const m = (v, k) => ((v % k) + k) % k;
+    switch (name) {
+        case 'waves': return m(Math.round(Math.sin(z / 3) * 1.5) + y, 3);
+        case 'checker': return m(Math.floor(z / 2) + y, 2);
+        case 'stripes': return m(y, 4);
+        case 'diamonds': return Math.abs(m(z, 6) - 3) + Math.abs(m(y, 6) - 3) <= 2 ? 0 : m(y, 2) + 1;
+        case 'bands': return m(Math.floor(z / 4), 3);
+        case 'dots': return m(z, 3) === 0 && m(y, 2) === 0 ? 1 : 0;
+        case 'arrows': return m(z - Math.abs(m(y, 6) - 3), 6) < 2 ? 0 : m(y, 2) ? 1 : 2;
+        default: return 0;
+    }
+}
+// one fill per run of the same block
+function runs(cells, make) {
+    const out = [];
+    let a = null, prev = null, col = null;
+    for (const [z, c] of cells) {
+        if (c === col && z === prev + 1) { prev = z; continue; }
+        if (col) out.push(make(a, prev, col));
+        a = prev = z; col = c;
+    }
+    if (col) out.push(make(a, prev, col));
+    return out;
+}
+function extraCommands() {
+    const [jx, jy, jz] = JAIL, [wx, wy, wz] = WIN;
+    return [
+        `fill ${jx - 2} ${jy - 1} ${jz - 2} ${jx + 2} ${jy + 3} ${jz + 2} ${B('iron_bars')}`,
+        `fill ${jx - 2} ${jy - 1} ${jz - 2} ${jx + 2} ${jy - 1} ${jz + 2} ${B('blue_concrete')}`,
+        `fill ${jx - 2} ${jy + 3} ${jz - 2} ${jx + 2} ${jy + 3} ${jz + 2} ${B('blue_concrete')}`,
+        `fill ${jx - 1} ${jy} ${jz - 1} ${jx + 1} ${jy + 2} ${jz + 1} ${B('air')}`,
+        `fill ${wx - 6} ${wy - 1} ${wz - 6} ${wx + 6} ${wy - 1} ${wz + 6} ${B('gold_block')}`,
+        `fill ${wx - 2} ${wy - 1} ${wz - 2} ${wx + 2} ${wy - 1} ${wz + 2} ${B('emerald_block')}`,
+        `fill ${wx - 6} ${wy} ${wz - 6} ${wx + 6} ${wy} ${wz + 6} ${B('white_concrete')} hollow`,
+        `fill ${wx - 5} ${wy} ${wz - 5} ${wx + 5} ${wy} ${wz + 5} ${B('air')}`,
+        `kill @e[type=minecraft:text_display,tag=wo_sign,x=${wx},y=${wy + 4},z=${wz},distance=..5]`,
+        `summon minecraft:text_display ${wx + 0.5} ${wy + 4} ${wz + 0.5} {Tags:["wo_sign"],billboard:"center",scale:[3f,3f,3f],text:{text:"YOU BEAT ALL 100 LEVELS",color:"gold",bold:true},background:0}`,
+    ];
+}
+
+// ---------- building the world (the same way as the Dropper) ----------
+async function patient(mc, command) {
+    try { return await mc(command); } catch (e) {
+        if (!/timeout/i.test(e.message)) throw e;
+        for (let i = 0; i < 60; i++) { try { await mc('list'); return ''; } catch (e2) { if (!/timeout/i.test(e2.message)) throw e2; } }
+        throw e;
+    }
+}
+function levelParts(L) {
+    const parts = [[]]; let work = 0;
+    for (const c of levelCommands(L)) {
+        const m = /^fill (-?\d+) (-?\d+) (-?\d+) (-?\d+) (-?\d+) (-?\d+)/.exec(c);
+        const wk = m ? (Math.abs(m[4] - m[1]) + 1) * (Math.abs(m[5] - m[2]) + 1) * (Math.abs(m[6] - m[3]) + 1) : 1;
+        if (parts[parts.length - 1].length && (work + wk > 300000 || parts[parts.length - 1].length >= 400)) { parts.push([]); work = 0; }
+        parts[parts.length - 1].push(c); work += wk;
+    }
+    return parts;
+}
+const progressFile = world => path.join(SAVES_DIR, world, 'unbound-wipeout.json');
+function saveProgress(n, world = WIPEOUT_WORLD) {
+    try { fs.writeFileSync(progressFile(world), JSON.stringify({ build: WIPEOUT_BUILD, levels: LEVELS, done: n, saved: new Date().toISOString() }, null, 2)); } catch { }
+}
+export function wipeoutProgress(world = WIPEOUT_WORLD) {
+    try { const p = JSON.parse(fs.readFileSync(progressFile(world), 'utf8')); return p.build === WIPEOUT_BUILD ? Math.min(LEVELS, p.done ?? 0) : 0; } catch { return 0; }
+}
+export function wipeoutBuilt(world = WIPEOUT_WORLD) {
+    try { const p = JSON.parse(fs.readFileSync(progressFile(world), 'utf8')); return p.build === WIPEOUT_BUILD && !!p.built && (p.done ?? 0) >= LEVELS; } catch { return false; }
+}
+export function markWipeoutBuilt(world = WIPEOUT_WORLD) {
+    fs.writeFileSync(progressFile(world), JSON.stringify({ build: WIPEOUT_BUILD, levels: LEVELS, done: LEVELS, built: new Date().toISOString() }, null, 2));
+}
+export async function buildWipeout(mc, { log = () => {}, progress = () => {}, from = 1, to = LEVELS } = {}) {
+    const area = async (x1, z1, x2, z2, fns) => {
+        await mc(`forceload add ${x1} ${z1} ${x2} ${z2}`);
+        for (let i = 0; i < 300; i++) {
+            if (/passed/i.test(await mc(`execute if loaded ${x1} 0 ${z1} if loaded ${x2} 0 ${z2} if loaded ${x1} 0 ${z2} if loaded ${x2} 0 ${z1}`))) break;
+            await new Promise(r => setTimeout(r, 100));
+        }
+        for (const part of fns) {
+            const res = await patient(mc, `function wipeout:${part}`);
+            if (/Unknown|Incorrect|Expected|Invalid|not loaded|Too many|Can't find/i.test(res)) log(`Wipeout build (${part}): ${res.trim().slice(0, 200)}`);
+        }
+        await mc(`forceload remove ${x1} ${z1} ${x2} ${z2}`);
+    };
+    if (from === 1) await area(Math.min(JAIL[0], WIN[0]) - 8, Math.min(JAIL[2], WIN[2]) - 8, Math.max(JAIL[0], WIN[0]) + 8, Math.max(JAIL[2], WIN[2]) + 8, ['build/extra']);
+    for (let n = from; n <= to; n++) {
+        const L = wipeoutLevel(n);
+        // the level in strips of the course's length (forceloading less at once)
+        const x1 = L.x - SPACING_X / 2, x2 = L.x + SPACING_X / 2 - 1, z1 = L.z0 - ROW_GAP / 2, z2 = L.z0 + L.length + ROW_GAP / 2;
+        await area(x1, z1, x2, z2, Array.from({ length: levelParts(L).length }, (_, i) => `build/${n}_${i + 1}`));
+        saveProgress(n);
+        progress(n);
+    }
+    const [sx, sy, sz] = levelStart(wipeoutLevel(1));
+    if (to >= LEVELS) await mc(`setworldspawn ${sx} ${sy} ${sz}`);
+}
+export function buildPackFiles(from, to) {
+    const f = { 'pack.mcmeta': JSON.stringify({ pack: { description: 'Unbound Wipeout: building the levels', min_format: 94, max_format: 999 } }, null, 2) };
+    if (from === 1) f['data/wipeout/function/build/extra.mcfunction'] = extraCommands().join('\n') + '\n';
+    for (let n = from; n <= to; n++) levelParts(wipeoutLevel(n)).forEach((p, i) => { f[`data/wipeout/function/build/${n}_${i + 1}.mcfunction`] = p.join('\n') + '\n'; });
+    return f;
+}
+const BUILD_PACK = 'unbound_wipeout_build';
+export function installWipeoutBuildPack(world = WIPEOUT_WORLD, from = 1, to = LEVELS) {
+    const root = path.join(SAVES_DIR, world, 'datapacks', BUILD_PACK);
+    fs.rmSync(root, { recursive: true, force: true });
+    for (const [rel, text] of Object.entries(buildPackFiles(from, to))) { const q = path.join(root, ...rel.split('/')); fs.mkdirSync(path.dirname(q), { recursive: true }); fs.writeFileSync(q, text); }
+    return `file/${BUILD_PACK}`;
+}
+export function removeWipeoutBuildPack(world = WIPEOUT_WORLD) { fs.rmSync(path.join(SAVES_DIR, world, 'datapacks', BUILD_PACK), { recursive: true, force: true }); }
+
+// ---------- the data pack: the game ----------
+export function packFiles() {
+    const levels = design();
+    const f = {
+        'pack.mcmeta': JSON.stringify({ pack: { description: 'Unbound Wipeout: 100 levels', min_format: 94, max_format: 999 } }, null, 2),
+        'data/minecraft/tags/function/load.json': J({ values: ['wipeout:load'] }),
+        'data/minecraft/tags/function/tick.json': J({ values: ['wipeout:tick'] }),
+        'data/wipeout/tags/block/glove.json': J({ values: ['minecraft:red_wool', 'minecraft:white_wool'] }),
+        'data/wipeout/predicate/on_ground.json': J({ condition: 'minecraft:entity_properties', entity: 'this', predicate: { flags: { is_on_ground: true } } }),
+    };
+    const fn = (name, lines) => { f[`data/wipeout/function/${name}.mcfunction`] = lines.join('\n') + '\n'; };
+    const title = (who, text, sub, color = 'gold', subColor = 'white') => [
+        `title ${who} times 3 30 8`, `title ${who} title ${J({ text, color, bold: true })}`, ...(sub ? [`title ${who} subtitle ${J({ text: sub, color: subColor })}`] : []),
+    ];
+    const periods = [...new Set(levels.flatMap(L => L.periods))];
+
+    fn('load', [
+        ...['wo_level', 'wo_fails', 'wo_jail', 'wo_js', 'wo_v', 'wo_lf', 'wo_ph', 'wo_gen', 'wo_cd', 'wo_bn', 'wo_y', 'wo_cx', 'wo_cy', 'wo_cz', 'wo_cr', 'wo_nz'].map(o => `scoreboard objectives add ${o} dummy`),
+        'scoreboard players set #20 wo_v 20',
+        ...periods.map(p => `scoreboard players set #P${p} wo_v ${p}`),
+        'execute unless score #punch wo_v matches 0..1 run scoreboard players set #punch wo_v 1',
+        'execute unless score #shield wo_v matches 0.. run scoreboard players set #shield wo_v 0',
+        'execute unless score #reset wo_v matches 0.. run scoreboard players set #reset wo_v 0',
+        'execute unless score #gen wo_v matches 0.. run scoreboard players set #gen wo_v 0',
+        'scoreboard players set #pend wo_v 0',
+        'execute unless data storage wipeout:s save run data modify storage wipeout:s save set value "Glowing Jellyfish"',
+        `bossbar add wipeout:level ${J({ text: 'LEVEL 01 / 100', bold: true })}`, 'bossbar set wipeout:level color blue', 'bossbar set wipeout:level max 100', 'bossbar set wipeout:level visible true',
+        `bossbar add wipeout:reset ${J({ text: 'Reset' })}`, 'bossbar set wipeout:reset color red', 'bossbar set wipeout:reset style notched_10',
+        ...['immediate_respawn true', 'keep_inventory true', 'advance_time false', 'advance_weather false', 'spawn_mobs false', 'spawn_monsters false',
+            'show_death_messages false', 'spawn_phantoms false', 'spawn_wandering_traders false', 'fall_damage false', 'mob_griefing false', 'drowning_damage false',
+            'command_block_output false', 'respawn_radius 0', 'locator_bar false'].map(g => `gamerule ${g}`),
+        'time set 6000', 'weather clear',
+    ]);
+    fn('tick', [
+        'execute as @a[tag=!wo_in] run function wipeout:join',
+        'scoreboard players add #t wo_v 1',
+        ...periods.map(p => `scoreboard players operation #m${p} wo_v = #t wo_v`), ...periods.map(p => `scoreboard players operation #m${p} wo_v %= #P${p} wo_v`),
+        // moving parts left from another level (or another try): gone
+        'execute as @e[tag=wo_mv] unless score @s wo_gen = #gen wo_v run function wipeout:gone',
+        // this level's obstacles
+        'execute if score #pend wo_v matches 1.. run function wipeout:pending',
+        'execute if score #pend wo_v matches ..0 run function wipeout:level_tick',
+        'scoreboard players remove @a[scores={wo_cd=1..}] wo_cd 1',
+        // a glove: bounce
+        'execute as @a[tag=wo_in,tag=!wo_ride] at @s if block ~ ~-0.2 ~ #wipeout:glove unless score @s wo_bn matches 1.. unless score @s wo_jail matches 1.. run function wipeout:bounce',
+        'execute as @a[scores={wo_bn=1..}] run function wipeout:bounce_tick',
+        // checkpoints (emerald) and the finish (gold)
+        'execute as @a[tag=wo_in] at @s if block ~ ~-0.2 ~ minecraft:emerald_block unless score @s wo_jail matches 1.. run function wipeout:checkpoint',
+        'execute as @a[tag=wo_in] at @s if block ~ ~-0.2 ~ minecraft:gold_block unless score @s wo_jail matches 1.. unless score @s wo_level matches 101.. run function wipeout:finish',
+        // in the sea, or landed on something below the course (the stands): a wipeout
+        'execute as @a[tag=wo_in] at @s if block ~ ~ ~ minecraft:water unless score @s wo_jail matches 1.. run function wipeout:fail',
+        'execute as @a[tag=wo_in] store result score @s wo_y run data get entity @s Pos[1] 10',
+        `execute as @a[tag=wo_in,tag=!wo_ride] at @s if predicate wipeout:on_ground unless score @s wo_jail matches 1.. if score @s wo_y matches ..${F * 10 - 15} run function wipeout:fail`,
+        `execute as @a[tag=wo_in] if score @s wo_y matches ..${(SEA - 8) * 10} run function wipeout:fail`,
+        'execute as @a[scores={wo_jail=1..}] run function wipeout:jail/tick',
+        'execute as @e[tag=wo_alert] run function wipeout:alert/tick',
+        'execute if score #reset wo_v matches 1.. run function wipeout:reset/tick',
+        'scoreboard players add #hud wo_v 1',
+        'execute if score #hud wo_v matches 10.. as @a[tag=wo_in] run function wipeout:hud',
+        'execute if score #hud wo_v matches 10.. run scoreboard players set #hud wo_v 0',
+        'execute if score #hud wo_v matches 0 run kill @e[type=minecraft:arrow,tag=!wo_keep,nbt={inGround:1b}]',
+    ]);
+    fn('gone', ['scoreboard players reset @s wo_ph', 'scoreboard players reset @s wo_gen', 'kill @s']);
+    fn('join', [
+        'tag @s add wo_in', 'gamemode adventure @s', 'clear @s',
+        'execute unless score @s wo_level matches 1.. run scoreboard players set @s wo_level 1',
+        'function wipeout:goto',
+        ...title('@s', 'WIPEOUT', '100 levels in the sky. Red knocks you off. Emerald saves your place.', 'aqua'),
+    ]);
+    fn('hud', [
+        'effect give @s minecraft:night_vision infinite 0 true', 'effect give @s minecraft:saturation infinite 0 true', 'effect give @s minecraft:resistance infinite 4 true',
+        'execute store result storage wipeout:h level int 1 run scoreboard players get @s wo_level',
+        'data modify storage wipeout:h pad set value ""', 'execute if score @s wo_level matches ..9 run data modify storage wipeout:h pad set value "0"',
+        'execute if score @s wo_level matches ..100 run function wipeout:hud_bar with storage wipeout:h',
+        `execute if score @s wo_level matches 101.. run bossbar set wipeout:level name ${J({ text: 'EVERY LEVEL DONE', color: 'gold', bold: true })}`,
+        'scoreboard players operation @s wo_js = @s wo_jail', 'scoreboard players add @s wo_js 19', 'scoreboard players operation @s wo_js /= #20 wo_v',
+        `execute if score @s wo_jail matches 1.. run return run title @s actionbar ${J([{ text: 'IN JAIL  ', color: 'red', bold: true }, { score: { name: '@s', objective: 'wo_js' }, color: 'white', bold: true }, { text: 's', color: 'red', bold: true }])}`,
+        'execute store result storage wipeout:h shield int 1 run scoreboard players get #shield wo_v',
+        'execute store result storage wipeout:h fails int 1 run scoreboard players get @s wo_fails',
+        'data modify storage wipeout:h punch set value "ON"', 'execute if score #punch wo_v matches 0 run data modify storage wipeout:h punch set value "OFF"',
+        'data modify storage wipeout:h pc set value "red"', 'execute if score #punch wo_v matches 0 run data modify storage wipeout:h pc set value "green"',
+        'execute if score #shield wo_v matches 1.. run return run function wipeout:hud_shield with storage wipeout:h',
+        'function wipeout:hud_line with storage wipeout:h',
+    ]);
+    fn('hud_bar', [
+        '$bossbar set wipeout:level name {"text":"LEVEL $(pad)$(level) / 100","color":"white","bold":true}',
+        'execute store result bossbar wipeout:level value run scoreboard players get @s wo_level',
+        'bossbar set wipeout:level players @a[tag=wo_in]',
+    ]);
+    fn('hud_line', [`$title @s actionbar [${J({ text: 'Wipeouts ', color: 'aqua' })},${J({ text: '$(fails)', color: 'white' })},${J({ text: '     Punches ', color: 'aqua' })},{"text":"$(punch)","color":"$(pc)","bold":true}]`]);
+    fn('hud_shield', [`$title @s actionbar [${J({ text: 'Wipeouts ', color: 'aqua' })},${J({ text: '$(fails)', color: 'white' })},${J({ text: '     Punches ', color: 'aqua' })},{"text":"$(punch)","color":"$(pc)","bold":true},${J({ text: '     Shield x$(shield)', color: 'aqua', bold: true })}]`]);
+    // a gift's alert in front of you (the same as the Dropper's)
+    fn('alert', [
+        'kill @e[tag=wo_alert]',
+        '$execute at @s anchored eyes positioned ^ ^0.4 ^5 run summon minecraft:text_display ~ ~ ~ {Tags:["wo_alert","wo_alert_text","wo_anew"],billboard:"center",teleport_duration:2,shadow:1b,background:0,scale:[1.3f,1.3f,1.3f],text:[{text:"$(who)",color:"gold",bold:true},{text:"\\n$(what)",color:"$(color)"}]}',
+        'scoreboard players set @e[tag=wo_anew] wo_lf 70', 'tag @e[tag=wo_anew] remove wo_anew',
+    ]);
+    fn('alert/tick', [
+        'scoreboard players remove @s wo_lf 1',
+        'execute if score @s wo_lf matches ..0 run return run kill @s',
+        'execute at @p[tag=wo_in] anchored eyes positioned ^ ^0.4 ^5 run tp @s ~ ~ ~',
+    ]);
+
+    // ---- levels: going to one, its obstacles each tick, each try ----
+    fn('goto', [
+        'execute if score @s wo_jail matches 1.. run return 0',
+        'execute if score @s wo_level matches ..0 run scoreboard players set @s wo_level 1',
+        'execute if score @s wo_level matches 101.. run return run function wipeout:win_tp',
+        ...levels.map(L => `execute if score @s wo_level matches ${L.n} run return run function wipeout:lvl/${L.n}`),
+    ]);
+    // each tick: the obstacles of the level being played (split in tens, so it's a few checks a tick)
+    fn('level_tick', Array.from({ length: 10 }, (_, k) => `execute if score #lvl wo_v matches ${k * 10 + 1}..${k * 10 + 10} run function wipeout:lt/${k}`));
+    for (let k = 0; k < 10; k++) fn(`lt/${k}`, levels.slice(k * 10, k * 10 + 10).map(L => `execute if score #lvl wo_v matches ${L.n} run return run function wipeout:lvl/${L.n}/tick`));
+    for (const L of levels) {
+        const [x, y, z] = levelStart(L);
+        const lo = L.x - Math.floor((L.w - 1) / 2) - 14, hi = L.x + 16, zEnd = L.z0 + L.length;
+        fn(`lvl/${L.n}`, [
+            'scoreboard players set @s wo_lf 0',
+            `scoreboard players set #lvl wo_v ${L.n}`,
+            // this level's area stays loaded while you're on it (its moving parts are summoned once it is)
+            'forceload remove all', `forceload add ${lo} ${L.z0} ${hi} ${zEnd}`,
+            `scoreboard players set @s wo_cx ${x}`, `scoreboard players set @s wo_cy ${y}`, `scoreboard players set @s wo_cz ${z}`, `scoreboard players set @s wo_cr ${z}`,
+            'function wipeout:respawn',
+            `title @s times 3 30 8`, `title @s title ${J({ text: `Level ${L.n}`, color: 'aqua', bold: true })}`, `title @s subtitle ${J({ text: L.name, color: 'white' })}`,
+            ...(L.n > 1 && (L.n - 1) % 10 === 0 ? [`title @s times 5 50 12`, `title @s title ${J({ text: `${L.n - 1} LEVELS DONE!`, color: 'gold', bold: true })}`, `title @s subtitle ${J({ text: `${LEVELS - L.n + 1} to go`, color: 'yellow', bold: true })}`].map(l => `execute if entity @s[tag=wo_done] run ${l}`) : []),
+        ]);
+        fn(`lvl/${L.n}/tick`, L.parts.flatMap(p => p.tick));
+        fn(`lvl/${L.n}/ready`, [`execute if loaded ${lo} 0 ${L.z0} if loaded ${hi} 0 ${zEnd} if loaded ${lo} 0 ${zEnd} if loaded ${hi} 0 ${L.z0} run function wipeout:lvl/${L.n}/spawn`]);
+        // the moving parts, summoned fresh each try (and the doors' right door picked again)
+        fn(`lvl/${L.n}/spawn`, [
+            'scoreboard players set #pend wo_v 0',
+            'scoreboard players add #gen wo_v 1',
+            ...L.parts.flatMap(p => p.spawn),
+            'scoreboard players operation @e[tag=wo_new] wo_gen = #gen wo_v', 'tag @e[tag=wo_new] remove wo_new',
+            ...L.parts.flatMap(p => p.reroll),
+        ]);
+        for (const p of L.parts) for (const [name, lines] of Object.entries(p.fns)) fn(`lvl/${L.n}/${p.id}_${name}`, lines);
+    }
+    // to your checkpoint (or the level's start), everything set up fresh
+    fn('respawn', [
+        'ride @s dismount', 'tag @s remove wo_ride', 'effect clear @s minecraft:levitation', 'scoreboard players set @s wo_bn 0',
+        'execute store result storage wipeout:c x int 1 run scoreboard players get @s wo_cx',
+        'execute store result storage wipeout:c y int 1 run scoreboard players get @s wo_cy',
+        'execute store result storage wipeout:c z int 1 run scoreboard players get @s wo_cz',
+        'function wipeout:respawn_tp with storage wipeout:c',
+        // the moving parts are summoned fresh (once the level's area is loaded)
+        'scoreboard players operation #pend wo_v = #lvl wo_v',
+    ]);
+    fn('respawn_tp', ['$tp @s $(x).5 $(y) $(z).5 0 0', '$spawnpoint @s $(x) $(y) $(z) 0 0']);
+    fn('pending', ['execute store result storage wipeout:c n int 1 run scoreboard players get #pend wo_v', 'function wipeout:pending_n with storage wipeout:c']);
+    fn('pending_n', ['$function wipeout:lvl/$(n)/ready']);
+    // standing on emerald: your place is saved (a new checkpoint further on says so)
+    fn('checkpoint', [
+        'execute store result score @s wo_nz run data get entity @s Pos[2]',
+        'execute if score @s wo_nz <= @s wo_cr run return 0',
+        'scoreboard players operation @s wo_cr = @s wo_nz', 'scoreboard players add @s wo_cr 2',
+        'execute store result score @s wo_cx run data get entity @s Pos[0]',
+        'execute store result score @s wo_cy run data get entity @s Pos[1]',
+        'scoreboard players operation @s wo_cz = @s wo_nz',
+        `title @s actionbar ${J({ text: 'CHECKPOINT!', color: 'green', bold: true })}`,
+        'playsound minecraft:block.note_block.chime master @s ~ ~ ~ 1 1.4',
+        'particle minecraft:happy_villager ~ ~0.5 ~ 0.6 0.3 0.6 0 20 force @s',
+    ]);
+    // the finish: on to the next level
+    fn('finish', [
+        'playsound minecraft:ui.toast.challenge_complete master @s ~ ~ ~ 0.8 1.3',
+        'scoreboard players add @s wo_level 1', 'tag @s add wo_done', 'schedule function wipeout:done_clear 2t',
+        'execute if score @s wo_level matches 101.. run return run function wipeout:win',
+        'function wipeout:goto',
+    ]);
+    fn('done_clear', ['tag @a remove wo_done']);
+    // a wipeout: back to your checkpoint
+    const quips = ['WIPEOUT!', 'SPLASH!', 'OOF!', 'IN THE DRINK!', 'BELLY FLOP!', 'SWIM BACK!'];
+    fn('fail', [
+        'scoreboard players add @s wo_fails 1', 'scoreboard players add @s wo_lf 1',
+        'playsound minecraft:entity.generic.splash master @s ~ ~ ~ 1 0.9', 'playsound minecraft:entity.player.hurt master @s ~ ~ ~ 0.5 1',
+        'execute store result score #q wo_v run random value 0..5',
+        ...quips.map((q, i) => `execute if score #q wo_v matches ${i} run title @s actionbar ${J({ text: q, color: 'aqua', bold: true })}`),
+        'function wipeout:respawn',
+    ]);
+    // hit by something red: knocked away from it (an arrow with Punch from its side, no damage: you
+    // have Resistance). $(p): how hard (1 or 2).
+    fn('hit', [
+        'execute if score @s wo_cd matches 1.. run return 0',
+        'execute if score @s wo_jail matches 1.. run return 0',
+        'scoreboard players set @s wo_cd 12',
+        'ride @s dismount', 'tag @s remove wo_ride',
+        'playsound minecraft:entity.player.attack.knockback master @a ~ ~ ~ 1 0.8',
+        'playsound minecraft:block.wool.break master @a ~ ~ ~ 1 0.7',
+        // which way: from here (what hit you) to you, flat
+        'execute facing entity @s feet rotated ~ 0 positioned as @s positioned ^ ^ ^1 summon minecraft:marker run tag @s add wo_dir',
+        'execute store result score #dx wo_v run data get entity @e[tag=wo_dir,limit=1] Pos[0] 1000',
+        'execute store result score #dz wo_v run data get entity @e[tag=wo_dir,limit=1] Pos[2] 1000',
+        'execute store result score #px wo_v run data get entity @s Pos[0] 1000', 'execute store result score #pz wo_v run data get entity @s Pos[2] 1000',
+        'scoreboard players operation #dx wo_v -= #px wo_v', 'scoreboard players operation #dz wo_v -= #pz wo_v',
+        'kill @e[tag=wo_dir]',
+        '$execute facing entity @s feet rotated ~ 0 positioned as @s positioned ^ ^1.0 ^-0.8 run summon minecraft:arrow ~ ~ ~ {Tags:["wo_ar"],damage:1.0d,pickup:2b,weapon:{id:"minecraft:bow",count:1,components:{"minecraft:enchantments":{"minecraft:punch":$(p)}}}}',
+        'execute store result entity @e[tag=wo_ar,limit=1] Motion[0] double 0.0018 run scoreboard players get #dx wo_v',
+        'data modify entity @e[tag=wo_ar,limit=1] Motion[1] set value 0.05d',
+        'execute store result entity @e[tag=wo_ar,limit=1] Motion[2] double 0.0018 run scoreboard players get #dz wo_v',
+        'tag @e[tag=wo_ar] remove wo_ar',
+    ]);
+    // gloves: a short push up (about 4 blocks)
+    fn('bounce', ['effect give @s minecraft:levitation 1 34 true', 'scoreboard players set @s wo_bn 4', 'playsound minecraft:entity.slime.jump master @a ~ ~ ~ 1 0.7', 'particle minecraft:cloud ~ ~ ~ 0.4 0.1 0.4 0.05 8']);
+    fn('bounce_tick', ['scoreboard players remove @s wo_bn 1', 'execute if score @s wo_bn matches 0 run effect clear @s minecraft:levitation']);
+    // the zipline's end: you're let go over the next platform
+    fn('zip_end', ['execute on passengers run tag @s remove wo_ride', 'execute on passengers run ride @s dismount', 'execute at @s run kill @e[tag=wo_ziph,distance=..3]', 'kill @s']);
+    const [wx, wy, wz] = WIN;
+    fn('win_tp', ['forceload remove all', `tp @s ${wx + 0.5} ${wy} ${wz + 0.5}`, `spawnpoint @s ${wx} ${wy} ${wz}`, 'scoreboard players set #lvl wo_v 0', 'scoreboard players set #pend wo_v 0']);
+    fn('win', [
+        'scoreboard players set @s wo_level 101', 'function wipeout:win_tp',
+        ...title('@s', 'YOU BEAT WIPEOUT', 'All 100 levels!'),
+        'playsound minecraft:ui.toast.challenge_complete master @s ~ ~ ~ 1 1',
+        ...[[3, 0, 16711680], [-3, 2, 65280], [0, -3, 3447003], [2, 3, 16766720]].map(([dx, dz, col]) =>
+            `summon minecraft:firework_rocket ~${dx} ~1 ~${dz} {LifeTime:30,FireworksItem:{id:"minecraft:firework_rocket",count:1,components:{"minecraft:fireworks":{flight_duration:2,explosions:[{shape:"large_ball",colors:[I;${col}],has_trail:1b,has_twinkle:1b}]}}}}`),
+    ]);
+
+    // ---- gifts (the same as the Dropper's) ----
+    fn('up', [
+        'execute if score @s wo_level matches 100.. run return 0',
+        '$scoreboard players add @s wo_level $(n)',
+        'execute if score @s wo_level matches 101.. run scoreboard players set @s wo_level 100',
+        'playsound minecraft:entity.player.levelup master @s ~ ~ ~ 1 1.5',
+        '$title @s actionbar {"text":"+$(n) level(s)!","color":"green","bold":true}',
+        'function wipeout:goto',
+    ]);
+    fn('down', [
+        '$scoreboard players remove @s wo_level $(n)',
+        'execute if score @s wo_level matches ..0 run scoreboard players set @s wo_level 1',
+        'playsound minecraft:entity.villager.no master @s ~ ~ ~ 1 0.8',
+        '$title @s actionbar {"text":"-$(n) level(s)","color":"red","bold":true}',
+        'function wipeout:goto',
+    ]);
+    fn('jail', [
+        'execute unless score @s wo_jail matches 1.. run function wipeout:jail/enter',
+        '$scoreboard players add @s wo_jail $(ticks)',
+        'execute if score @s wo_jail matches 7200.. run scoreboard players set @s wo_jail 7200',
+    ]);
+    fn('jail/enter', [
+        'ride @s dismount', 'tag @s remove wo_ride',
+        'execute at @s run fill ~-1 ~ ~-1 ~1 ~2 ~1 minecraft:iron_bars replace minecraft:air',
+        'execute at @s run fill ~ ~ ~ ~ ~1 ~ minecraft:air replace minecraft:iron_bars',
+        'execute at @s run fill ~-1 ~3 ~-1 ~1 ~3 ~1 minecraft:iron_bars replace minecraft:air',
+        'effect give @s minecraft:jump_boost 9999 250 true',
+        'playsound minecraft:block.iron_door.close master @s ~ ~ ~ 1 0.8', ...title('@s', 'JAILED', '', 'red'),
+    ]);
+    fn('jail/tick', ['scoreboard players remove @s wo_jail 1', 'execute if score @s wo_jail matches ..0 run function wipeout:jail/free']);
+    fn('jail/free', ['scoreboard players set @s wo_jail 0', 'execute at @s run fill ~-1 ~ ~-1 ~1 ~3 ~1 minecraft:air replace minecraft:iron_bars', 'effect clear @s minecraft:jump_boost', 'playsound minecraft:block.iron_door.open master @s ~ ~ ~ 1 1', ...title('@s', 'FREE', '', 'green')]);
+    // punches: an arrow with Punch II from a random side (only while punches are on)
+    fn('punch', [
+        `execute if score #punch wo_v matches 0 run return run title @s actionbar ${J({ text: 'Punches are OFF', color: 'green', bold: true })}`,
+        'execute store result storage wipeout:p vy double 0.001 run data get entity @s Motion[1] 1000',
+        'execute store result score #r wo_v run random value 0..7',
+        ...Array.from({ length: 8 }, (_, i) => `execute if score #r wo_v matches ${i} run return run function wipeout:punch/d${i} with storage wipeout:p`),
+    ]);
+    const arrow = (mx, mz) => `summon minecraft:arrow ~ ~ ~ {Motion:[${mx.toFixed(3)}d,$(vy)d,${mz.toFixed(3)}d],damage:2.0d,crit:1b,pickup:2b,weapon:{id:"minecraft:bow",count:1,components:{"minecraft:enchantments":{"minecraft:punch":2}}}}`;
+    for (let i = 0; i < 8; i++) {
+        const a = i * Math.PI / 4, dx = Math.sin(a) * 0.45, dz = Math.cos(a) * 0.45, s = 2 / 0.45;
+        fn(`punch/d${i}`, [
+            'playsound minecraft:entity.arrow.shoot master @a ~ ~1 ~ 1 1',
+            `$execute positioned ~${dx.toFixed(3)} ~1.1 ~${dz.toFixed(3)} if block ~ ~ ~ #minecraft:replaceable run return run ${arrow(-dx * s, -dz * s)}`,
+            `$execute positioned ~${(-dx).toFixed(3)} ~1.1 ~${(-dz).toFixed(3)} if block ~ ~ ~ #minecraft:replaceable run return run ${arrow(dx * s, dz * s)}`,
+            `execute positioned ~ ~2.3 ~ run ${arrow(0, 0).replace('$(vy)d', '-2.0d')}`,
+        ]);
+    }
+    fn('punch_toggle', [
+        'execute store success score #was wo_v if score #punch wo_v matches 1',
+        'execute if score #was wo_v matches 1 run scoreboard players set #punch wo_v 0',
+        'execute if score #was wo_v matches 0 run scoreboard players set #punch wo_v 1',
+        ...title('@a', 'PUNCHES ON', 'Arrows can knock you around', 'red').map(l => `execute if score #punch wo_v matches 1 run ${l}`),
+        ...title('@a', 'PUNCHES OFF', 'No more arrows', 'green').map(l => `execute if score #punch wo_v matches 0 run ${l}`),
+        'execute as @a at @s run playsound minecraft:block.lever.click master @s ~ ~ ~ 1 1',
+    ]);
+    // the reset countdown and the save (the same as the Dropper's)
+    fn('reset/start', [
+        '$data modify storage wipeout:s save set value "$(save)"',
+        'execute if score #shield wo_v matches 1.. run return run function wipeout:reset/blocked',
+        'execute if score #reset wo_v matches 1.. run return 0',
+        '$scoreboard players set #reset wo_v $(ticks)',
+        '$bossbar set wipeout:reset max $(secs)',
+        'bossbar set wipeout:reset players @a', 'bossbar set wipeout:reset visible true',
+        'function wipeout:reset/second',
+        ...title('@a', 'RESET INCOMING', '').slice(0, 2),
+        '$title @a subtitle {"text":"$(save) saves you","color":"aqua"}',
+        'execute as @a at @s run playsound minecraft:block.bell.use master @s ~ ~ ~ 1 0.6',
+    ]);
+    fn('reset/blocked', ['scoreboard players remove #shield wo_v 1', ...title('@a', 'RESET BLOCKED', 'Your shield took it', 'aqua'), 'execute as @a at @s run playsound minecraft:item.shield.block master @s ~ ~ ~ 1 1']);
+    fn('reset/tick', [
+        'scoreboard players remove #reset wo_v 1',
+        'scoreboard players operation #m wo_v = #reset wo_v', 'scoreboard players operation #m wo_v %= #20 wo_v',
+        'execute if score #m wo_v matches 0 run function wipeout:reset/second',
+        'execute if score #reset wo_v matches ..0 run function wipeout:reset/boom',
+    ]);
+    fn('reset/second', [
+        'scoreboard players operation #secs wo_v = #reset wo_v', 'scoreboard players add #secs wo_v 19', 'scoreboard players operation #secs wo_v /= #20 wo_v',
+        'execute store result bossbar wipeout:reset value run scoreboard players get #secs wo_v',
+        'execute store result storage wipeout:s secs int 1 run scoreboard players get #secs wo_v',
+        'function wipeout:reset/name with storage wipeout:s',
+        'execute if score #secs wo_v matches 1..10 run function wipeout:reset/flash with storage wipeout:s',
+    ]);
+    fn('reset/name', [`$bossbar set wipeout:reset name [${J({ text: 'RESET IN $(secs)s', color: 'red', bold: true })},${J({ text: '   $(save) saves you', color: 'aqua' })}]`]);
+    fn('reset/flash', ['title @a times 0 14 4', '$title @a title {"text":"$(secs)","color":"red","bold":true}', 'title @a subtitle ""', 'execute as @a at @s run playsound minecraft:block.note_block.pling master @s ~ ~ ~ 1 0.8']);
+    fn('reset/boom', [
+        'scoreboard players set #reset wo_v 0', 'bossbar set wipeout:reset visible false',
+        'execute as @a[tag=wo_in] run scoreboard players set @s wo_level 1',
+        'execute as @a[tag=wo_in] run function wipeout:goto',
+        ...title('@a', 'RESET!', 'Back to level 1', 'red'),
+        'execute as @a at @s run playsound minecraft:entity.wither.death master @s ~ ~ ~ 0.6 1',
+    ]);
+    fn('save', [
+        'execute if score #reset wo_v matches 1.. run return run function wipeout:save/stop',
+        'scoreboard players add #shield wo_v 1', 'execute if score #shield wo_v matches 4.. run scoreboard players set #shield wo_v 3',
+        ...title('@a', 'SHIELD READY', 'The next reset gets blocked', 'aqua'),
+        'execute as @a at @s run playsound minecraft:item.armor.equip_diamond master @s ~ ~ ~ 1 1',
+    ]);
+    fn('save/stop', [
+        'scoreboard players set #reset wo_v 0', 'bossbar set wipeout:reset visible false',
+        ...title('@a', 'SAVED!', 'The reset is stopped', 'green'),
+        'execute as @a at @s run playsound minecraft:ui.toast.challenge_complete master @s ~ ~ ~ 1 1.2',
+    ]);
+    return f;
+}
+
+// Writes the pack into the Wipeout world (making its folder if the world isn't made yet).
+export function installWipeoutPack(world = WIPEOUT_WORLD) {
+    const root = path.join(SAVES_DIR, world, 'datapacks', 'unbound_wipeout');
+    const files = packFiles();
+    let changed = false;
+    for (const [rel, text] of Object.entries(files)) {
+        const p = path.join(root, ...rel.split('/'));
+        if (fs.existsSync(p) && fs.readFileSync(p, 'utf8') === text) continue;
+        fs.mkdirSync(path.dirname(p), { recursive: true });
+        fs.writeFileSync(p, text);
+        changed = true;
+    }
+    const prune = (dir, rel) => {
+        for (const e of fs.existsSync(dir) ? fs.readdirSync(dir, { withFileTypes: true }) : []) {
+            const q = path.join(dir, e.name), r = `${rel}/${e.name}`;
+            if (e.isDirectory()) { prune(q, r); if (!fs.readdirSync(q).length) fs.rmdirSync(q); }
+            else if (!files[r]) { fs.rmSync(q); changed = true; }
+        }
+    };
+    prune(path.join(root, 'data'), 'data');
+    return changed;
+}
+
+// The commands for a gift action (run as you, at you): the same actions as the Dropper's
+export const WIPEOUT_ACTIONS = new Set(['punch', 'punchToggle', 'levelUp', 'levelDown', 'resetTimer', 'saveReset', 'jail', 'levelWheel']);
+export function wipeoutCommands(a, times, { saveGift = 'Glowing Jellyfish' } = {}) {
+    const n = (v, lo, hi, def) => Math.max(lo, Math.min(hi, Number.isFinite(+v) && +v > 0 ? Math.round(+v) : def));
+    switch (a.type) {
+        case 'punch': return Array(Math.min(n(a.amount, 1, 10, 1) * times, 10)).fill('function wipeout:punch');
+        case 'punchToggle': return ['function wipeout:punch_toggle'];
+        case 'levelUp': return [`function wipeout:up {n:${Math.min(99, n(a.amount, 1, 99, 1) * times)}}`];
+        case 'levelDown': return [`function wipeout:down {n:${Math.min(99, n(a.amount, 1, 99, 1) * times)}}`];
+        case 'resetTimer': { const s = n(a.seconds, 5, 600, 60); return [`function wipeout:reset/start {ticks:${s * 20},secs:${s},save:"${String(saveGift).replace(/[^\w ]/g, '').slice(0, 30) || 'a save gift'}"}`]; }
+        case 'saveReset': return ['function wipeout:save'];
+        case 'jail': return [`function wipeout:jail {ticks:${Math.min(7200, n(a.seconds, 1, 360, 5) * times * 20)}}`];
+        default: return [];
+    }
+}

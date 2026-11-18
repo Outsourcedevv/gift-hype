@@ -1371,7 +1371,7 @@ const MENU_LOOK = { menuX: 2, menuY: 50, menuScale: 1, menuRows: 7, menuTitle: '
 // ----- Boxes on the overlay: show / hide, width, height and size of each one -----
 const BOXES = [
   { k: 'popups', name: 'Gift popups' }, { k: 'menu', name: 'Gift list' }, { k: 'timer', name: 'Timer (Chunk Chat / Chat Teleport)' },
-  { k: 'chatdel', name: 'Block delete list' }, { k: 'reset', name: 'Reset countdown (Dropper)' }, { k: 'reveal', name: 'Chunk reveal (Chunk Chat)' },
+  { k: 'chatdel', name: 'Block delete list' }, { k: 'reset', name: 'Reset countdown (Dropper, Wipeout)' }, { k: 'reveal', name: 'Chunk reveal (Chunk Chat)' },
 ];
 const boxPlace = k => (settings.overlay.place || {})[k] || {};
 const boxShown = k => k === 'menu' ? settings.overlay.menu !== false : !boxPlace(k).hide;
@@ -1750,7 +1750,7 @@ function renderStatus() {
     const m = status.minecraft;
     dot = m === 'connected' ? 'on' : ['connecting', 'offline', 'downloading', 'starting'].includes(m) ? 'wait' : '';
     text = {
-      connected: isDropperMode() ? (/building/.test(status.dropper || '') ? `Building the Dropper: ${status.dropper.replace('building ', '')} levels…` : 'The Dropper is ready') : game?.minecraft?.single ? `Your world is ready: ${game.minecraft.world}` : 'Minecraft connected',
+      connected: isDropperMode() ? (/building/.test(status.dropper || '') ? `Building ${courseName()}: ${status.dropper.replace('building ', '')} levels…` : `${courseName()[0].toUpperCase() + courseName().slice(1)} is ready`) : game?.minecraft?.single ? `Your world is ready: ${game.minecraft.world}` : 'Minecraft connected',
       connecting: 'Connecting to Minecraft…',
       offline: 'Waiting for your Minecraft server to start',
       'no server picked': 'Minecraft: pick your server',
@@ -1761,8 +1761,8 @@ function renderStatus() {
       'no world picked': 'Minecraft: pick your world',
       'world not found': 'Minecraft: world not found',
       'eula not accepted': 'Minecraft: tick the EULA box',
-      'java missing': 'Minecraft: Java not found',
-      downloading: 'Getting Minecraft ready (first time only)…',
+      'java missing': "Minecraft: Java couldn't be downloaded",
+      downloading: 'Downloading Java and Minecraft (first time only)…',
       starting: 'Opening your world…',
       'world open in singleplayer': 'Close the world in singleplayer first',
       'world closed': 'Your world is closed',
@@ -1775,6 +1775,8 @@ function renderStatus() {
   } else if (c === 'keys') { dot = 'on'; text = 'Key presses ready'; }
   $('gmDot').className = 'dot ' + dot;
   $('gmText').textContent = text;
+  // while Play is getting everything ready, its button says what it's doing
+  if (playing_ && $('playMc')) $('playMc').textContent = /ready|connected/i.test(text) && !/building/i.test(text) ? 'Opening Minecraft…' : text;
   const mcs = $('mcState');
   if (mcs) mcs.textContent = text;
   const wsc = $('wsCount');
@@ -1788,7 +1790,7 @@ const coverHtml = g => g.cover
   ? `<img src="/cover/${encodeURIComponent(g.id)}?v=${g.cover}" alt="" onerror="this.outerHTML='<div class=blank>'+this.dataset.name+'</div>'" data-name="${esc(esc(g.name))}">`
   : `<div class="blank">${esc(g.name)}</div>`;
 // A type's cover: its own picture, or the built-in one for Dropper / Block Delete / Parkour
-const TYPE_ART = [[/dropper/i, '/img/type-dropper.svg'], [/block delete/i, '/img/type-blockdelete.svg'], [/chunk chat/i, '/img/type-chunkchat.svg'], [/chat teleport/i, '/img/type-chatteleport.svg'], [/parkour/i, '/img/type-parkour.svg']];
+const TYPE_ART = [[/dropper/i, '/img/type-dropper.svg'], [/wipe ?out/i, '/img/type-wipeout.svg'], [/block delete/i, '/img/type-blockdelete.svg'], [/chunk chat/i, '/img/type-chunkchat.svg'], [/chat teleport/i, '/img/type-chatteleport.svg'], [/parkour/i, '/img/type-parkour.svg']];
 const typeCoverHtml = m => {
   if (m.cover) return `<img src="/cover/${encodeURIComponent(game.id)}?mode=${encodeURIComponent(m.id)}&v=${encodeURIComponent(m.cover)}" alt="">`;
   const art = TYPE_ART.find(([re]) => re.test(m.name || ''));
@@ -1871,7 +1873,10 @@ $('nCreate').onclick = async () => {
 // ----- Types (e.g. Minecraft: Parkour Paradise / Block Delete Survival), each with its own gifts -----
 const curMode = () => game.modes.find(m => m.id === game.mode) || game.modes[0];
 const R = () => curMode().rules;
-const isDropperMode = () => game?.connector === 'minecraft' && /dropper/i.test(curMode().name || '');
+// a level game: the Dropper or Wipeout (100 levels in a world of their own; the same gifts)
+const isDropperMode = () => game?.connector === 'minecraft' && /dropper|wipe ?out/i.test(curMode().name || '');
+const isWipeoutMode = () => game?.connector === 'minecraft' && /wipe ?out/i.test(curMode().name || '');
+const courseName = () => isWipeoutMode() ? 'Wipeout' : 'the Dropper';
 function renderTypes() {
   const box = $('typeBox'), many = game.modes.length > 1;
   box.innerHTML = many ? `<h2 style="margin-top:18px">Type <span class="right" style="font-weight:400;text-transform:none">gifts do what the picked one says</span></h2>
@@ -1985,11 +1990,25 @@ function renderPlay() {
     playing_ = true; renderPlay();
     try {
       await flushSave();
-      const r = await api('/api/minecraft/play', {});
-      toast(r.quick === false ? 'Minecraft is opening: play, then Multiplayer, then "Unbound"' : 'Minecraft is opening: press Play on "Unbound"');
-    } catch (e) { toast(e.message, true); }
-    playing_ = false; renderPlay();
+      await api('/api/minecraft/play', {});
+      toast('Getting everything ready. Minecraft opens by itself when it is (the first time downloads Java and the game, so it takes a few minutes)');
+    } catch (e) { toast(e.message, true); playing_ = false; renderPlay(); }
   };
+}
+// Play runs in the background on the app's side: this follows it through the status updates
+let playSeen_ = null;
+function followPlay() {
+  const p = status.play;
+  if (!p) return;
+  const key = p.state + ':' + (p.at || '');
+  if (key === playSeen_) return;
+  const first = playSeen_ === null;
+  playSeen_ = key;
+  const busy = p.state === 'getting ready';
+  if (busy !== playing_) { playing_ = busy; renderPlay(); if (busy) renderStatus(); }
+  if (first) return; // don't repeat an old result when the app is reopened
+  if (p.state === 'opened') toast(p.quick === false ? 'Minecraft is opening: play, then Multiplayer, then "Unbound"' : 'Minecraft is opening: press Play on "Unbound"');
+  else if (p.state === 'failed') toast(p.error || 'Minecraft could not be opened', true);
 }
 
 async function renderMinecraftBox() {
@@ -1998,13 +2017,14 @@ async function renderMinecraftBox() {
   const m = game.minecraft;
   if (isDropperMode()) {
     box.innerHTML = `<div class="conn-box">
-        <p class="wide" style="margin:0"><b>The Dropper has its own world</b>, made by Unbound: 100 levels that get harder as you go. Fall through the gaps and land in the water to go to the next level. Hit anything else and you start that level again.</p>
+        ${isWipeoutMode() ? `<p class="wide" style="margin:0"><b>Wipeout has its own world</b>, made by Unbound: 100 obstacle courses in the sky over warm sea water, with stands on both sides. Get past spinners, sliding cubes, moving walls, punching gloves, crushers, the zipline and the doors to the gold finish pad. Anything red knocks you off; red and white boxing gloves bounce you up; emerald pads save your place. Fall in the sea and you're back at your last emerald. Levels 1 to 80 take about 15 to 20 seconds, after that they get longer.</p>`
+          : `<p class="wide" style="margin:0"><b>The Dropper has its own world</b>, made by Unbound: 100 levels that get harder as you go. Fall through the gaps and land in the water to go to the next level. Hit anything else and you start that level again.</p>`}
         <div class="wide"><label class="check"><input type="checkbox" id="mcEula" ${settings.mcEula ? 'checked' : ''}> I agree to the <a href="https://aka.ms/MinecraftEULA" target="_blank" rel="noopener" style="color:var(--main-text)">Minecraft EULA</a> (needed to open the world for gifts)</label></div>
         <div class="wide row"><button class="small" id="mcRestart">Reopen world</button><span class="pill" id="mcState"></span></div>
       </div>
-      <p class="hint"><b>How to play:</b> press <b>Play Minecraft</b>. The first time, Unbound makes the world and builds the levels (about a minute). Your level, punches on/off and any shield are shown at the bottom of your screen, and the reset countdown at the top.</p>`;
+      <p class="hint"><b>How to play:</b> press <b>Play Minecraft</b>. The first time, Unbound makes the world and builds the levels (${isWipeoutMode() ? 'a few minutes' : 'about a minute'}). Your level, ${isWipeoutMode() ? 'wipeouts' : 'fails'}, punches on/off and any shield are shown at the bottom of your screen, and the reset countdown at the top.</p>`;
     $('mcEula').onchange = () => { settings.mcEula = $('mcEula').checked; api('/api/settings', { mcEula: settings.mcEula }); };
-    $('mcRestart').onclick = async () => { try { await api('/api/minecraft/restart-world', {}); toast('Reopening the Dropper…'); } catch (e) { toast(e.message, true); } };
+    $('mcRestart').onclick = async () => { try { await api('/api/minecraft/restart-world', {}); toast(`Reopening ${courseName()}…`); } catch (e) { toast(e.message, true); } };
     renderStatus();
     return;
   }
@@ -2090,7 +2110,7 @@ async function renderMinecraftBox() {
 // is still there for anything else. fields = the settings each one has, with their starting values.
 const ACTION_TYPES = {
   nuke: { label: 'Nuke', conn: 'minecraft', desc: 'A nuke falls on you and goes up in a mushroom cloud, leaving a huge crater down to y -20: a wide flat middle, then a steep wall you can just climb. Size = how far the flat middle goes out (40 makes a hole about 18 chunks across)', fields: { size: { label: 'crater size', def: 40, min: 16, max: 64 } } },
-  jail: { label: 'Jail', conn: 'minecraft', desc: 'Locks you in a jail (in the Dropper: a cell, then back to the start of your level)', fields: { seconds: { label: 'seconds', def: 30, min: 1, max: 3600 } } },
+  jail: { label: 'Jail', conn: 'minecraft', desc: 'Locks you in a jail (in the Dropper: a cell at the start of your level; in Wipeout: a cage where you are)', fields: { seconds: { label: 'seconds', def: 30, min: 1, max: 3600 } } },
   punch: { label: 'Punch arrow', conn: 'minecraft', desc: 'An arrow with Punch II knocks you from a random side. Only while punches are on', fields: { amount: { label: 'arrows', def: 1, min: 1, max: 10 } } },
   punchToggle: { label: 'Punches on/off', conn: 'minecraft', desc: 'Turns punch arrows off if they are on, and back on if they are off' },
   levelUp: { label: 'Level up', conn: 'minecraft', desc: 'Skips you ahead to the start of a later level', fields: { amount: { label: 'levels', def: 1, min: 1, max: 99 } } },
@@ -2138,7 +2158,7 @@ function addActionOptions() {
   const DROPPER = ['punch', 'punchToggle', 'levelUp', 'levelDown', 'levelWheel', 'jail', 'resetTimer', 'saveReset'];
   const mcOpts = blockDelete ? usable.filter(([k, t]) => t.conn === 'minecraft' && k !== 'command' && (k === 'jail' || !DROPPER.includes(k)))
     : dropper ? DROPPER.map(k => [k, ACTION_TYPES[k]]) : [];
-  return `${mcOpts.length ? `<optgroup label="${dropper ? 'Dropper' : 'Block Delete'}">${mcOpts.map(([k, t]) => `<option value="${k}">${t.label}</option>`).join('')}</optgroup>` : ''}
+  return `${mcOpts.length ? `<optgroup label="${dropper ? (isWipeoutMode() ? 'Wipeout' : 'Dropper') : 'Block Delete'}">${mcOpts.map(([k, t]) => `<option value="${k}">${t.label}</option>`).join('')}</optgroup>` : ''}
     <optgroup label="Other"><option value="command">Custom command (type your own)</option><option value="wait">Wait</option></optgroup>`;
 }
 
@@ -2781,7 +2801,7 @@ function applyState(s) {
     $('gName').value = game.name;
     renderTypes(); renderConnector(); renderRules(); renderPlay();
   }
-  renderStatus(); renderUpdate();
+  followPlay(); renderStatus(); renderUpdate();
   showView(view);
 }
 
@@ -2801,7 +2821,7 @@ async function init() {
 
   const es = new EventSource('/api/events');
   es.addEventListener('state', e => { saveTimer = null; applyState(JSON.parse(e.data)); });
-  es.addEventListener('status', e => { const was = ovShape(); status = JSON.parse(e.data); renderStatus(); renderUpdate(); renderOvView(); if (ovShape() !== was) fitOverlayEditor(); });
+  es.addEventListener('status', e => { const was = ovShape(); status = JSON.parse(e.data); renderStatus(); followPlay(); renderUpdate(); renderOvView(); if (ovShape() !== was) fitOverlayEditor(); });
   es.addEventListener('settings', e => { settings = JSON.parse(e.data); applyTheme(settings.theme); applyLook(); fillBoxes(); });
   es.addEventListener('games', e => { gamesList = JSON.parse(e.data); renderGames(); });
   es.addEventListener('sounds', e => { sounds = JSON.parse(e.data); renderSounds(); if (game) renderRules(); });
@@ -2810,7 +2830,7 @@ async function init() {
   es.addEventListener('stopSound', e => stopSound(JSON.parse(e.data).id));
   es.addEventListener('log', e => { const l = $('log'); l.textContent += (l.textContent ? '\n' : '') + JSON.parse(e.data); l.scrollTop = l.scrollHeight; });
   es.onerror = () => { $('ttText').textContent = 'App closed'; $('ttDot').className = 'dot'; };
-  es.onopen = () => { if (game) api('/api/state').then(s => { status = s.status; renderStatus(); }); };
+  es.onopen = () => { if (game) api('/api/state').then(s => { status = s.status; renderStatus(); followPlay(); }); };
 }
 init();
 </script>
