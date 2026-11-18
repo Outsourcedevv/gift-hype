@@ -20,7 +20,7 @@ import { SAVES_DIR } from './singleplayer.js';
 
 export const WIPEOUT_WORLD = 'Unbound Wipeout 2';     // 2: one straight line, no checkpoints
 export const WIPEOUT_MC = '26.2';
-export const WIPEOUT_BUILD = 2;                  // bump when the levels change, to rebuild them
+export const WIPEOUT_BUILD = 3;                  // bump when the levels change, to rebuild them
 export const LEVELS = 100;
 
 // Settings for making the world the first time: nothing but the levels (and sea), warm ocean colours
@@ -310,11 +310,76 @@ function obstacle(type, ctx) {
     return o;
 }
 
+// ---------- level 100: the tower ----------
+// A black and yellow tower rising out of the sea: a column in the middle, round landings stacked up it
+// and a spiral of steps on the outside from each landing to the next (three quarters of the way round,
+// one block up a step). A red arm sweeps round every landing: jump it, then walk round to the next
+// steps. The gold on the very top wins the game.
+const TOWER = { floors: 4, rise: 12, ring: 6.5, outer: 9.5, column: 2.5, a0: 315 };
+function tower(ctx, z0) {
+    const { n, x, r } = ctx, T = TOWER;
+    const id = `o${n}_tower`, cx = x, cz = z0 + 18;
+    const o = { id, type: 'tower', blocks: [], spawn: [], tick: [], reroll: [], fns: {}, len: 0, secs: 45 };
+    const H = i => F - 1 + i * T.rise;                         // landing i's blocks (feet one above)
+    const top = H(T.floors);
+    const cells = [];
+    for (let dx = -10; dx <= 10; dx++) for (let dz = -10; dz <= 10; dz++) {
+        const rr = Math.hypot(dx, dz), deg = ((Math.atan2(dz, dx) * 180 / Math.PI) + 360) % 360;
+        cells.push({ x: cx + dx, z: cz + dz, rr, deg });
+    }
+    const col = (c, k) => B(k % 2 ? 'yellow_concrete' : 'black_concrete');
+    // the bridge from the start pad
+    o.blocks.push(...floorFill(x - 2, z0 + 6, x + 2, cz - 3, 'hazard'));
+    // the column, from the sea to the top, black with yellow bands
+    for (const c of cells.filter(c => c.rr < T.column)) {
+        o.blocks.push(`fill ${c.x} ${SEA + 1} ${c.z} ${c.x} ${top} ${c.z} ${B('black_concrete')}`);
+        for (let y = SEA + 3; y < top; y += 6) o.blocks.push(`fill ${c.x} ${y} ${c.z} ${c.x} ${y + 1} ${c.z} ${B('yellow_concrete')}`);
+    }
+    // the landings: yellow with a black rim (the top one is a whole disc with gold in the middle)
+    for (let i = 0; i <= T.floors; i++) for (const c of cells.filter(c => c.rr < T.ring && (i === T.floors || c.rr >= T.column))) {
+        const b = i === T.floors && Math.abs(c.x - cx) <= 2 && Math.abs(c.z - cz) <= 2 ? 'gold_block' : c.rr >= T.ring - 1 ? 'black_concrete' : (c.x + c.z) % 2 ? 'yellow_concrete' : 'black_concrete';
+        o.blocks.push(`setblock ${c.x} ${H(i)} ${c.z} ${B(i === T.floors || c.rr >= T.ring - 1 ? b : 'yellow_concrete')}`);
+    }
+    // the steps: from landing i, three quarters round on the outside, up to landing i+1
+    const steps = T.rise - 1, per = 270 / steps;
+    for (let i = 0; i < T.floors; i++) {
+        const a = (T.a0 + 90 * i) % 360;
+        for (const c of cells.filter(c => c.rr >= T.ring && c.rr < T.outer)) {
+            const rel = (c.deg - a + 360) % 360;
+            if (rel >= 270) continue;
+            const k = Math.floor(rel / per) + 1;
+            o.blocks.push(`setblock ${c.x} ${H(i) + k} ${c.z} ${col(c, k)}`);
+        }
+    }
+    // a red arm sweeping round each landing (faster going up; two on the last one)
+    for (let i = 0; i < T.floors; i++) {
+        const arms = i === T.floors - 1 ? 2 : 1, deg = (4 + i * 1.2) * (i % 2 ? -1 : 1), len = T.ring - T.column;
+        for (let a = 0; a < arms; a++) {
+            const aid = `${id}a${i}`;
+            o.spawn.push(display([id, aid, 'wo_arm'], cx + 0.5, H(i) + 1, cz + 0.5, 'red_concrete', 0.6, 0.55, len, { tx: -0.3, ty: 0.05, tz: T.column, yaw: a * 180 + r.int(0, 89) }));
+            if (a === 0) {
+                o.tick.push(`execute as @e[tag=${aid}] at @s run tp @s ~ ~ ~ ~${deg} ~`);
+                for (let k = T.column + 0.4; k <= T.ring - 0.4; k += 0.75)
+                    o.tick.push(`execute as @e[tag=${aid}] at @s rotated as @s positioned ^ ^ ^${k.toFixed(2)} positioned ~-0.5 ~-0.3 ~-0.5 if entity @a[tag=wo_in,dx=0,dy=0,dz=0] as @a[tag=wo_in,sort=nearest,limit=1] run function wipeout:zap`);
+            }
+        }
+    }
+    o.blocks.push(`kill @e[type=minecraft:text_display,tag=wo_sign,x=${cx},y=${top + 5},z=${cz},distance=..3]`,
+        `summon minecraft:text_display ${cx + 0.5} ${top + 5.2} ${cz + 0.5} {Tags:["wo_sign"],billboard:"vertical",scale:[3f,3f,3f],background:1711276032,text:{text:"FINISH",color:"gold",bold:true}}`);
+    o.len = cz + 10 - z0;
+    return { o, cx, cz, top };
+}
+
 // a slab of course at the floor, in this level's pattern
 function floorFill(x1, z1, x2, z2, style) {
     const out = [`fill ${x1} ${F - 1} ${z1} ${x2} ${F - 1} ${z2} ${B('white_concrete')}`];
     const blue = (a, b, c, e) => out.push(`fill ${a} ${F - 1} ${b} ${c} ${F - 1} ${e} ${B('blue_concrete')}`);
     if (style === 'lane') { blue(x1, z1, x2, z2); return out; }
+    if (style === 'hazard') {                       // black and yellow stripes (level 100)
+        out[0] = `fill ${x1} ${F - 1} ${z1} ${x2} ${F - 1} ${z2} ${B('black_concrete')}`;
+        for (let zz = z1; zz <= z2; zz++) for (let xx = x1; xx <= x2; xx++) if ((((xx + zz) % 4) + 4) % 4 < 2) out.push(`setblock ${xx} ${F - 1} ${zz} ${B('yellow_concrete')}`);
+        return out;
+    }
     if (style === 'edges' || style === 'zigzag') { blue(x1, z1, x1, z2); blue(x2, z1, x2, z2); }
     if (style === 'center') { const m = Math.floor((x1 + x2) / 2); blue(m, z1, m, z2); }
     if (style === 'stripes') for (let zz = z1; zz <= z2; zz++) if (((zz % 4) + 4) % 4 === 0) blue(x1, zz, x2, zz);
@@ -391,6 +456,12 @@ function design() {
         const style = FLOOR_STYLES[(n - 1) % FLOOR_STYLES.length], stand = STAND_STYLES[(n * 3) % STAND_STYLES.length];
         const ctx = { n, d, r, x, w, style, periods: new Set(), fnBase: `lvl/${n}` };
         const parts = [];
+        if (n === LEVELS) {                                     // the tower
+            const t = tower({ ...ctx, style: 'hazard' }, z0);
+            out.push({ n, x, z0, w: 5, style: 'hazard', stand, parts: [{ ...t.o, z: z0 + 6 }], finish: null, tower: t, length: t.o.len + 1, secs: t.o.secs,
+                name: 'The Tower', periods: [], kinds: ['tower'] });
+            break;
+        }
         let z = z0 + 6, secs = 1.5;                         // the start pad
         const pool = POOL.filter(t => n >= FIRST[t]);
         const used = [];
@@ -439,9 +510,10 @@ function levelCommands(L) {
     c.push(...floorFill(lo - 1, z0, hi + 1, z0 + 5, L.style));
     c.push(`fill ${lo - 1} ${F - 1} ${z0} ${hi + 1} ${F - 1} ${z0} ${B('blue_concrete')}`);
     L.parts.forEach((p, i) => { if (i) c.push(...floorFill(lo, p.z - 3, hi, p.z - 1, L.style)); c.push(...p.blocks); });
-    c.push(`fill ${lo - 1} ${F - 1} ${L.finish} ${hi + 1} ${F - 1} ${L.finish + 2} ${B('gold_block')}`);
+    if (L.tower) c.push(`fill ${lo - 1} ${F - 1} ${z0} ${hi + 1} ${F - 1} ${z0} ${B('yellow_concrete')}`);
+    if (!L.tower) c.push(`fill ${lo - 1} ${F - 1} ${L.finish} ${hi + 1} ${F - 1} ${L.finish + 2} ${B('gold_block')}`,
     // the arch over the gold pad
-    c.push(`fill ${lo - 2} ${F} ${L.finish + 1} ${lo - 2} ${F + 4} ${L.finish + 1} ${B('white_concrete')}`, `fill ${hi + 2} ${F} ${L.finish + 1} ${hi + 2} ${F + 4} ${L.finish + 1} ${B('white_concrete')}`,
+    `fill ${lo - 2} ${F} ${L.finish + 1} ${lo - 2} ${F + 4} ${L.finish + 1} ${B('white_concrete')}`, `fill ${hi + 2} ${F} ${L.finish + 1} ${hi + 2} ${F + 4} ${L.finish + 1} ${B('white_concrete')}`,
         `fill ${lo - 2} ${F + 5} ${L.finish + 1} ${hi + 2} ${F + 5} ${L.finish + 1} ${B('blue_concrete')}`);
     // the stands: birch seats stepping up and back on both sides, birch log legs down into the sea, a
     // concrete design on the back wall and the seat fronts
@@ -465,8 +537,8 @@ function levelCommands(L) {
     // the level's number over the start, and the finish sign
     c.push(`kill @e[type=minecraft:text_display,tag=wo_sign,x=${x},y=${F + 3},z=${z0 + 3},distance=..3]`,
         `summon minecraft:text_display ${x + 0.5} ${F + 3.2} ${z0 + 3.5} {Tags:["wo_sign"],billboard:"vertical",scale:[2f,2f,2f],background:1711276032,text:[{text:"LEVEL ${L.n}",color:"white",bold:true},{text:"\\n${L.name}",color:"aqua"}]}`,
-        `kill @e[type=minecraft:text_display,tag=wo_sign,x=${x},y=${F + 6},z=${L.finish + 1},distance=..3]`,
-        `summon minecraft:text_display ${x + 0.5} ${F + 6.2} ${L.finish + 1.5} {Tags:["wo_sign"],billboard:"vertical",scale:[2.5f,2.5f,2.5f],background:1711276032,text:{text:"${L.n < LEVELS ? 'LEVEL UP' : 'FINISH'}",color:"gold",bold:true}}`);
+        ...(L.tower ? [] : [`kill @e[type=minecraft:text_display,tag=wo_sign,x=${x},y=${F + 6},z=${L.finish + 1},distance=..3]`,
+            `summon minecraft:text_display ${x + 0.5} ${F + 6.2} ${L.finish + 1.5} {Tags:["wo_sign"],billboard:"vertical",scale:[2.5f,2.5f,2.5f],background:1711276032,text:{text:"LEVEL UP",color:"gold",bold:true}}`]));
     return c.filter(Boolean);
 }
 // the stretch of sea (and stands) a level builds: x1 x2 z1 z2
@@ -730,8 +802,9 @@ export function packFiles() {
         const glo = L.x - Math.floor((L.w - 1) / 2) - 1;
         fn(`lvl/${L.n}/tick`, [
             ...L.parts.flatMap(p => p.tick),
-            // the gold pad: on to the next level
-            `execute positioned ${glo} ${F - 0.5} ${L.finish} as @a[tag=wo_in,dx=${L.w + 1},dy=2,dz=2] unless score @s wo_jail matches 1.. unless score @s wo_level matches 101.. run function wipeout:finish`,
+            // the gold pad: on to the next level (on the tower: the gold on top wins)
+            L.tower ? `execute positioned ${L.tower.cx - 2} ${L.tower.top + 0.5} ${L.tower.cz - 2} as @a[tag=wo_in,dx=4,dy=2,dz=4] unless score @s wo_jail matches 1.. unless score @s wo_level matches 101.. run function wipeout:finish`
+                : `execute positioned ${glo} ${F - 0.5} ${L.finish} as @a[tag=wo_in,dx=${L.w + 1},dy=2,dz=2] unless score @s wo_jail matches 1.. unless score @s wo_level matches 101.. run function wipeout:finish`,
         ]);
         fn(`lvl/${L.n}/ready`, [`execute if loaded ${lo} 0 ${L.z0} if loaded ${hi} 0 ${zEnd} if loaded ${lo} 0 ${zEnd} if loaded ${hi} 0 ${L.z0} run function wipeout:lvl/${L.n}/spawn`]);
         // the moving parts, summoned fresh each try (and the doors' right door picked again)
