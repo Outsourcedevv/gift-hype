@@ -137,30 +137,37 @@ CHAT BLOCK DELETE (Minecraft -> Block Delete Survival)
 WIPEOUT (Minecraft -> Wipeout)
   100 levels in the sky, in a world of its own that Unbound makes (the first time it builds the
   levels: under a minute). The whole course is one straight line of white and blue concrete over warm
-  sea water, with birch wood stands on both sides (a different concrete design on each level). Each
-  level is two obstacles (three after level 80); the gold pad at the end of it is the level up, and the
-  next level starts right after it, so you just keep running.
+  sea water a few blocks below, between blue and white walls with birch stands on top (a different
+  blue and white design on each level). Each level is two obstacles (three after level 80); the gold
+  pad at the end of it is the level up, and the next level starts right after it, so you just keep
+  running.
     - Touch anything RED and you're dead, back at the start of the level: spinners to jump over, cubes
       sliding across, waves of red walls coming down a corridor at you
       (duck into a hole in the side while one goes past, then run to the next hole), crushers slamming down, red
       blocks sweeping past the zipline.
-    - Punching gloves from the side (red and white wool) knock you off into the sea.
+    - Punching gloves (red and white wool) shoot out of holes in a big wall on metal arms and knock
+      you off into the sea. Wait for one to go back into its hole, then run past.
     - Red and white boxing gloves bounce you up: jump from glove to glove over the water.
-    - The zipline: step on the gold pressure plate and you ride under the iron bars. Time it so the
-      red blocks don't get you.
+    - The zipline: step on the gold pressure plate and you ride under the iron bars, past up to three
+      red blocks sweeping side to side. They're timed together: step on when the light on top of the
+      start is GREEN and you get past them all.
     - Pick the door: jump onto the ledge and walk into a door. The right one opens; a wrong one goes
       red and the ledge drops into the sea. The right door is picked again every try.
-    - The vanishing bridge: once you step on it, it goes yellow, then red, then disappears. Run
-      across before it goes. It comes back a moment later.
+    - The vanishing bridge: it comes and goes by itself. Blue and white, then yellow, then red, then
+      gone for 2 seconds. Wait for it to come back and run across before it goes.
     - Also: tiles that flash red and disappear, fields of spinners.
   LEVEL 100 is the Tower: black and yellow, rising out of the sea. Steps spiral round the outside up to
     a landing, then the next steps start on the other side; a red arm sweeps round every landing (two
-    on the last one). Get to the gold on the very top to win. Fall off and you land lower down (or in
-    the sea).
+    on the last one), and a punching glove shoots out of the column across landings 1 to 3. Some steps
+    turn red and disappear for a second: wait for them to come back. Get to the gold on the very top
+    to win. Fall off and you land lower down, or it's back to the start of the tower.
+  Knocked onto the stands is a wipeout too.
+  The next level's obstacles are already moving before you get there, so nothing pops in.
+  Every level has been checked tick by tick to make sure it can be done (at a little under a sprint).
   There are no checkpoints: fall in the sea (a wipeout) or touch red and the level starts again.
   Levels 1 to 80 take about 10 seconds, 81 to 100 a bit longer. The gifts are the Dropper's: levels up
   and down, punches (on/off), jail, the level slot machine, the reset countdown and the save.
-  ("Unbound Wipeout 1" and "Unbound Wipeout 2", the older Wipeout worlds, aren't used any more. You
+  ("Unbound Wipeout 1" to "5", the older Wipeout worlds, aren't used any more. You
   can delete them in Minecraft's Singleplayer list.)
 
 THE DROPPER (Minecraft -> Dropper)
@@ -199,7 +206,7 @@ THE DROPPER (Minecraft -> Dropper)
   the seconds left and "Send Glowing Jellyfish to SAVE me!", and the reset's sound (I Need a Hero)
   plays on for the whole countdown until someone saves you. Jail locks you in a cage on your level's
   bridge.
-  Starting gifts: Finger Heart = punch arrow (only while punches are on), Doughnut = punches on/off,
+  Starting gifts: Finger Heart = punch (only while punches are on), Doughnut = punches on/off,
     Rosa = jail 5s, Paper Crane / Corgi = up 1 / 5 levels, Hat and Mustache / Boxing Gloves = down 1 / 5,
     Galaxy = 60s reset countdown (back to level 1), Glowing Jellyfish = saves you (or a shield if no
     countdown is running), Hand Hearts = level slot machine. Change any of them like other gifts.
@@ -207,6 +214,8 @@ THE DROPPER (Minecraft -> Dropper)
     numbers go past) and stops on one of the amounts you typed for that gift (e.g. -10, -5, -1, 1, 5, 10).
     Green + sends you up that many levels, red - sends you down. Numbers are in Monocraft, a free
     Minecraft-style font (publiconts, SIL Open Font License).
+  PUNCHES: each punch action can be an arrow (Punch II) or a sword hit (pick "hit with" on the action).
+    Every one lands, from a random side, and several come one after another. You never lose health.
 
 GIFTS
   + Add gift / Browse all gifts   - every TikTok gift with its picture and price
