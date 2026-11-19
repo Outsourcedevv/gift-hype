@@ -668,8 +668,11 @@ const feed = [];
 let catalog = readJson(path.join(DATA, 'gift-catalog.json'), []);
 const learnedPath = path.join(DATA, 'learned-gifts.json');
 let learned = readJson(learnedPath, []);
+// A follow works like a gift called "Follow": give it sounds, a popup and actions like any gift
+const FOLLOW = { name: 'Follow', coins: null, image: '/img/follow.svg', event: 'follow' };
 const findGift = name => {
     const n = String(name || '').toLowerCase();
+    if (n === 'follow') return FOLLOW;
     return learned.find(g => g.name.toLowerCase() === n) || catalog.find(g => g.name.toLowerCase() === n) || null;
 };
 function learnGift(name, coins, image) {
@@ -1191,11 +1194,12 @@ async function handleGift(giftName, count, from, image, coins) {
         image: image || known?.image || rule?.image || null,
         coins: coins ?? known?.coins ?? null,
         did: rule ? (rule.label || rule.gift) : null,
+        ...(known?.event ? { event: known.event } : {}),
     };
     feed.unshift(entry);
     feed.length = Math.min(feed.length, 60);
     broadcast('gift', entry);
-    log(`${from} sent ${count > 1 ? count + ' x ' : ''}${giftName}${rule ? ` -> ${entry.did}` : ' (nothing set up for it)'}`);
+    log(`${from} ${entry.event === 'follow' ? 'followed you' : `sent ${count > 1 ? count + ' x ' : ''}${giftName}`}${rule ? ` -> ${entry.did}` : ' (nothing set up for it)'}`);
     if (!rule) return;
 
     const dropper = isDropper(game), resetEvent = dropper ? dropperResetGift(game, rule, from) : null;
@@ -1220,6 +1224,13 @@ async function handleGift(giftName, count, from, image, coins) {
 
 let tiktok = null, tiktokTimer = null;
 const streaks = new Map();
+// a follow: once per person each time you connect (TikTok can send it again if they follow, unfollow, follow)
+let followed = new Set();
+function onFollow(data) {
+    const id = data.user?.userId || data.user?.uniqueId;
+    if (id) { if (followed.has(id)) return; followed.add(id); }
+    handleGift('Follow', 1, data.user?.nickname || data.user?.uniqueId || 'someone', FOLLOW.image, null);
+}
 
 function onGift(data) {
     const name = data.gift?.name || `gift ${data.giftId}`;
@@ -1253,6 +1264,8 @@ async function connectTikTok(username) {
     tiktok = conn;
     conn.on(WebcastEvent.GIFT, onGift);
     conn.on(WebcastEvent.CHAT, onChat);
+    conn.on(WebcastEvent.FOLLOW, onFollow);
+    followed = new Set();
     conn.on('disconnected', () => {
         if (tiktok !== conn) return;
         log('TikTok disconnected. Reconnecting in 10s...');
@@ -1424,7 +1437,7 @@ const routes = {
         return r;
     },
     'POST /api/chatdel/clear': async () => ({ cleared: await chatDelete.clear() }),
-    'GET /api/catalog': () => [...learned, ...catalog.filter(c => !learned.some(l => l.name.toLowerCase() === c.name.toLowerCase()))].sort((a, b) => (a.coins ?? 0) - (b.coins ?? 0) || a.name.localeCompare(b.name)),
+    'GET /api/catalog': () => [FOLLOW, ...[...learned, ...catalog.filter(c => !learned.some(l => l.name.toLowerCase() === c.name.toLowerCase()))].sort((a, b) => (a.coins ?? 0) - (b.coins ?? 0) || a.name.localeCompare(b.name))],
     'POST /api/connect': async b => { await connectTikTok(b.username); return { ok: true }; },
     'POST /api/disconnect': async () => { await disconnectTikTok(); return { ok: true }; },
     'POST /api/settings': b => {
@@ -1614,7 +1627,7 @@ const routes = {
 // localtest.me is a public name that always points to 127.0.0.1, so it's still this PC. Through it
 // only the overlay works (the page, its sounds, gift pictures and the live gift events), nothing else.
 const OVERLAY_HOST = 'gifthype.localtest.me';
-const OVERLAY_PATHS = new Set(['/overlay', '/api/overlay-state', '/api/events', '/gift-img', '/api/overlay/view']);
+const OVERLAY_PATHS = new Set(['/overlay', '/api/overlay-state', '/api/events', '/gift-img', '/api/overlay/view', '/img/follow.svg']);
 const overlayOnly = req => String(req.headers.host || '').replace(/:\d+$/, '').toLowerCase() === OVERLAY_HOST;
 // Pages only from this PC: blocks other websites (and DNS tricks) from using the app.
 function allowed(req) {

@@ -275,7 +275,7 @@ body.editing { background: #18202e; background-image: linear-gradient(rgba(255,2
 </div>
 <script>
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const pic = url => url ? '/gift-img?u=' + encodeURIComponent(url) : '';
+const pic = url => !url ? '' : url.startsWith('/') ? url : '/gift-img?u=' + encodeURIComponent(url);
 let settings = { overlay: { position: 'top', scale: 1, showSender: true }, soundsIn: 'app' };
 const EDITING = new URLSearchParams(location.search).has('edit');
 // the part of each box that takes the width and height (popups: one popup; lists: one entry)
@@ -351,7 +351,7 @@ function burst(e) {
 function popHtml(e) {
   const o = settings.overlay, word = o.popWord ?? 'sent';
   return `${o.popImage !== false ? `<div class="img">${e.image ? `<img src="${pic(e.image)}" alt="">` : ''}</div>` : ''}
-    <div><div class="who">${o.showSender ? `<b>${esc(e.from)}</b> ${esc(word)} ` : ''}${e.count > 1 && o.popCount !== false ? `<span class="n">${e.count}×</span> ` : ''}${esc(e.gift)}</div>
+    <div><div class="who">${e.event === 'follow' ? `<b>${esc(e.from)}</b> followed!` : `${o.showSender ? `<b>${esc(e.from)}</b> ${esc(word)} ` : ''}${e.count > 1 && o.popCount !== false ? `<span class="n">${e.count}×</span> ` : ''}${esc(e.gift)}`}</div>
     ${e.label ? `<div class="did">${esc(e.label)}</div>` : ''}</div>`;
 }
 // Popups never cover the gift list: they move sideways to the list's open side, or else above or below it

@@ -145,8 +145,9 @@ WIPEOUT (Minecraft -> Wipeout)
       sliding across, waves of red walls coming down a corridor at you
       (duck into a hole in the side while one goes past, then run to the next hole), crushers slamming down, red
       blocks sweeping past the zipline.
-    - Punching gloves (red and white wool) shoot out of small frames at the edge on metal arms and
-      knock you off into the sea; the arm knocks you back too. Wait for one to go back, then run past.
+    - Punching gloves (red and white wool) wait in small frames at the edge and shoot out on iron arms
+      that grow out with them, knocking you into the sea; the arm knocks you back too. Wait for one to
+      go back in, then run past.
     - Red and white boxing gloves bounce you up: jump from glove to glove over the water.
     - The zipline: step on the gold pressure plate and you ride under the iron bars, past up to three
       red blocks sweeping side to side. They're timed together: step on when the light on top of the
@@ -155,6 +156,12 @@ WIPEOUT (Minecraft -> Wipeout)
       red and the ledge drops into the sea. The right door is picked again every try.
     - The vanishing bridge: it comes and goes by itself. Blue and white, then yellow, then red, then
       gone for 2 seconds. Wait for it to come back and run across before it goes.
+    - Duck & jump: two red arms go round a platform, a low one to jump over and a high one to crouch
+      under (hold Shift).
+    - Laser gates: red walls of light across the course switch on and off; go through while they're off.
+    - Rolling bars: low red bars roll down the course at you; jump them.
+    - Big balls: giant red and white balls over the water; bounce from one to the next.
+    - Stepping stones: little floating blocks to jump across.
     - Also: tiles that flash red and disappear, fields of spinners.
   LEVEL 100 is the Tower: black and yellow, rising out of the sea. Steps spiral round the outside up to
     a landing, then the next steps start on the other side; a red arm sweeps round every landing (two
@@ -167,7 +174,7 @@ WIPEOUT (Minecraft -> Wipeout)
   There are no checkpoints: fall in the sea (a wipeout) or touch red and the level starts again.
   Levels 1 to 80 take about 10 seconds, 81 to 100 a bit longer. The gifts are the Dropper's: levels up
   and down, punches (on/off), jail, the level slot machine, the reset countdown and the save.
-  ("Unbound Wipeout 1" to "9", the older Wipeout worlds, aren't used any more. You
+  ("Unbound Wipeout 1" to "10", the older Wipeout worlds, aren't used any more. You
   can delete them in Minecraft's Singleplayer list.)
 
 THE DROPPER (Minecraft -> Dropper)
@@ -220,6 +227,8 @@ THE DROPPER (Minecraft -> Dropper)
 GIFTS
   + Add gift / Browse all gifts   - every TikTok gift with its picture and price
   + Any other gift                - plays for any gift you didn't set up
+  Follow (first in Browse all gifts) - when someone follows you: give it a sound, a popup and actions
+    like a gift. It goes off once per person each time you connect (the popup says "<name> followed!").
   Each gift has: a sound (and volume), "Pop up on stream", what it does, and actions.
   Actions: press "+ Add an action..." and pick one. For Minecraft there are ready-made ones:
     Nuke (falls from the sky, goes up in a mushroom cloud and leaves a crater down to y -20 with a steep wall you can climb;
