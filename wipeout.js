@@ -19,9 +19,9 @@ import path from 'node:path';
 import { SAVES_DIR } from './singleplayer.js';
 import { knockFiles, knockCommand } from './knock.js';
 
-export const WIPEOUT_WORLD = 'Unbound Wipeout 10';    // 10: shorter emerald pads on quartz (the layout moved)
+export const WIPEOUT_WORLD = 'Unbound Wipeout 11';    // 11: new obstacles (the layout moved)
 export const WIPEOUT_MC = '26.2';
-export const WIPEOUT_BUILD = 15;                  // bump when the levels change, to rebuild them
+export const WIPEOUT_BUILD = 16;                  // bump when the levels change, to rebuild them
 export const LEVELS = 100;
 
 // Settings for making the world the first time: nothing but the levels (and sea), warm ocean colours
@@ -58,8 +58,8 @@ const STAND_STYLES = ['waves', 'checker', 'stripes', 'diamonds', 'bands', 'dots'
 // Each makes: the blocks (built once), the moving parts (summoned when you get to the level), what they
 // do every tick, what happens each try (the doors' right door), and how long it takes to get past.
 // x: the middle of the course, z: where it starts, w: the course's width. Returns { len, secs, ... }.
-const SECS = { spinner: 3.2, gloves: 3, cubes: 1.8, wall: 6, punch: 1.8, zipline: 5.5, doors: 3.2, beam: 2.4, blink: 3.6, crusher: 1.8, spinfield: 4 };
-const FIRST = { spinner: 1, gloves: 1, cubes: 1, beam: 2, doors: 3, wall: 4, punch: 5, zipline: 6, crusher: 9, blink: 11, spinfield: 22 };
+const SECS = { spinner: 3.2, gloves: 3, cubes: 1.8, wall: 6, punch: 1.8, zipline: 5.5, doors: 3.2, beam: 2.4, blink: 3.6, crusher: 1.8, spinfield: 4, duck: 4.5, lasers: 4, barrels: 4, balls: 4, stones: 4 };
+const FIRST = { spinner: 1, gloves: 1, cubes: 1, beam: 2, doors: 3, wall: 4, punch: 5, zipline: 6, balls: 7, crusher: 9, stones: 10, blink: 11, lasers: 13, barrels: 16, spinfield: 22, duck: 26 };
 
 let uid = 0;
 function obstacle(type, ctx) {
@@ -399,6 +399,105 @@ function obstacle(type, ctx) {
             o.len = tz - z + 1; o.secs = 1.5 + count * 0.55;
             break;
         }
+        // ---- duck and jump: a round platform with two red arms going round, a low one to jump over and
+        // a high one to duck under (crouch) ----
+        case 'duck': {
+            const R = r.int(4, 5), cz = z + R + 1;
+            disc(o, x, cz, R + 1, ctx.style);
+            o.blocks.push(`fill ${x} ${F} ${cz} ${x} ${F + 2} ${cz} ${B('red_concrete')}`);        // the post in the middle
+            const deg = sp(3, 5) * (r.chance(0.5) ? 1 : -1), yaw = r.int(0, 89);
+            o.spawn.push(display([id, `${id}l`, 'wo_arm'], x + 0.5, F, cz + 0.5, 'red_concrete', 0.6, 0.55, 2 * R, { tx: -0.3, ty: 0.05, tz: -R, yaw }),
+                display([id, `${id}h`, 'wo_arm'], x + 0.5, F + 1.55, cz + 0.5, 'red_concrete', 0.6, 0.4, 2 * R, { tx: -0.3, ty: 0.05, tz: -R, yaw: yaw + 90 }));
+            o.tick.push(`execute as @e[tag=${id}] at @s run tp @s ~ ~ ~ ~${deg} ~`);
+            const back = deg > 0 ? -18 : 18;
+            for (let k = -R + 0.4; k <= R - 0.4; k += 0.75) {
+                // the low arm: at your feet (jump it)
+                o.tick.push(`execute as @e[tag=${id}l] at @s rotated as @s positioned ^ ^ ^${k.toFixed(2)} positioned ~-0.5 ~-0.3 ~-0.5 if entity @a[tag=wo_in,dx=0,dy=0,dz=0] as @a[tag=wo_in,sort=nearest,limit=1] run function wipeout:zap`);
+                // the high arm: from just above a crouching player's head (1.5) up
+                o.tick.push(`execute as @e[tag=${id}h] at @s rotated as @s positioned ^ ^ ^${k.toFixed(2)} positioned ~-0.5 ~ ~-0.5 if entity @a[tag=wo_in,dx=0,dy=0,dz=0] as @a[tag=wo_in,sort=nearest,limit=1] run function wipeout:zap`);
+            }
+            o.len = 2 * R + 3; o.secs = 4.5;
+            break;
+        }
+        // ---- laser gates: red walls of light across the course that switch on and off, one after another.
+        // Go through each while it's off ----
+        case 'lasers': {
+            const count = Math.min(5, 2 + Math.floor(d * 3)), gap = 4, L = count * gap + 2;
+            floorRow(lo, z, hi, z + L - 1);
+            const P = 50 - Math.round(d * 12), on = Math.round(P * (0.4 + 0.15 * d)), m = `#m${P}`;
+            ctx.periods.add(P);
+            const when = (k1, k2) => {                    // the #m ranges for k in [k1, k2) after ph
+                return ph => { const a1 = (k1 + ph) % P, a2 = (k2 - 1 + ph) % P; return a1 <= a2 ? [[a1, a2]] : [[a1, P - 1], [0, a2]]; };
+            };
+            for (let i = 0; i < count; i++) {
+                const gz = z + 2 + i * gap, lid = `${id}g${i}`, ph = (i * Math.round(P / count) + r.int(0, 4)) % P;
+                // the posts it shines between
+                for (const px of [lo - 1, hi + 1]) o.blocks.push(`fill ${px} ${F} ${gz} ${px} ${F + 1} ${gz} ${B('blue_concrete')}`, `setblock ${px} ${F + 2} ${gz} ${B('redstone_lamp[lit=true]')}`);
+                const glass = st => `data merge entity @e[tag=${lid},limit=1] {block_state:{Name:"minecraft:${st}"}}`;
+                o.spawn.push(display([id, lid], lo, F + 0.1, gz + 0.4, 'red_stained_glass', w, 1.7, 0.2));
+                // set as it should be right now, then on and off in time
+                o.spawn.push(...when(on, P)(ph).map(([a, b]) => `execute if score ${m} wo_v matches ${a}..${b} run ${glass('air')}`));
+                o.tick.push(`execute if score ${m} wo_v matches ${ph} run ${glass('red_stained_glass')}`,
+                    `execute if score ${m} wo_v matches ${ph} run playsound minecraft:block.beacon.power_select master @a ${x} ${F + 1} ${gz} 0.4 2`,
+                    `execute if score ${m} wo_v matches ${(ph + on) % P} run ${glass('air')}`,
+                    ...when(0, on)(ph).map(([a, b]) => `execute if score ${m} wo_v matches ${a}..${b} positioned ${lo + 0.1} ${F} ${gz - 0.3} if entity @a[tag=wo_in,dx=${(w - 1.2).toFixed(2)},dy=0.8,dz=0] positioned ${x + 0.5} ${F + 1} ${gz + 0.5} as @a[tag=wo_in,sort=nearest,limit=1] run function wipeout:zap`));
+                o.sim.push({ kind: 'gate', P, ph, on });
+            }
+            o.len = L; o.secs = 1.5 + count * 1.1;
+            break;
+        }
+        // ---- rolling bars: low red bars rolling down the course at you, one after another: jump them ----
+        case 'barrels': {
+            const L = r.int(14, 18) + Math.round(d * 6);
+            floorRow(lo, z, hi, z + L - 1);
+            const travel = L - 1, t = Math.round(travel / sp(0.12, 0.2)), v = travel / t, pause = Math.round(26 - 12 * d);
+            const steps = [{ d: [0, 0, -v], t }, { d: [0, 0, travel], t: 1 }, { d: [0, 0, 0], t: pause }];
+            const bars = d < 0.5 ? 1 : 2, tot = t + 1 + pause;
+            for (let j = 0; j < bars; j++) {
+                const bid = `${id}b${j}`, off = Math.round(j * tot / bars + r.int(0, 8)) % tot;
+                o.spawn.push(display([id, bid], ...posAt([lo, F, z + L - 1], steps, off), 'red_concrete', w, 0.6, 0.8), `scoreboard players set @e[tag=${bid}] wo_ph ${off}`);
+                // (only up to 0.6 high: jump and you're over it)
+                o.tick.push(...moveLines(bid, steps), `execute as @e[tag=${bid}] at @s positioned ~0.1 ~-0.4 ~-0.1 if entity @a[tag=wo_in,dx=${(w - 1.2).toFixed(2)},dy=0,dz=0] positioned ~${(w / 2).toFixed(2)} ~0.7 ~0.5 as @a[tag=wo_in,sort=nearest,limit=1] run function wipeout:zap`);
+            }
+            o.len = L; o.secs = 2 + L / 5;
+            break;
+        }
+        // ---- big balls: giant red and white bouncy balls over the water: bounce from one to the next ----
+        case 'balls': {
+            const count = r.int(3, 4) + (d > 0.55 ? 1 : 0);
+            floorRow(lo, z, hi, z);
+            let zc = z + 1, cx = x;
+            for (let i = 0; i < count; i++) {
+                zc += r.int(1, 2) + (d > 0.6 ? 1 : 0);
+                const cz = zc + 2, cy = F - 3;
+                if (i) cx = Math.max(x - 3, Math.min(x + 3, cx + r.int(-2, 2)));
+                for (let dx = -2; dx <= 2; dx++) for (let dy = -2; dy <= 2; dy++) for (let dz = -2; dz <= 2; dz++) {
+                    if (dx * dx + dy * dy + dz * dz > 5.5) continue;
+                    o.blocks.push(`setblock ${cx + dx} ${cy + dy} ${cz + dz} ${B(dy === 0 ? 'white_wool' : 'red_wool')}`);
+                }
+                zc = cz + 3;
+            }
+            zc += 1;
+            floorRow(lo, zc, hi, zc);
+            o.len = zc - z + 1; o.secs = 1.2 + count * 1.0;
+            break;
+        }
+        // ---- stepping stones: little floating blocks to jump across ----
+        case 'stones': {
+            const count = r.int(5, 7) + Math.round(d * 3), size = d < 0.4 ? 2 : d < 0.75 && r.chance(0.5) ? 2 : 1;
+            floorRow(lo, z, hi, z);
+            let tz = z + 1, px = x;
+            for (let i = 0; i < count; i++) {
+                tz += size === 2 ? r.int(1, 2) : r.int(1, d > 0.7 ? 2 : 1) + (i % 3 === 2 ? 0 : 0);
+                px = Math.max(x - 3, Math.min(x + 3 - size + 1, px + r.int(-(size === 2 ? 2 : 1), size === 2 ? 2 : 1)));
+                o.blocks.push(`fill ${px} ${F - 1} ${tz} ${px + size - 1} ${F - 1} ${tz + size - 1} ${B(i % 2 ? 'blue_concrete' : 'light_blue_concrete')}`);
+                tz += size;
+            }
+            tz += r.int(1, 2);
+            floorRow(lo, tz, hi, tz);
+            o.len = tz - z + 1; o.secs = 1 + count * 0.6;
+            break;
+        }
     }
     return o;
 }
@@ -570,7 +669,7 @@ function hitBox(tag, sx, sy, sz, sel = `tag=${tag}`, what = 'zap') {
 const NAMES = ['Splash Zone', 'Spin Cycle', 'Glove Love', 'Cube Rush', 'Door Dash', 'Wall Street', 'Zip It', 'Knock Knock', 'Sky Sweep', 'Bounce House', 'Red Alert', 'Tight Rope',
     'Big Splash', 'Punch Line', 'Crush Hour', 'Blink Twice', 'Seaside Sprint', 'Wet and Wild', 'Sweeper Keeper', 'High Tide', 'Deep End', 'Belly Flop', 'Cannonball', 'Wave Rider',
     'Final Fling', 'No Way Through', 'Lucky Door', 'Slip and Slide', 'Over the Edge', 'Tidal Turn'];
-const POOL = ['spinner', 'gloves', 'cubes', 'beam', 'doors', 'wall', 'zipline', 'punch', 'crusher', 'blink', 'spinfield'];
+const POOL = ['spinner', 'gloves', 'cubes', 'beam', 'doors', 'wall', 'zipline', 'punch', 'crusher', 'blink', 'spinfield', 'balls', 'stones', 'lasers', 'barrels', 'duck'];
 
 let designs = null;
 function design() {
