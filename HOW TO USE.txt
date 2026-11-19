@@ -222,7 +222,8 @@ THE DROPPER (Minecraft -> Dropper)
     Green + sends you up that many levels, red - sends you down. Numbers are in Monocraft, a free
     Minecraft-style font (publiconts, SIL Open Font License).
   PUNCHES: each punch action can be an arrow (Punch II) or a sword hit (pick "hit with" on the action).
-    Every one lands, from a random side, and several come one after another. You never lose health.
+    Every one lands, from a random side, and several come one after another. You never lose health,
+    and arrows never stay stuck in you (they go through and are cleared away).
 
 GIFTS
   + Add gift / Browse all gifts   - every TikTok gift with its picture and price

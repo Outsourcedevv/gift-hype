@@ -4,7 +4,8 @@
 //    inside your hitbox and Minecraft doesn't count it as a hit);
 //  - arrows and sword hits ignore the moment after a hit when you can't be hurt again (a damage type
 //    tag), so a second one straight after the first still knocks you;
-//  - a sword hit is a /damage from that side (always lands), with a sword swinging at you.
+//  - a sword hit is a /damage from that side (always lands), with a sword swinging at you;
+//  - arrows pierce (PierceLevel 1), so none stay stuck in you afterwards.
 // You never lose health: the games give you Resistance V.
 //
 // ns: the pack's namespace, p: its scoreboard prefix (e.g. 'wo_'). The game's own #punch <p>v score
@@ -41,7 +42,7 @@ export function knockFiles(ns, p) {
         `execute store result score #r ${p}v run random value 0..7`,
         ...Array.from({ length: 8 }, (_, i) => `execute if score #r ${p}v matches ${i} run return run function ${ns}:knock/arrow/d${i} with storage ${ns}:k`),
     ]);
-    const arrow = (mx, mz, vy = '$(vy)d') => `summon minecraft:arrow ~ ~ ~ {Motion:[${mx.toFixed(3)}d,${vy},${mz.toFixed(3)}d],damage:2.0d,crit:1b,pickup:2b,weapon:{id:"minecraft:bow",count:1,components:{"minecraft:enchantments":{"minecraft:punch":2}}}}`;
+    const arrow = (mx, mz, vy = '$(vy)d') => `summon minecraft:arrow ~ ~ ~ {Motion:[${mx.toFixed(3)}d,${vy},${mz.toFixed(3)}d],PierceLevel:1b,damage:2.0d,crit:1b,pickup:2b,weapon:{id:"minecraft:bow",count:1,components:{"minecraft:enchantments":{"minecraft:punch":2}}}}`;
     const R = 1.05, SPEED = 2.2;
     for (let i = 0; i < 8; i++) {
         const a = i * Math.PI / 4, dx = Math.sin(a), dz = Math.cos(a);
@@ -89,6 +90,10 @@ export function knockFiles(ns, p) {
             `execute as @a[scores={${p}pq=1..}] at @s run function ${ns}:knock/arrow_q`,
             `execute as @a[scores={${p}sq=1..}] at @s run function ${ns}:knock/sword_q`,
             `execute as @e[type=minecraft:item_display,tag=${p}sw] run function ${ns}:knock/sword_tick`,
+            // arrows that went through you and landed: gone (every half a second)
+            `scoreboard players add #kt ${p}v 1`,
+            `execute if score #kt ${p}v matches 10.. run kill @e[type=minecraft:arrow,nbt={inGround:1b}]`,
+            `execute if score #kt ${p}v matches 10.. run scoreboard players set #kt ${p}v 0`,
         ],
     };
 }
