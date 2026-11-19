@@ -1098,7 +1098,7 @@ ubIntro.start();
 <script>
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const pic = url => url ? '/gift-img?u=' + encodeURIComponent(url) : '';
+const pic = url => !url ? '' : url.startsWith('/') ? url : '/gift-img?u=' + encodeURIComponent(url);
 const coinText = c => c == null ? '' : `${Number(c).toLocaleString()} coin${c == 1 ? '' : 's'}`;
 const IC = {
   play: '<svg class="i" viewBox="0 0 16 16"><path d="M4.5 2.5v11l9-5.5z" fill="currentColor"/></svg>',
@@ -2746,7 +2746,7 @@ function renderGallery() {
   if ($('gSort').value === 'down') list.reverse();
   $('gCount').textContent = `${list.length} gift${list.length === 1 ? '' : 's'}`;
   $('gGrid').innerHTML = list.map(({ g, gi }) => `<div class="gcard" data-gi="${gi}" tabindex="0" role="button">
-    <img src="${pic(g.image)}" alt="" loading="lazy"><span class="n">${esc(g.name)}</span><span class="coins">${coinText(g.coins)}</span></div>`).join('')
+    <img src="${pic(g.image)}" alt="" loading="lazy"><span class="n">${esc(g.name)}</span><span class="coins">${g.event === 'follow' ? 'when someone follows you' : coinText(g.coins)}</span></div>`).join('')
     || '<div class="empty">No gifts match.</div>';
   $('gGrid').querySelectorAll('[data-gi]').forEach(c => {
     const pick = () => { const g = catalog[+c.dataset.gi]; $('gallery').close(); addRule(g.name, g.image, g.coins); };

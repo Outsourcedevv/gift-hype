@@ -21,7 +21,7 @@ import { knockFiles, knockCommand } from './knock.js';
 
 export const WIPEOUT_WORLD = 'Unbound Wipeout 10';    // 10: shorter emerald pads on quartz (the layout moved)
 export const WIPEOUT_MC = '26.2';
-export const WIPEOUT_BUILD = 13;                  // bump when the levels change, to rebuild them
+export const WIPEOUT_BUILD = 14;                  // bump when the levels change, to rebuild them
 export const LEVELS = 100;
 
 // Settings for making the world the first time: nothing but the levels (and sea), warm ocean colours
@@ -646,10 +646,11 @@ function levelCommands(L) {
                 c.push(`fill ${cx2} ${top + 1} ${zz} ${cx2} ${top + cr.int(1, 3)} ${zz} ${B('birch_planks')}`);
             }
         }
-        // sea lanterns set in the sea floor, 3x3x3 cubes in a line a little in from the wall
+        // sea lanterns standing on the sea floor, 3x3x3 cubes (up to the top of the water) in a line a
+        // little in from the wall
         for (let zz = s1 + (((ORIGIN_Z + 1 - s1) % 9) + 9) % 9; zz + 1 <= s2; zz += 9) if (zz - 1 >= s1) {
             const lx = x + side * (IN - 3);
-            c.push(`fill ${lx - 1} ${SEA - 5} ${zz - 1} ${lx + 1} ${SEA - 3} ${zz + 1} ${B('sea_lantern')}`);
+            c.push(`fill ${lx - 1} ${SEA - 2} ${zz - 1} ${lx + 1} ${SEA} ${zz + 1} ${B('sea_lantern')}`);
         }
         // floodlights: a white pole twelve blocks up, a 3x3 of sea lanterns at the top facing the course
         for (let zz = s1 + (((ORIGIN_Z + 20 - s1) % 48) + 48) % 48; zz <= s2; zz += 48) {

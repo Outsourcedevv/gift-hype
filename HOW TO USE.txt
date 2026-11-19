@@ -138,7 +138,7 @@ WIPEOUT (Minecraft -> Wipeout)
   100 levels in the sky, in a world of its own that Unbound makes (the first time it builds the
   levels: under a minute). The whole course is one straight line of blue and light blue concrete just
   above warm sea water, between low white and blue walls with a colourful crowd on top, floodlights
-  on tall white poles, sea lantern cubes in the sea floor, and a few clouds in the sky. Each level is
+  on tall white poles, sea lantern cubes standing on the sea floor, and a few clouds in the sky. Each level is
   two obstacles (three after level 80); the emerald pad at the end of it is the level up, and the next
   level starts right after it, so you just keep running.
     - Touch anything RED and you're dead, back at the start of the level: spinners to jump over, cubes
@@ -220,6 +220,8 @@ THE DROPPER (Minecraft -> Dropper)
 GIFTS
   + Add gift / Browse all gifts   - every TikTok gift with its picture and price
   + Any other gift                - plays for any gift you didn't set up
+  Follow (first in Browse all gifts) - when someone follows you: give it a sound, a popup and actions
+    like a gift. It goes off once per person each time you connect (the popup says "<name> followed!").
   Each gift has: a sound (and volume), "Pop up on stream", what it does, and actions.
   Actions: press "+ Add an action..." and pick one. For Minecraft there are ready-made ones:
     Nuke (falls from the sky, goes up in a mushroom cloud and leaves a crater down to y -20 with a steep wall you can climb;
