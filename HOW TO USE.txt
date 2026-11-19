@@ -138,15 +138,15 @@ WIPEOUT (Minecraft -> Wipeout)
   100 levels in the sky, in a world of its own that Unbound makes (the first time it builds the
   levels: under a minute). The whole course is one straight line of blue and light blue concrete just
   above warm sea water, between low white and blue walls with a colourful crowd on top, floodlights
-  on tall white poles, a line of sea lanterns in the water, and a few clouds in the sky. Each level is
+  on tall white poles, sea lantern cubes in the sea floor, and a few clouds in the sky. Each level is
   two obstacles (three after level 80); the emerald pad at the end of it is the level up, and the next
   level starts right after it, so you just keep running.
     - Touch anything RED and you're dead, back at the start of the level: spinners to jump over, cubes
       sliding across, waves of red walls coming down a corridor at you
       (duck into a hole in the side while one goes past, then run to the next hole), crushers slamming down, red
       blocks sweeping past the zipline.
-    - Punching gloves (red and white wool) shoot out of holes in a big wall on metal arms and knock
-      you off into the sea. Wait for one to go back into its hole, then run past.
+    - Punching gloves (red and white wool) shoot out of small frames at the edge on metal arms and
+      knock you off into the sea; the arm knocks you back too. Wait for one to go back, then run past.
     - Red and white boxing gloves bounce you up: jump from glove to glove over the water.
     - The zipline: step on the gold pressure plate and you ride under the iron bars, past up to three
       red blocks sweeping side to side. They're timed together: step on when the light on top of the
@@ -167,7 +167,7 @@ WIPEOUT (Minecraft -> Wipeout)
   There are no checkpoints: fall in the sea (a wipeout) or touch red and the level starts again.
   Levels 1 to 80 take about 10 seconds, 81 to 100 a bit longer. The gifts are the Dropper's: levels up
   and down, punches (on/off), jail, the level slot machine, the reset countdown and the save.
-  ("Unbound Wipeout 1" to "7", the older Wipeout worlds, aren't used any more. You
+  ("Unbound Wipeout 1" to "9", the older Wipeout worlds, aren't used any more. You
   can delete them in Minecraft's Singleplayer list.)
 
 THE DROPPER (Minecraft -> Dropper)
