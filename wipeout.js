@@ -2,7 +2,7 @@
 //
 // The whole course is one straight line of white and blue concrete floating high above warm sea
 // water, with birch wood stands on both sides (a different concrete design on each level). Each level
-// is a short run of two obstacles (three after level 80) ending at a gold pad: step on it and you're
+// is a short run of two obstacles (three after level 80) ending at a emerald pad: step on it and you're
 // on the next level, which starts right after. There are no checkpoints: touch anything red (spinners
 // to jump over, cubes sliding across, walls coming at you, crushers, red blocks sweeping past the
 // zipline) and you're dead, back at the start of the level. The punching gloves knock you off; red and
@@ -19,9 +19,9 @@ import path from 'node:path';
 import { SAVES_DIR } from './singleplayer.js';
 import { knockFiles, knockCommand } from './knock.js';
 
-export const WIPEOUT_WORLD = 'Unbound Wipeout 6';     // 6: the sea higher up, walls closer (made fresh)
+export const WIPEOUT_WORLD = 'Unbound Wipeout 8';     // 8: lower walls with a crowd, clouds (made fresh)
 export const WIPEOUT_MC = '26.2';
-export const WIPEOUT_BUILD = 8;                  // bump when the levels change, to rebuild them
+export const WIPEOUT_BUILD = 11;                  // bump when the levels change, to rebuild them
 export const LEVELS = 100;
 
 // Settings for making the world the first time: nothing but the levels (and sea), warm ocean colours
@@ -35,7 +35,7 @@ export const WIPEOUT_PROPS = [
 const F = 140;                       // your feet on the course (the floor blocks are at F-1)
 const SEA = F - 6;                   // the sea's top (water from SEA-3 to SEA, sand under it): a short fall
 const ORIGIN_X = 1000, ORIGIN_Z = 1000, SEA_W = 60;     // the course runs north to south along x=1000; sea 60 each side
-const WALL_X = 9, TOWER_WALL_X = 12;  // the side walls' inner face, either side of the middle (wider round the tower)
+const WALL_X = 11, TOWER_WALL_X = 13; // the side walls' inner face, either side of the middle (wider round the tower)
 const JAIL = [700, F, 700], WIN = [700, F, 800];
 const B = b => `minecraft:${b}`;
 const J = o => JSON.stringify(o);
@@ -50,7 +50,7 @@ function rngFor(seed) {
 // ---------- the look ----------
 // The course: white with blue, a different pattern on different levels
 const FLOOR_STYLES = ['edges', 'stripes', 'checker', 'center', 'zigzag'];
-// The side walls' designs: all blue and white
+// The side walls' designs: white and blue
 const BW = ['blue_concrete', 'white_concrete'];
 const STAND_STYLES = ['waves', 'checker', 'stripes', 'diamonds', 'bands', 'dots', 'arrows'].map(name => ({ name, cols: BW }));
 
@@ -146,7 +146,7 @@ function obstacle(type, ctx) {
             const S = 5, holes = 3 + Math.floor(d * 2) + r.int(0, 1), L = (holes + 1) * S + 1;
             floorRow(lo, z, hi, z + L - 1);
             // the corridor's sides (white, blue on top)
-            for (const wx of [lo - 1, hi + 1]) o.blocks.push(`fill ${wx} ${F} ${z} ${wx} ${F + 2} ${z + L - 1} ${B('white_concrete')}`, `fill ${wx} ${F + 3} ${z} ${wx} ${F + 3} ${z + L - 1} ${B('blue_concrete')}`);
+            for (const wx of [lo - 1, hi + 1]) o.blocks.push(`fill ${wx} ${F} ${z} ${wx} ${F + 2} ${z + L - 1} ${B('light_blue_concrete')}`, `fill ${wx} ${F + 3} ${z} ${wx} ${F + 3} ${z + L - 1} ${B('blue_concrete')}`);
             // the holes: an opening in the side and a little room behind it (two deep, two long)
             let side = r.chance(0.5) ? 1 : -1;
             for (let i = 0; i < holes; i++) {
@@ -154,10 +154,10 @@ function obstacle(type, ctx) {
                 o.blocks.push(
                     `fill ${Math.min(open, inner)} ${F - 1} ${hz} ${Math.max(open, inner)} ${F - 1} ${hz + 1} ${B('blue_concrete')}`,
                     `fill ${open} ${F} ${hz} ${open} ${F + 2} ${hz + 1} ${B('air')}`,
-                    `fill ${inner} ${F} ${hz - 1} ${inner} ${F + 2} ${hz - 1} ${B('white_concrete')}`, `fill ${inner} ${F} ${hz + 2} ${inner} ${F + 2} ${hz + 2} ${B('white_concrete')}`,
-                    `fill ${back} ${F} ${hz - 1} ${back} ${F + 2} ${hz + 2} ${B('white_concrete')}`,
+                    `fill ${inner} ${F} ${hz - 1} ${inner} ${F + 2} ${hz - 1} ${B('light_blue_concrete')}`, `fill ${inner} ${F} ${hz + 2} ${inner} ${F + 2} ${hz + 2} ${B('light_blue_concrete')}`,
+                    `fill ${back} ${F} ${hz - 1} ${back} ${F + 2} ${hz + 2} ${B('light_blue_concrete')}`,
                     `fill ${Math.min(open, back)} ${F + 3} ${hz - 1} ${Math.max(open, back)} ${F + 3} ${hz + 2} ${B('blue_concrete')}`,
-                    `fill ${open} ${F + 3} ${hz} ${open} ${F + 3} ${hz + 1} ${B('light_blue_concrete')}`,
+                    `fill ${open} ${F + 3} ${hz} ${open} ${F + 3} ${hz + 1} ${B('white_concrete')}`,
                 );
                 if (r.chance(0.6)) side = -side;
             }
@@ -182,10 +182,10 @@ function obstacle(type, ctx) {
             floorRow(lo, z, hi, z + L - 1);
             const reach = w + 0.4, arm = reach + 1.6;
             // the wall: its face along the course's edge, out to the side wall (the arms go back into that)
-            const wallX = side > 0 ? hi + 1 : lo - 1, backX = x + side * (WALL_X - 1);
+            const wallX = side > 0 ? hi + 1 : lo - 1, backX = x + side * (WALL_X + 1);
             const xa = Math.min(wallX, backX), xb = Math.max(wallX, backX);
-            o.blocks.push(`fill ${xa} ${F - 1} ${z - 1} ${xb} ${F + 3} ${z + L} ${B('white_concrete')}`, `fill ${xa} ${F + 4} ${z - 1} ${xb} ${F + 4} ${z + L} ${B('blue_concrete')}`,
-                `fill ${wallX} ${F + 3} ${z - 1} ${wallX} ${F + 3} ${z + L} ${B('light_blue_concrete')}`);
+            o.blocks.push(`fill ${xa} ${F - 1} ${z - 1} ${xb} ${F + 3} ${z + L} ${B('light_blue_concrete')}`, `fill ${xa} ${F + 4} ${z - 1} ${xb} ${F + 4} ${z + L} ${B('blue_concrete')}`,
+                `fill ${wallX} ${F + 3} ${z - 1} ${wallX} ${F + 3} ${z + L} ${B('white_concrete')}`);
             const out = Math.max(3, Math.round(reach / sp(0.55, 0.85))), back = Math.round(reach / 0.15);
             const wait = Math.round(42 - 22 * d) + r.int(0, 10);
             const vo = +(reach / out).toFixed(3), vb = +(reach / back).toFixed(3);
@@ -225,7 +225,7 @@ function obstacle(type, ctx) {
                 o.spawn.push(display([id, cid], ...start, 'red_concrete', w, 2, 2), `scoreboard players set @e[tag=${cid}] wo_ph ${off}`);
                 o.sim.push({ kind: 'lane', axis: 'y', p0: [lo, F + 3.8, cz], steps, off, size: [w, 2, 2], lo, hi });
                 o.tick.push(...moveLines(cid, steps), hitBox(cid, w, 2, 2));
-                o.blocks.push(`fill ${lo - 1} ${F} ${cz} ${lo - 1} ${F + 6} ${cz + 1} ${B('white_concrete')}`, `fill ${hi + 1} ${F} ${cz} ${hi + 1} ${F + 6} ${cz + 1} ${B('white_concrete')}`,
+                o.blocks.push(`fill ${lo - 1} ${F} ${cz} ${lo - 1} ${F + 6} ${cz + 1} ${B('light_blue_concrete')}`, `fill ${hi + 1} ${F} ${cz} ${hi + 1} ${F + 6} ${cz + 1} ${B('light_blue_concrete')}`,
                     `fill ${lo - 1} ${F + 6} ${cz} ${hi + 1} ${F + 6} ${cz + 1} ${B('blue_concrete')}`);
             }
             o.len = L; o.secs = 1.2 + count * 0.9;
@@ -238,9 +238,9 @@ function obstacle(type, ctx) {
             floorRow(lo, z2 + 1, hi, z2 + 3);
             o.blocks.push(`setblock ${x} ${F} ${z + 1} ${B('light_weighted_pressure_plate')}`,
                 `fill ${x} ${F + 4} ${z + 1} ${x} ${F + 4} ${z2 + 1} ${B('iron_bars')}`,
-                `fill ${x - 1} ${F} ${z} ${x - 1} ${F + 4} ${z} ${B('white_concrete')}`, `fill ${x + 1} ${F} ${z} ${x + 1} ${F + 4} ${z} ${B('white_concrete')}`,
+                `fill ${x - 1} ${F} ${z} ${x - 1} ${F + 4} ${z} ${B('light_blue_concrete')}`, `fill ${x + 1} ${F} ${z} ${x + 1} ${F + 4} ${z} ${B('light_blue_concrete')}`,
                 `fill ${x - 1} ${F + 5} ${z} ${x + 1} ${F + 5} ${z} ${B('blue_concrete')}`,
-                `fill ${x - 1} ${F} ${z2 + 2} ${x - 1} ${F + 4} ${z2 + 2} ${B('white_concrete')}`, `fill ${x + 1} ${F} ${z2 + 2} ${x + 1} ${F + 4} ${z2 + 2} ${B('white_concrete')}`,
+                `fill ${x - 1} ${F} ${z2 + 2} ${x - 1} ${F + 4} ${z2 + 2} ${B('light_blue_concrete')}`, `fill ${x + 1} ${F} ${z2 + 2} ${x + 1} ${F + 4} ${z2 + 2} ${B('light_blue_concrete')}`,
                 `fill ${x - 1} ${F + 5} ${z2 + 2} ${x + 1} ${F + 5} ${z2 + 2} ${B('blue_concrete')}`);
             const speed = 0.32, ticks = Math.round((z2 + 1.5 - (z + 1.5)) / speed);
             // riding: the plate starts it (the "seat" is invisible, a chain is your handle)
@@ -292,7 +292,7 @@ function obstacle(type, ctx) {
             floorRow(lo, z, hi, z);
             const lz = z + 1 + gap, wz = lz + 2;                  // the ledge, then the doors' wall
             o.blocks.push(...floorFill(dlo, lz, dlo + DW - 1, lz + 1, 'edges'),
-                `fill ${dlo} ${F} ${wz} ${dlo + DW - 1} ${F + 3} ${wz} ${B('white_concrete')}`,
+                `fill ${dlo} ${F} ${wz} ${dlo + DW - 1} ${F + 3} ${wz} ${B('light_blue_concrete')}`,
                 `fill ${dlo} ${F + 4} ${wz} ${dlo + DW - 1} ${F + 4} ${wz} ${B('blue_concrete')}`);
             o.blocks.push(...floorFill(dlo, wz + 1, dlo + DW - 1, wz + 2, 'edges'));
             o.reroll.push(`execute store result score #${id} wo_v run random value 1..${N}`);
@@ -300,7 +300,7 @@ function obstacle(type, ctx) {
             for (let j = 1; j <= N; j++) {
                 const dx = dlo + 1 + (j - 1) * 3;
                 const door = c => `fill ${dx} ${F} ${wz} ${dx + 1} ${F + 2} ${wz} ${B(c)}`;
-                o.blocks.push(door('blue_concrete'), `setblock ${dx} ${F + 3} ${wz} ${B('light_blue_concrete')}`, `setblock ${dx + 1} ${F + 3} ${wz} ${B('light_blue_concrete')}`);
+                o.blocks.push(door('blue_concrete'), `setblock ${dx} ${F + 3} ${wz} ${B('white_concrete')}`, `setblock ${dx + 1} ${F + 3} ${wz} ${B('white_concrete')}`);
                 // a wrong door goes red and the ledge drops away under you (into the sea)
                 o.fns[`door${j}`] = [
                     `execute if score #${id} wo_v matches ${j} run return run function wipeout:${ctx.fnBase}/${id}_open${j}`,
@@ -328,7 +328,7 @@ function obstacle(type, ctx) {
             floorRow(lo, z, hi, z);
             const bx = d > 0.5 && r.chance(0.5) ? x + r.int(-1, 0) : x;
             const normal = [];
-            for (let k = 1; k <= L; k++) normal.push(`fill ${bx} ${F - 1} ${z + k} ${bx + bw - 1} ${F - 1} ${z + k} ${B(k % 2 ? 'white_concrete' : 'blue_concrete')}`);
+            for (let k = 1; k <= L; k++) normal.push(`fill ${bx} ${F - 1} ${z + k} ${bx + bw - 1} ${F - 1} ${z + k} ${B(k % 2 ? 'light_blue_concrete' : 'blue_concrete')}`);
             const all = c => `fill ${bx} ${F - 1} ${z + 1} ${bx + bw - 1} ${F - 1} ${z + L} ${B(c)}`;
             o.blocks.push(...normal);
             floorRow(lo, z + L + 1, hi, z + L + 1);
@@ -371,13 +371,13 @@ function obstacle(type, ctx) {
                 const tx = x - 1 + (i % 2 ? r.int(0, 1) : -r.int(0, 1)), tile = c => `fill ${tx} ${F - 1} ${tz} ${tx + 2} ${F - 1} ${tz + 1} ${B(c)}`;
                 const on = Math.round(P * 0.55), warn = Math.round(P * 0.75), phase = (i * lag) % P;
                 const at = k => (k + phase) % P;
-                o.blocks.push(tile(i % 2 ? 'blue_concrete' : 'white_concrete'));
+                o.blocks.push(tile(i % 2 ? 'blue_concrete' : 'light_blue_concrete'));
                 o.tick.push(
                     `execute if score #m${P} wo_v matches ${at(on)} run ${tile('red_concrete')}`,
                     `execute if score #m${P} wo_v matches ${at(warn)} run ${tile('air')}`,
-                    `execute if score #m${P} wo_v matches ${at(0)} run ${tile(i % 2 ? 'blue_concrete' : 'white_concrete')}`,
+                    `execute if score #m${P} wo_v matches ${at(0)} run ${tile(i % 2 ? 'blue_concrete' : 'light_blue_concrete')}`,
                 );
-                o.spawn.push(tile(i % 2 ? 'blue_concrete' : 'white_concrete'));
+                o.spawn.push(tile(i % 2 ? 'blue_concrete' : 'light_blue_concrete'));
                 o.sim.push({ kind: 'tile', P, phase, warn, i });
                 ctx.periods.add(P);
                 tz += 3;
@@ -394,7 +394,7 @@ function obstacle(type, ctx) {
 // A black and yellow tower rising out of the sea: a column in the middle, round landings stacked up it
 // and a spiral of steps on the outside from each landing to the next (three quarters of the way round,
 // one block up a step). A red arm sweeps round every landing: jump it, then walk round to the next
-// steps. The gold on the very top wins the game.
+// steps. The emerald on the very top wins the game.
 const TOWER = { floors: 4, rise: 12, ring: 6.5, outer: 9.5, column: 2.5, a0: 315 };
 function tower(ctx, z0) {
     const { n, x, r } = ctx, T = TOWER;
@@ -415,9 +415,9 @@ function tower(ctx, z0) {
         o.blocks.push(`fill ${c.x} ${SEA + 1} ${c.z} ${c.x} ${top} ${c.z} ${B('black_concrete')}`);
         for (let y = SEA + 3; y < top; y += 6) o.blocks.push(`fill ${c.x} ${y} ${c.z} ${c.x} ${y + 1} ${c.z} ${B('yellow_concrete')}`);
     }
-    // the landings: yellow with a black rim (the top one is a whole disc with gold in the middle)
+    // the landings: yellow with a black rim (the top one is a whole disc with emerald in the middle)
     for (let i = 0; i <= T.floors; i++) for (const c of cells.filter(c => c.rr < T.ring && (i === T.floors || c.rr >= T.column))) {
-        const b = i === T.floors && Math.abs(c.x - cx) <= 2 && Math.abs(c.z - cz) <= 2 ? 'gold_block' : c.rr >= T.ring - 1 ? 'black_concrete' : (c.x + c.z) % 2 ? 'yellow_concrete' : 'black_concrete';
+        const b = i === T.floors && Math.abs(c.x - cx) <= 2 && Math.abs(c.z - cz) <= 2 ? 'emerald_block' : c.rr >= T.ring - 1 ? 'black_concrete' : (c.x + c.z) % 2 ? 'yellow_concrete' : 'black_concrete';
         o.blocks.push(`setblock ${c.x} ${H(i)} ${c.z} ${B(i === T.floors || c.rr >= T.ring - 1 ? b : 'yellow_concrete')}`);
     }
     // the steps: from landing i, three quarters round on the outside, up to landing i+1. Some of them
@@ -487,7 +487,7 @@ function tower(ctx, z0) {
 
 // a slab of course at the floor, in this level's pattern
 function floorFill(x1, z1, x2, z2, style) {
-    const out = [`fill ${x1} ${F - 1} ${z1} ${x2} ${F - 1} ${z2} ${B('white_concrete')}`];
+    const out = [`fill ${x1} ${F - 1} ${z1} ${x2} ${F - 1} ${z2} ${B('light_blue_concrete')}`];
     const blue = (a, b, c, e) => out.push(`fill ${a} ${F - 1} ${b} ${c} ${F - 1} ${e} ${B('blue_concrete')}`);
     if (style === 'lane') { blue(x1, z1, x2, z2); return out; }
     if (style === 'hazard') {                       // black and yellow stripes (level 100)
@@ -506,7 +506,7 @@ function floorFill(x1, z1, x2, z2, style) {
 function disc(o, cx, cz, R, style) {
     for (let dz = -R; dz <= R; dz++) {
         const h = Math.floor(Math.sqrt(R * R - dz * dz + 0.5));
-        o.blocks.push(`fill ${cx - h} ${F - 1} ${cz + dz} ${cx + h} ${F - 1} ${cz + dz} ${B(Math.abs(dz) % 3 === 0 && style !== 'center' ? 'white_concrete' : 'white_concrete')}`);
+        o.blocks.push(`fill ${cx - h} ${F - 1} ${cz + dz} ${cx + h} ${F - 1} ${cz + dz} ${B(Math.abs(dz) % 3 === 0 && style !== 'center' ? 'light_blue_concrete' : 'light_blue_concrete')}`);
         o.blocks.push(`setblock ${cx - h} ${F - 1} ${cz + dz} ${B('blue_concrete')}`, `setblock ${cx + h} ${F - 1} ${cz + dz} ${B('blue_concrete')}`);
     }
     o.blocks.push(`fill ${cx - R} ${F - 1} ${cz} ${cx + R} ${F - 1} ${cz} ${B('blue_concrete')}`, `fill ${cx} ${F - 1} ${cz - R} ${cx} ${F - 1} ${cz + R} ${B('blue_concrete')}`);
@@ -591,7 +591,7 @@ function design() {
             secs += o.secs;
             if (parts.length < count) { z += 3; secs += 0.6; }      // a short run of course before the next
         }
-        const finish = z;                                      // the gold pad (3 long), then the next level
+        const finish = z;                                      // the emerald pad (3 long), then the next level
         const length = finish + 3 - z0;
         out.push({ n, x, z0, w, style, stand, parts, finish, length, secs: Math.round(secs), name: NAMES[(n * 7) % NAMES.length], periods: [...ctx.periods],
             kinds: used });
@@ -621,32 +621,45 @@ function levelCommands(L) {
         c.push(`setblock ${cx} ${SEA - 3} ${cz} ${B(r.pick(['brain_coral_block', 'tube_coral_block', 'fire_coral_block', 'horn_coral_block', 'bubble_coral_block', 'sea_lantern']))}`);
         if (r.chance(0.5)) c.push(`setblock ${cx} ${SEA - 2} ${cz} ${B(r.pick(['brain_coral[waterlogged=true]', 'tube_coral[waterlogged=true]', 'fire_coral[waterlogged=true]', 'horn_coral[waterlogged=true]', 'bubble_coral[waterlogged=true]', 'seagrass']))}`);
     }
-    // the start pad, the course parts (a short run of course between them), the gold pad at the end
+    // the start pad, the course parts (a short run of course between them), the emerald pad at the end
     c.push(...floorFill(lo - 1, z0, hi + 1, z0 + 5, L.style));
     c.push(`fill ${lo - 1} ${F - 1} ${z0} ${hi + 1} ${F - 1} ${z0} ${B('blue_concrete')}`);
     L.parts.forEach((p, i) => { if (i) c.push(...floorFill(lo, p.z - 3, hi, p.z - 1, L.style)); c.push(...p.blocks); });
     if (L.tower) c.push(`fill ${lo - 1} ${F - 1} ${z0} ${hi + 1} ${F - 1} ${z0} ${B('yellow_concrete')}`);
-    if (!L.tower) c.push(`fill ${lo - 2} ${F - 1} ${L.finish} ${hi + 2} ${F - 1} ${L.finish + 2} ${B('gold_block')}`,
-    // the arch over the gold pad
-    `fill ${lo - 2} ${F} ${L.finish + 1} ${lo - 2} ${F + 4} ${L.finish + 1} ${B('white_concrete')}`, `fill ${hi + 2} ${F} ${L.finish + 1} ${hi + 2} ${F + 4} ${L.finish + 1} ${B('white_concrete')}`,
+    if (!L.tower) c.push(`fill ${lo - 2} ${F - 1} ${L.finish} ${hi + 2} ${F - 1} ${L.finish + 2} ${B('emerald_block')}`,
+    // the arch over the emerald pad
+    `fill ${lo - 2} ${F} ${L.finish + 1} ${lo - 2} ${F + 4} ${L.finish + 1} ${B('light_blue_concrete')}`, `fill ${hi + 2} ${F} ${L.finish + 1} ${hi + 2} ${F + 4} ${L.finish + 1} ${B('light_blue_concrete')}`,
         `fill ${lo - 2} ${F + 5} ${L.finish + 1} ${hi + 2} ${F + 5} ${L.finish + 1} ${B('blue_concrete')}`);
-    // the side walls: blue and white from the sea floor up to just above the course, four blocks thick,
-    // with birch stands on top (rows of seats stepping up and back, looking at the course)
-    // (they run the whole way along, at the same place for every level)
-    const s1 = z0, s2 = end - 1, IN = L.tower ? TOWER_WALL_X : WALL_X, top = F + 1;
+    // the side walls: white and blue, from the sea floor to three blocks under the course. On top, the
+    // crowd: colourful concrete people and birch planks, scattered, up to three high. Floodlights on
+    // tall white poles every so often, and a line of sea lanterns in the water a little in from the walls
+    // (it all runs the whole way along, at the same place for every level)
+    const s1 = z0, s2 = end - 1, IN = L.tower ? TOWER_WALL_X : WALL_X, top = F - 4;
+    const cr = rngFor(L.n * 131 + 5);
+    const PEOPLE = ['red', 'orange', 'yellow', 'lime', 'green', 'cyan', 'light_blue', 'blue', 'purple', 'magenta', 'pink', 'white', 'black', 'gray', 'brown'];
     for (const side of [-1, 1]) {
-        const face = x + side * IN, far = x + side * (IN + 3);
-        c.push(`fill ${Math.min(face, far)} ${SEA - 5} ${s1} ${Math.max(face, far)} ${top} ${s2} ${B('white_concrete')}`);
-        c.push(...standWall(face, SEA - 5, top, s1, s2, L.stand));              // the design on the face
-        c.push(`fill ${Math.min(face, far)} ${top} ${s1} ${Math.max(face, far)} ${top} ${s2} ${B('blue_concrete')}`);
-        const facing = side < 0 ? 'east' : 'west';
-        for (let t = 0; t < 4; t++) {
-            const sx = face + side * t, sy = top + 1 + t;
-            if (t) c.push(`fill ${sx} ${top + 1} ${s1} ${sx} ${sy - 1} ${s2} ${B('birch_planks')}`);
-            c.push(`fill ${sx} ${sy} ${s1} ${sx} ${sy} ${s2} ${B(`birch_stairs[facing=${facing}]`)}`);
+        const face = x + side * IN, far = x + side * (IN + 5), xa = Math.min(face, far), xb = Math.max(face, far);
+        c.push(`fill ${xa} ${SEA - 5} ${s1} ${xb} ${top} ${s2} ${B('white_concrete')}`);
+        c.push(...standWall(face, SEA - 5, top, s1, s2, L.stand));                 // the design on the face
+        c.push(`fill ${face} ${top} ${s1} ${face} ${top} ${s2} ${B('blue_concrete')}`);
+        for (let zz = s1; zz <= s2; zz++) for (let k = 0; k < 6; k++) {
+            const cx2 = face + side * k, roll = cr.next();
+            if (roll < 0.42) {                                       // someone watching: one or two blocks
+                const h = cr.chance(0.7) ? 2 : 1;
+                c.push(`fill ${cx2} ${top + 1} ${zz} ${cx2} ${top + h} ${zz} ${B(`${cr.pick(PEOPLE)}_concrete`)}`);
+            } else if (roll < 0.72) {                                // birch planks, one to three high
+                c.push(`fill ${cx2} ${top + 1} ${zz} ${cx2} ${top + cr.int(1, 3)} ${zz} ${B('birch_planks')}`);
+            }
         }
-        // a birch rail along the back of the top row
-        c.push(`fill ${far} ${top + 5} ${s1} ${far} ${top + 5} ${s2} ${B('birch_fence')}`);
+        // sea lanterns in the water, in a line a little in from the wall
+        for (let zz = s1 + (((ORIGIN_Z - s1) % 5) + 5) % 5; zz <= s2; zz += 5) c.push(`setblock ${x + side * (IN - 2)} ${SEA} ${zz} ${B('sea_lantern')}`);
+        // floodlights: a white pole twelve blocks up, a 3x3 of sea lanterns at the top facing the course
+        for (let zz = s1 + (((ORIGIN_Z + 20 - s1) % 48) + 48) % 48; zz <= s2; zz += 48) {
+            const px = x + side * (IN + 4);
+            c.push(`fill ${px} ${top + 1} ${zz} ${px} ${top + 12} ${zz} ${B('white_concrete')}`,
+                `fill ${px} ${top + 10} ${zz - 1} ${px} ${top + 12} ${zz + 1} ${B('white_concrete')}`,
+                `fill ${px - side} ${top + 10} ${zz - 1} ${px - side} ${top + 12} ${zz + 1} ${B('sea_lantern')}`);
+        }
     }
     // the level's number over the start, and the finish sign
     c.push(`kill @e[type=minecraft:text_display,tag=wo_sign,x=${x},y=${F + 3},z=${z0 + 3},distance=..3]`,
@@ -700,7 +713,7 @@ function extraCommands() {
         `fill ${jx - 2} ${jy - 1} ${jz - 2} ${jx + 2} ${jy - 1} ${jz + 2} ${B('blue_concrete')}`,
         `fill ${jx - 2} ${jy + 3} ${jz - 2} ${jx + 2} ${jy + 3} ${jz + 2} ${B('blue_concrete')}`,
         `fill ${jx - 1} ${jy} ${jz - 1} ${jx + 1} ${jy + 2} ${jz + 1} ${B('air')}`,
-        `fill ${wx - 6} ${wy - 1} ${wz - 6} ${wx + 6} ${wy - 1} ${wz + 6} ${B('gold_block')}`,
+        `fill ${wx - 6} ${wy - 1} ${wz - 6} ${wx + 6} ${wy - 1} ${wz + 6} ${B('emerald_block')}`,
         `fill ${wx - 2} ${wy - 1} ${wz - 2} ${wx + 2} ${wy - 1} ${wz + 2} ${B('emerald_block')}`,
         `fill ${wx - 6} ${wy} ${wz - 6} ${wx + 6} ${wy} ${wz + 6} ${B('white_concrete')} hollow`,
         `fill ${wx - 5} ${wy} ${wz - 5} ${wx + 5} ${wy} ${wz + 5} ${B('air')}`,
@@ -781,6 +794,27 @@ export function installWipeoutBuildPack(world = WIPEOUT_WORLD, from = 1, to = LE
 export function removeWipeoutBuildPack(world = WIPEOUT_WORLD) { fs.rmSync(path.join(SAVES_DIR, world, 'datapacks', BUILD_PACK), { recursive: true, force: true }); }
 
 // ---------- the data pack: the game ----------
+// Minecraft 26.2's overworld with its own clouds lower down, so they're in the sky above the course
+// (about 35 blocks up instead of 50), and fainter, so there seem to be fewer
+const CLOUDY_OVERWORLD = {
+    ambient_light: 0.0,
+    attributes: {
+        'minecraft:audio/ambient_sounds': { mood: { block_search_extent: 8, offset: 2.0, sound: 'minecraft:ambient.cave', tick_delay: 6000 } },
+        'minecraft:audio/background_music': { creative: { max_delay: 24000, min_delay: 12000, sound: 'minecraft:music.creative' }, default: { max_delay: 24000, min_delay: 12000, sound: 'minecraft:music.game' } },
+        'minecraft:gameplay/bed_rule': { can_set_spawn: 'always', can_sleep: 'when_dark', error_message: { translate: 'block.minecraft.bed.no_sleep' } },
+        'minecraft:gameplay/nether_portal_spawns_piglin': true,
+        'minecraft:gameplay/respawn_anchor_works': false,
+        'minecraft:visual/ambient_light_color': '#0a0a0a',
+        'minecraft:visual/cloud_color': '#88ffffff',
+        'minecraft:visual/cloud_height': 176.0,
+        'minecraft:visual/fog_color': '#c0d8ff',
+        'minecraft:visual/sky_color': '#78a7ff',
+    },
+    coordinate_scale: 1.0, default_clock: 'minecraft:overworld', has_ceiling: false, has_ender_dragon_fight: false, has_skylight: true,
+    height: 384, infiniburn: '#minecraft:infiniburn_overworld', logical_height: 384, min_y: -64,
+    monster_spawn_block_light_limit: 0, monster_spawn_light_level: { type: 'minecraft:uniform', max_inclusive: 7, min_inclusive: 0 },
+    timelines: '#minecraft:in_overworld',
+};
 export function packFiles() {
     const levels = design();
     const f = {
@@ -797,6 +831,7 @@ export function packFiles() {
     const periods = [...new Set(levels.flatMap(L => L.periods))];
     const knock = knockFiles('wipeout', 'wo_');
     Object.assign(f, knock.files);
+    f['data/minecraft/dimension_type/overworld.json'] = JSON.stringify(CLOUDY_OVERWORLD, null, 2);
 
     fn('load', [
         ...['wo_level', 'wo_fails', 'wo_jail', 'wo_js', 'wo_v', 'wo_lf', 'wo_ph', 'wo_gen', 'wo_cd', 'wo_bn', 'wo_y', 'wo_cx', 'wo_cy', 'wo_cz', 'wo_cr', 'wo_nz', 'wo_px', ...knock.objectives].map(o => `scoreboard objectives add ${o} dummy`),
@@ -828,16 +863,17 @@ export function packFiles() {
         // a glove: bounce
         'execute as @a[tag=wo_in,tag=!wo_ride] at @s if block ~ ~-0.2 ~ #wipeout:glove unless score @s wo_bn matches 1.. unless score @s wo_jail matches 1.. run function wipeout:bounce',
         'execute as @a[scores={wo_bn=1..}] run function wipeout:bounce_tick',
-        // (the gold pad at the end of the level you're on: in that level's tick)
+        // (the emerald pad at the end of the level you're on: in that level's tick)
         // in the sea, or landed on something below the course (the stands): a wipeout
         'execute as @a[tag=wo_in] at @s if block ~ ~ ~ minecraft:water unless score @s wo_jail matches 1.. run function wipeout:fail',
         'execute as @a[tag=wo_in] store result score @s wo_y run data get entity @s Pos[1] 10',
         `execute as @a[tag=wo_in,tag=!wo_ride] at @s if predicate wipeout:on_ground unless score @s wo_jail matches 1.. if score @s wo_y matches ..${F * 10 - 15} run function wipeout:fail`,
         `execute as @a[tag=wo_in] if score @s wo_y matches ..${(SEA - 8) * 10} run function wipeout:fail`,
-        // knocked onto the stands (on top of the side walls): a wipeout too. Nothing on the course is that
-        // high up except the tower, where it's how far out you are that counts
-        `execute unless score #lvl wo_v matches ${LEVELS} as @a[tag=wo_in,tag=!wo_ride] at @s if predicate wipeout:on_ground unless score @s wo_jail matches 1.. if score @s wo_y matches ${(F + 2.5) * 10}.. run function wipeout:fail`,
-        `execute if score #lvl wo_v matches ${LEVELS} as @a[tag=wo_in] store result score @s wo_px run data get entity @s Pos[0] 10`,
+        // knocked onto the stands (on top of the side walls): a wipeout too. That's anywhere past the walls'
+        // face; and nothing on the course you can stand on is that high up (the glove wall's top)
+        `execute if score #lvl wo_v matches 1..${LEVELS - 1} as @a[tag=wo_in,tag=!wo_ride] at @s if predicate wipeout:on_ground unless score @s wo_jail matches 1.. if score @s wo_y matches ${(F + 2.5) * 10}.. run function wipeout:fail`,
+        'execute as @a[tag=wo_in] store result score @s wo_px run data get entity @s Pos[0] 10',
+        `execute if score #lvl wo_v matches 1..${LEVELS - 1} as @a[tag=wo_in] unless score @s wo_jail matches 1.. unless score @s wo_px matches ${(ORIGIN_X - WALL_X + 0.3) * 10}..${(ORIGIN_X + WALL_X - 0.3) * 10} run function wipeout:fail`,
         `execute if score #lvl wo_v matches ${LEVELS} as @a[tag=wo_in] unless score @s wo_jail matches 1.. unless score @s wo_px matches ${(ORIGIN_X - TOWER_WALL_X + 0.3) * 10}..${(ORIGIN_X + TOWER_WALL_X - 0.3) * 10} run function wipeout:fail`,
         'execute as @a[scores={wo_jail=1..}] run function wipeout:jail/tick',
         'execute as @e[tag=wo_alert] run function wipeout:alert/tick',
@@ -926,7 +962,7 @@ export function packFiles() {
         const glo = L.x - Math.floor((L.w - 1) / 2) - 1;
         fn(`lvl/${L.n}/tick`, [
             ...L.parts.flatMap(p => p.tick),
-            // the gold pad: on to the next level (on the tower: the gold on top wins)
+            // the emerald pad: on to the next level (on the tower: the emerald on top wins)
             L.tower ? `execute positioned ${L.tower.cx - 2} ${L.tower.top + 0.5} ${L.tower.cz - 2} as @a[tag=wo_in,dx=4,dy=2,dz=4] unless score @s wo_jail matches 1.. unless score @s wo_level matches 101.. run function wipeout:finish`
                 : `execute positioned ${glo - 1} ${F - 0.5} ${L.finish} as @a[tag=wo_in,dx=${L.w + 3},dy=2,dz=2] unless score @s wo_jail matches 1.. unless score @s wo_level matches 101.. run function wipeout:finish`,
         ]);
