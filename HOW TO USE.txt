@@ -136,11 +136,11 @@ CHAT BLOCK DELETE (Minecraft -> Block Delete Survival)
 
 WIPEOUT (Minecraft -> Wipeout)
   100 levels in the sky, in a world of its own that Unbound makes (the first time it builds the
-  levels: under a minute). The whole course is one straight line of white and blue concrete over warm
-  sea water a few blocks below, between light blue and white walls with three rows of birch seats on
-  top (a different design on each level). Each level is two obstacles (three after level 80); the emerald
-  pad at the end of it is the level up, and the next level starts right after it, so you just keep
-  running.
+  levels: under a minute). The whole course is one straight line of blue and light blue concrete just
+  above warm sea water, between low white and blue walls with a colourful crowd on top, floodlights
+  on tall white poles, a line of sea lanterns in the water, and a few clouds in the sky. Each level is
+  two obstacles (three after level 80); the emerald pad at the end of it is the level up, and the next
+  level starts right after it, so you just keep running.
     - Touch anything RED and you're dead, back at the start of the level: spinners to jump over, cubes
       sliding across, waves of red walls coming down a corridor at you
       (duck into a hole in the side while one goes past, then run to the next hole), crushers slamming down, red
@@ -167,7 +167,7 @@ WIPEOUT (Minecraft -> Wipeout)
   There are no checkpoints: fall in the sea (a wipeout) or touch red and the level starts again.
   Levels 1 to 80 take about 10 seconds, 81 to 100 a bit longer. The gifts are the Dropper's: levels up
   and down, punches (on/off), jail, the level slot machine, the reset countdown and the save.
-  ("Unbound Wipeout 1" to "6", the older Wipeout worlds, aren't used any more. You
+  ("Unbound Wipeout 1" to "7", the older Wipeout worlds, aren't used any more. You
   can delete them in Minecraft's Singleplayer list.)
 
 THE DROPPER (Minecraft -> Dropper)
