@@ -209,7 +209,7 @@ const rulesOf = g => currentMode(g).rules;
 // What the Minecraft starter types do. Commands only, so they work on any server.
 const AT = 'execute at @a[name={player},limit=1] run';
 const PARKOUR_RULES = [
-    { gift: 'Finger Heart', sound: 'builtin/bonk.mp3', label: 'Arrow rain', actions: [{ type: 'command', command: `${AT} summon arrow ~ ~6 ~ {Motion:[0.0d,-1.0d,0.0d],pickup:0b}` }] },
+    { gift: 'Finger Heart', sound: 'builtin/bonk.mp3', label: 'Arrow rain', actions: [{ type: 'command', command: `${AT} summon arrow ~ ~6 ~ {Motion:[0.0d,-1.0d,0.0d],pickup:0b,PierceLevel:1b}` }] },
     { gift: 'Rosa', sound: 'builtin/oh-no.mp3', label: 'Frozen for 5s', actions: [
         { type: 'command', command: 'effect give {player} minecraft:slowness 5 255 true' },
         { type: 'command', command: 'effect give {player} minecraft:jump_boost 5 250 true' }] },
@@ -315,6 +315,16 @@ if (!settings.presets) {
         if (changed) saveGame(g);
     }
     settings.presets = true; saveSettings();
+}
+if (!settings.piercingArrows) {
+    // arrows from gifts pierce, so none stay stuck in you: the Arrow rain starter command gets it too
+    const OLD = `${AT} summon arrow ~ ~6 ~ {Motion:[0.0d,-1.0d,0.0d],pickup:0b}`, NEW = `${AT} summon arrow ~ ~6 ~ {Motion:[0.0d,-1.0d,0.0d],pickup:0b,PierceLevel:1b}`;
+    for (const g of Object.values(games)) {
+        let changed = false;
+        for (const m of g.modes || []) for (const r of m.rules || []) for (const a of r.actions || []) if (a.type === 'command' && a.command === OLD) { a.command = NEW; changed = true; }
+        if (changed) saveGame(g);
+    }
+    settings.piercingArrows = true; saveSettings();
 }
 if (!settings.bedrockNuke) {
     // the nuke now digs to bedrock across about 20 chunks: older starting sizes (12, 35) become 40

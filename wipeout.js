@@ -1164,7 +1164,7 @@ export function packFiles() {
         'execute store result score #px wo_v run data get entity @s Pos[0] 1000', 'execute store result score #pz wo_v run data get entity @s Pos[2] 1000',
         'scoreboard players operation #dx wo_v -= #px wo_v', 'scoreboard players operation #dz wo_v -= #pz wo_v',
         'kill @e[tag=wo_dir]',
-        '$execute facing entity @s feet rotated ~ 0 positioned as @s positioned ^ ^1.0 ^-1.05 run summon minecraft:arrow ~ ~ ~ {Tags:["wo_ar"],damage:1.0d,pickup:2b,weapon:{id:"minecraft:bow",count:1,components:{"minecraft:enchantments":{"minecraft:punch":$(p)}}}}',
+        '$execute facing entity @s feet rotated ~ 0 positioned as @s positioned ^ ^1.0 ^-1.05 run summon minecraft:arrow ~ ~ ~ {Tags:["wo_ar"],PierceLevel:1b,damage:1.0d,pickup:2b,weapon:{id:"minecraft:bow",count:1,components:{"minecraft:enchantments":{"minecraft:punch":$(p)}}}}',
         'execute store result entity @e[tag=wo_ar,limit=1] Motion[0] double 0.0018 run scoreboard players get #dx wo_v',
         'data modify entity @e[tag=wo_ar,limit=1] Motion[1] set value 0.05d',
         'execute store result entity @e[tag=wo_ar,limit=1] Motion[2] double 0.0018 run scoreboard players get #dz wo_v',
