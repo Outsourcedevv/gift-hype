@@ -2,7 +2,7 @@
 //
 // The whole course is one straight line of white and blue concrete floating high above warm sea
 // water, with birch wood stands on both sides (a different concrete design on each level). Each level
-// is a short run of two obstacles (three after level 80) ending at a gold pad: step on it and you're
+// is a short run of two obstacles (three after level 80) ending at a emerald pad: step on it and you're
 // on the next level, which starts right after. There are no checkpoints: touch anything red (spinners
 // to jump over, cubes sliding across, walls coming at you, crushers, red blocks sweeping past the
 // zipline) and you're dead, back at the start of the level. The punching gloves knock you off; red and
@@ -21,7 +21,7 @@ import { knockFiles, knockCommand } from './knock.js';
 
 export const WIPEOUT_WORLD = 'Unbound Wipeout 6';     // 6: the sea higher up, walls closer (made fresh)
 export const WIPEOUT_MC = '26.2';
-export const WIPEOUT_BUILD = 8;                  // bump when the levels change, to rebuild them
+export const WIPEOUT_BUILD = 9;                  // bump when the levels change, to rebuild them
 export const LEVELS = 100;
 
 // Settings for making the world the first time: nothing but the levels (and sea), warm ocean colours
@@ -394,7 +394,7 @@ function obstacle(type, ctx) {
 // A black and yellow tower rising out of the sea: a column in the middle, round landings stacked up it
 // and a spiral of steps on the outside from each landing to the next (three quarters of the way round,
 // one block up a step). A red arm sweeps round every landing: jump it, then walk round to the next
-// steps. The gold on the very top wins the game.
+// steps. The emerald on the very top wins the game.
 const TOWER = { floors: 4, rise: 12, ring: 6.5, outer: 9.5, column: 2.5, a0: 315 };
 function tower(ctx, z0) {
     const { n, x, r } = ctx, T = TOWER;
@@ -415,9 +415,9 @@ function tower(ctx, z0) {
         o.blocks.push(`fill ${c.x} ${SEA + 1} ${c.z} ${c.x} ${top} ${c.z} ${B('black_concrete')}`);
         for (let y = SEA + 3; y < top; y += 6) o.blocks.push(`fill ${c.x} ${y} ${c.z} ${c.x} ${y + 1} ${c.z} ${B('yellow_concrete')}`);
     }
-    // the landings: yellow with a black rim (the top one is a whole disc with gold in the middle)
+    // the landings: yellow with a black rim (the top one is a whole disc with emerald in the middle)
     for (let i = 0; i <= T.floors; i++) for (const c of cells.filter(c => c.rr < T.ring && (i === T.floors || c.rr >= T.column))) {
-        const b = i === T.floors && Math.abs(c.x - cx) <= 2 && Math.abs(c.z - cz) <= 2 ? 'gold_block' : c.rr >= T.ring - 1 ? 'black_concrete' : (c.x + c.z) % 2 ? 'yellow_concrete' : 'black_concrete';
+        const b = i === T.floors && Math.abs(c.x - cx) <= 2 && Math.abs(c.z - cz) <= 2 ? 'emerald_block' : c.rr >= T.ring - 1 ? 'black_concrete' : (c.x + c.z) % 2 ? 'yellow_concrete' : 'black_concrete';
         o.blocks.push(`setblock ${c.x} ${H(i)} ${c.z} ${B(i === T.floors || c.rr >= T.ring - 1 ? b : 'yellow_concrete')}`);
     }
     // the steps: from landing i, three quarters round on the outside, up to landing i+1. Some of them
@@ -591,7 +591,7 @@ function design() {
             secs += o.secs;
             if (parts.length < count) { z += 3; secs += 0.6; }      // a short run of course before the next
         }
-        const finish = z;                                      // the gold pad (3 long), then the next level
+        const finish = z;                                      // the emerald pad (3 long), then the next level
         const length = finish + 3 - z0;
         out.push({ n, x, z0, w, style, stand, parts, finish, length, secs: Math.round(secs), name: NAMES[(n * 7) % NAMES.length], periods: [...ctx.periods],
             kinds: used });
@@ -621,13 +621,13 @@ function levelCommands(L) {
         c.push(`setblock ${cx} ${SEA - 3} ${cz} ${B(r.pick(['brain_coral_block', 'tube_coral_block', 'fire_coral_block', 'horn_coral_block', 'bubble_coral_block', 'sea_lantern']))}`);
         if (r.chance(0.5)) c.push(`setblock ${cx} ${SEA - 2} ${cz} ${B(r.pick(['brain_coral[waterlogged=true]', 'tube_coral[waterlogged=true]', 'fire_coral[waterlogged=true]', 'horn_coral[waterlogged=true]', 'bubble_coral[waterlogged=true]', 'seagrass']))}`);
     }
-    // the start pad, the course parts (a short run of course between them), the gold pad at the end
+    // the start pad, the course parts (a short run of course between them), the emerald pad at the end
     c.push(...floorFill(lo - 1, z0, hi + 1, z0 + 5, L.style));
     c.push(`fill ${lo - 1} ${F - 1} ${z0} ${hi + 1} ${F - 1} ${z0} ${B('blue_concrete')}`);
     L.parts.forEach((p, i) => { if (i) c.push(...floorFill(lo, p.z - 3, hi, p.z - 1, L.style)); c.push(...p.blocks); });
     if (L.tower) c.push(`fill ${lo - 1} ${F - 1} ${z0} ${hi + 1} ${F - 1} ${z0} ${B('yellow_concrete')}`);
-    if (!L.tower) c.push(`fill ${lo - 2} ${F - 1} ${L.finish} ${hi + 2} ${F - 1} ${L.finish + 2} ${B('gold_block')}`,
-    // the arch over the gold pad
+    if (!L.tower) c.push(`fill ${lo - 2} ${F - 1} ${L.finish} ${hi + 2} ${F - 1} ${L.finish + 2} ${B('emerald_block')}`,
+    // the arch over the emerald pad
     `fill ${lo - 2} ${F} ${L.finish + 1} ${lo - 2} ${F + 4} ${L.finish + 1} ${B('white_concrete')}`, `fill ${hi + 2} ${F} ${L.finish + 1} ${hi + 2} ${F + 4} ${L.finish + 1} ${B('white_concrete')}`,
         `fill ${lo - 2} ${F + 5} ${L.finish + 1} ${hi + 2} ${F + 5} ${L.finish + 1} ${B('blue_concrete')}`);
     // the side walls: blue and white from the sea floor up to just above the course, four blocks thick,
@@ -700,7 +700,7 @@ function extraCommands() {
         `fill ${jx - 2} ${jy - 1} ${jz - 2} ${jx + 2} ${jy - 1} ${jz + 2} ${B('blue_concrete')}`,
         `fill ${jx - 2} ${jy + 3} ${jz - 2} ${jx + 2} ${jy + 3} ${jz + 2} ${B('blue_concrete')}`,
         `fill ${jx - 1} ${jy} ${jz - 1} ${jx + 1} ${jy + 2} ${jz + 1} ${B('air')}`,
-        `fill ${wx - 6} ${wy - 1} ${wz - 6} ${wx + 6} ${wy - 1} ${wz + 6} ${B('gold_block')}`,
+        `fill ${wx - 6} ${wy - 1} ${wz - 6} ${wx + 6} ${wy - 1} ${wz + 6} ${B('emerald_block')}`,
         `fill ${wx - 2} ${wy - 1} ${wz - 2} ${wx + 2} ${wy - 1} ${wz + 2} ${B('emerald_block')}`,
         `fill ${wx - 6} ${wy} ${wz - 6} ${wx + 6} ${wy} ${wz + 6} ${B('white_concrete')} hollow`,
         `fill ${wx - 5} ${wy} ${wz - 5} ${wx + 5} ${wy} ${wz + 5} ${B('air')}`,
@@ -828,7 +828,7 @@ export function packFiles() {
         // a glove: bounce
         'execute as @a[tag=wo_in,tag=!wo_ride] at @s if block ~ ~-0.2 ~ #wipeout:glove unless score @s wo_bn matches 1.. unless score @s wo_jail matches 1.. run function wipeout:bounce',
         'execute as @a[scores={wo_bn=1..}] run function wipeout:bounce_tick',
-        // (the gold pad at the end of the level you're on: in that level's tick)
+        // (the emerald pad at the end of the level you're on: in that level's tick)
         // in the sea, or landed on something below the course (the stands): a wipeout
         'execute as @a[tag=wo_in] at @s if block ~ ~ ~ minecraft:water unless score @s wo_jail matches 1.. run function wipeout:fail',
         'execute as @a[tag=wo_in] store result score @s wo_y run data get entity @s Pos[1] 10',
@@ -926,7 +926,7 @@ export function packFiles() {
         const glo = L.x - Math.floor((L.w - 1) / 2) - 1;
         fn(`lvl/${L.n}/tick`, [
             ...L.parts.flatMap(p => p.tick),
-            // the gold pad: on to the next level (on the tower: the gold on top wins)
+            // the emerald pad: on to the next level (on the tower: the emerald on top wins)
             L.tower ? `execute positioned ${L.tower.cx - 2} ${L.tower.top + 0.5} ${L.tower.cz - 2} as @a[tag=wo_in,dx=4,dy=2,dz=4] unless score @s wo_jail matches 1.. unless score @s wo_level matches 101.. run function wipeout:finish`
                 : `execute positioned ${glo - 1} ${F - 0.5} ${L.finish} as @a[tag=wo_in,dx=${L.w + 3},dy=2,dz=2] unless score @s wo_jail matches 1.. unless score @s wo_level matches 101.. run function wipeout:finish`,
         ]);

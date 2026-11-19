@@ -138,7 +138,7 @@ WIPEOUT (Minecraft -> Wipeout)
   100 levels in the sky, in a world of its own that Unbound makes (the first time it builds the
   levels: under a minute). The whole course is one straight line of white and blue concrete over warm
   sea water a few blocks below, between blue and white walls with birch stands on top (a different
-  blue and white design on each level). Each level is two obstacles (three after level 80); the gold
+  blue and white design on each level). Each level is two obstacles (three after level 80); the emerald
   pad at the end of it is the level up, and the next level starts right after it, so you just keep
   running.
     - Touch anything RED and you're dead, back at the start of the level: spinners to jump over, cubes
@@ -159,7 +159,7 @@ WIPEOUT (Minecraft -> Wipeout)
   LEVEL 100 is the Tower: black and yellow, rising out of the sea. Steps spiral round the outside up to
     a landing, then the next steps start on the other side; a red arm sweeps round every landing (two
     on the last one), and a punching glove shoots out of the column across landings 1 to 3. Some steps
-    turn red and disappear for a second: wait for them to come back. Get to the gold on the very top
+    turn red and disappear for a second: wait for them to come back. Get to the emerald on the very top
     to win. Fall off and you land lower down, or it's back to the start of the tower.
   Knocked onto the stands is a wipeout too.
   The next level's obstacles are already moving before you get there, so nothing pops in.
