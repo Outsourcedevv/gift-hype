@@ -19,9 +19,9 @@ import path from 'node:path';
 import { SAVES_DIR } from './singleplayer.js';
 import { knockFiles, knockCommand } from './knock.js';
 
-export const WIPEOUT_WORLD = 'Unbound Wipeout 6';     // 6: the sea higher up, walls closer (made fresh)
+export const WIPEOUT_WORLD = 'Unbound Wipeout 7';     // 7: the walls moved (made fresh)
 export const WIPEOUT_MC = '26.2';
-export const WIPEOUT_BUILD = 9;                  // bump when the levels change, to rebuild them
+export const WIPEOUT_BUILD = 10;                  // bump when the levels change, to rebuild them
 export const LEVELS = 100;
 
 // Settings for making the world the first time: nothing but the levels (and sea), warm ocean colours
@@ -35,7 +35,7 @@ export const WIPEOUT_PROPS = [
 const F = 140;                       // your feet on the course (the floor blocks are at F-1)
 const SEA = F - 6;                   // the sea's top (water from SEA-3 to SEA, sand under it): a short fall
 const ORIGIN_X = 1000, ORIGIN_Z = 1000, SEA_W = 60;     // the course runs north to south along x=1000; sea 60 each side
-const WALL_X = 9, TOWER_WALL_X = 12;  // the side walls' inner face, either side of the middle (wider round the tower)
+const WALL_X = 11, TOWER_WALL_X = 13; // the side walls' inner face, either side of the middle (wider round the tower)
 const JAIL = [700, F, 700], WIN = [700, F, 800];
 const B = b => `minecraft:${b}`;
 const J = o => JSON.stringify(o);
@@ -50,8 +50,8 @@ function rngFor(seed) {
 // ---------- the look ----------
 // The course: white with blue, a different pattern on different levels
 const FLOOR_STYLES = ['edges', 'stripes', 'checker', 'center', 'zigzag'];
-// The side walls' designs: all blue and white
-const BW = ['blue_concrete', 'white_concrete'];
+// The side walls' designs: light blue and white (so the blue and white course stands out against them)
+const BW = ['light_blue_concrete', 'white_concrete'];
 const STAND_STYLES = ['waves', 'checker', 'stripes', 'diamonds', 'bands', 'dots', 'arrows'].map(name => ({ name, cols: BW }));
 
 // ---------- the obstacles ----------
@@ -630,23 +630,21 @@ function levelCommands(L) {
     // the arch over the emerald pad
     `fill ${lo - 2} ${F} ${L.finish + 1} ${lo - 2} ${F + 4} ${L.finish + 1} ${B('white_concrete')}`, `fill ${hi + 2} ${F} ${L.finish + 1} ${hi + 2} ${F + 4} ${L.finish + 1} ${B('white_concrete')}`,
         `fill ${lo - 2} ${F + 5} ${L.finish + 1} ${hi + 2} ${F + 5} ${L.finish + 1} ${B('blue_concrete')}`);
-    // the side walls: blue and white from the sea floor up to just above the course, four blocks thick,
-    // with birch stands on top (rows of seats stepping up and back, looking at the course)
+    // the side walls: light blue and white from the sea floor up to the course's height, with stands on
+    // top: three rows of birch seats on concrete steps, a low wall behind
     // (they run the whole way along, at the same place for every level)
-    const s1 = z0, s2 = end - 1, IN = L.tower ? TOWER_WALL_X : WALL_X, top = F + 1;
+    const s1 = z0, s2 = end - 1, IN = L.tower ? TOWER_WALL_X : WALL_X;
     for (const side of [-1, 1]) {
-        const face = x + side * IN, far = x + side * (IN + 3);
-        c.push(`fill ${Math.min(face, far)} ${SEA - 5} ${s1} ${Math.max(face, far)} ${top} ${s2} ${B('white_concrete')}`);
-        c.push(...standWall(face, SEA - 5, top, s1, s2, L.stand));              // the design on the face
-        c.push(`fill ${Math.min(face, far)} ${top} ${s1} ${Math.max(face, far)} ${top} ${s2} ${B('blue_concrete')}`);
+        const face = x + side * IN, far = x + side * (IN + 3), xa = Math.min(face, far), xb = Math.max(face, far);
+        c.push(`fill ${xa} ${SEA - 5} ${s1} ${xb} ${F - 1} ${s2} ${B('white_concrete')}`);
+        c.push(...standWall(face, SEA - 5, F - 1, s1, s2, L.stand));               // the design on the face
         const facing = side < 0 ? 'east' : 'west';
-        for (let t = 0; t < 4; t++) {
-            const sx = face + side * t, sy = top + 1 + t;
-            if (t) c.push(`fill ${sx} ${top + 1} ${s1} ${sx} ${sy - 1} ${s2} ${B('birch_planks')}`);
-            c.push(`fill ${sx} ${sy} ${s1} ${sx} ${sy} ${s2} ${B(`birch_stairs[facing=${facing}]`)}`);
+        for (let t = 0; t < 3; t++) {
+            const sx = face + side * t;
+            if (t) c.push(`fill ${sx} ${F} ${s1} ${sx} ${F - 1 + t} ${s2} ${B('white_concrete')}`);    // the step
+            c.push(`fill ${sx} ${F + t} ${s1} ${sx} ${F + t} ${s2} ${B(`birch_stairs[facing=${facing}]`)}`);   // the seats
         }
-        // a birch rail along the back of the top row
-        c.push(`fill ${far} ${top + 5} ${s1} ${far} ${top + 5} ${s2} ${B('birch_fence')}`);
+        c.push(...standWall(far, F, F + 3, s1, s2, L.stand));                         // the wall behind
     }
     // the level's number over the start, and the finish sign
     c.push(`kill @e[type=minecraft:text_display,tag=wo_sign,x=${x},y=${F + 3},z=${z0 + 3},distance=..3]`,
@@ -834,10 +832,11 @@ export function packFiles() {
         'execute as @a[tag=wo_in] store result score @s wo_y run data get entity @s Pos[1] 10',
         `execute as @a[tag=wo_in,tag=!wo_ride] at @s if predicate wipeout:on_ground unless score @s wo_jail matches 1.. if score @s wo_y matches ..${F * 10 - 15} run function wipeout:fail`,
         `execute as @a[tag=wo_in] if score @s wo_y matches ..${(SEA - 8) * 10} run function wipeout:fail`,
-        // knocked onto the stands (on top of the side walls): a wipeout too. Nothing on the course is that
-        // high up except the tower, where it's how far out you are that counts
-        `execute unless score #lvl wo_v matches ${LEVELS} as @a[tag=wo_in,tag=!wo_ride] at @s if predicate wipeout:on_ground unless score @s wo_jail matches 1.. if score @s wo_y matches ${(F + 2.5) * 10}.. run function wipeout:fail`,
-        `execute if score #lvl wo_v matches ${LEVELS} as @a[tag=wo_in] store result score @s wo_px run data get entity @s Pos[0] 10`,
+        // knocked onto the stands (on top of the side walls): a wipeout too. That's anywhere past the walls'
+        // face; and nothing on the course you can stand on is that high up (the glove wall's top)
+        `execute if score #lvl wo_v matches 1..${LEVELS - 1} as @a[tag=wo_in,tag=!wo_ride] at @s if predicate wipeout:on_ground unless score @s wo_jail matches 1.. if score @s wo_y matches ${(F + 2.5) * 10}.. run function wipeout:fail`,
+        'execute as @a[tag=wo_in] store result score @s wo_px run data get entity @s Pos[0] 10',
+        `execute if score #lvl wo_v matches 1..${LEVELS - 1} as @a[tag=wo_in] unless score @s wo_jail matches 1.. unless score @s wo_px matches ${(ORIGIN_X - WALL_X + 0.3) * 10}..${(ORIGIN_X + WALL_X - 0.3) * 10} run function wipeout:fail`,
         `execute if score #lvl wo_v matches ${LEVELS} as @a[tag=wo_in] unless score @s wo_jail matches 1.. unless score @s wo_px matches ${(ORIGIN_X - TOWER_WALL_X + 0.3) * 10}..${(ORIGIN_X + TOWER_WALL_X - 0.3) * 10} run function wipeout:fail`,
         'execute as @a[scores={wo_jail=1..}] run function wipeout:jail/tick',
         'execute as @e[tag=wo_alert] run function wipeout:alert/tick',
