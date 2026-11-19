@@ -22,6 +22,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { SAVES_DIR } from './singleplayer.js';
+import { knockFiles, knockCommand } from './knock.js';
 
 // "2": the levels got twice as tall, so the world needs a taller sky than an existing world can be
 // given. The first Dropper world ("Gift Hype Dropper") is left as it was.
@@ -1079,18 +1080,21 @@ const TALL_OVERWORLD = {
     monster_spawn_block_light_limit: 0, monster_spawn_light_level: { type: 'minecraft:uniform', max_inclusive: 7, min_inclusive: 0 },
     timelines: '#minecraft:in_overworld',
 };
-function packFiles() {
+export function packFiles() {
     const f = {
         'pack.mcmeta': JSON.stringify({ pack: { description: 'Unbound Dropper: 100 levels', min_format: 94, max_format: 999 } }, null, 2),
         'data/minecraft/tags/function/load.json': J({ values: ['dropper:load'] }),
         'data/minecraft/tags/function/tick.json': J({ values: ['dropper:tick'] }),
     };
     const fn = (name, lines) => { f[`data/dropper/function/${name}.mcfunction`] = lines.join('\n') + '\n'; };
+    const knock = knockFiles('dropper', 'dr_');
+    Object.assign(f, knock.files);
     const title = (who, text, sub, color = 'gold', subColor = 'white') => [
         `title ${who} times 3 30 8`, `title ${who} title ${J({ text, color, bold: true })}`, ...(sub ? [`title ${who} subtitle ${J({ text: sub, color: subColor })}`] : []),
     ];
 
     fn('load', [
+        ...knock.objectives.map(o => `scoreboard objectives add ${o} dummy`),
         'scoreboard objectives add dr_level dummy', 'scoreboard objectives add dr_fails dummy', 'scoreboard objectives add dr_jail dummy', 'scoreboard objectives add dr_js dummy', 'scoreboard objectives add dr_v dummy',
         'scoreboard players set #20 dr_v 20',
         'execute unless score #punch dr_v matches 0..1 run scoreboard players set #punch dr_v 1',
@@ -1117,6 +1121,8 @@ function packFiles() {
         `execute as @a[tag=dr_in] at @s unless score @s dr_jail matches 1.. positioned ~ ${WORLD_MIN} ~ if entity @s[dy=1] run function dropper:goto`,
         'execute as @a[scores={dr_jail=1..}] run function dropper:jail/tick',
         'execute as @e[tag=dr_alert] run function dropper:alert/tick',
+        // gift punches (arrows or sword hits), one at a time
+        ...knock.tick,
         'execute if score #reset dr_v matches 1.. run function dropper:reset/tick',
         'scoreboard players add #hud dr_v 1',
         'execute if score #hud dr_v matches 10.. as @a[tag=dr_in] run function dropper:hud',
@@ -1267,29 +1273,13 @@ function packFiles() {
     fn('jail/tick', ['scoreboard players remove @s dr_jail 1', 'execute if score @s dr_jail matches ..0 run function dropper:jail/free']);
     fn('jail/free', ['scoreboard players set @s dr_jail 0', 'execute at @s run fill ~-1 ~ ~-1 ~1 ~3 ~1 minecraft:air replace minecraft:iron_bars', 'effect clear @s minecraft:jump_boost', 'playsound minecraft:block.iron_door.open master @s ~ ~ ~ 1 1', 'tag @s add dr_quiet', 'function dropper:goto', 'tag @s remove dr_quiet', ...title('@s', 'FREE', '', 'green')]);
 
-    // gifts: punches. An arrow with Punch II hits you from a random side (only while punches are on).
-    fn('punch', [
-        `execute if score #punch dr_v matches 0 run return run title @s actionbar ${J({ text: 'Punches are OFF', color: 'green', bold: true })}`,
-        'execute store result storage dropper:p vy double 0.001 run data get entity @s Motion[1] 1000',
-        'execute store result score #r dr_v run random value 0..7',
-        ...Array.from({ length: 8 }, (_, i) => `execute if score #r dr_v matches ${i} run return run function dropper:punch/d${i} with storage dropper:p`),
-    ]);
-    const arrow = (mx, mz) => `summon minecraft:arrow ~ ~ ~ {Motion:[${mx.toFixed(3)}d,$(vy)d,${mz.toFixed(3)}d],damage:2.0d,crit:1b,pickup:2b,weapon:{id:"minecraft:bow",count:1,components:{"minecraft:enchantments":{"minecraft:punch":2}}}}`;
-    for (let i = 0; i < 8; i++) {
-        const a = i * Math.PI / 4, dx = Math.sin(a) * 0.45, dz = Math.cos(a) * 0.45, sp = 2 / 0.45;
-        fn(`punch/d${i}`, [
-            'playsound minecraft:entity.arrow.shoot master @a ~ ~1 ~ 1 1',
-            `$execute positioned ~${dx.toFixed(3)} ~1.1 ~${dz.toFixed(3)} if block ~ ~ ~ #minecraft:replaceable run return run ${arrow(-dx * sp, -dz * sp)}`,
-            `$execute positioned ~${(-dx).toFixed(3)} ~1.1 ~${(-dz).toFixed(3)} if block ~ ~ ~ #minecraft:replaceable run return run ${arrow(dx * sp, dz * sp)}`,
-            `execute positioned ~ ~2.3 ~ run ${arrow(0, 0).replace('$(vy)d', '-2.0d')}`,
-        ]);
-    }
+    // gifts: punches (arrows or sword hits: knock.js)
     fn('punch_toggle', [
         'execute store success score #was dr_v if score #punch dr_v matches 1',
         'execute if score #was dr_v matches 1 run scoreboard players set #punch dr_v 0',
         'execute if score #was dr_v matches 0 run scoreboard players set #punch dr_v 1',
-        ...title('@a', 'PUNCHES ON', 'Arrows can knock you around', 'red').map(l => `execute if score #punch dr_v matches 1 run ${l}`),
-        ...title('@a', 'PUNCHES OFF', 'No more arrows', 'green').map(l => `execute if score #punch dr_v matches 0 run ${l}`),
+        ...title('@a', 'PUNCHES ON', 'Arrows and swords can knock you around', 'red').map(l => `execute if score #punch dr_v matches 1 run ${l}`),
+        ...title('@a', 'PUNCHES OFF', 'No more arrows or swords', 'green').map(l => `execute if score #punch dr_v matches 0 run ${l}`),
         'execute as @a at @s run playsound minecraft:block.lever.click master @s ~ ~ ~ 1 1',
     ]);
 
@@ -1396,7 +1386,7 @@ export function wheelAmounts(a) {
 export function dropperCommands(a, times, { saveGift = 'Glowing Jellyfish' } = {}) {
     const n = (v, lo, hi, def) => Math.max(lo, Math.min(hi, Number.isFinite(+v) && +v > 0 ? Math.round(+v) : def));
     switch (a.type) {
-        case 'punch': return Array(Math.min(n(a.amount, 1, 10, 1) * times, 10)).fill('function dropper:punch');
+        case 'punch': return [knockCommand('dropper', a, Math.min(n(a.amount, 1, 10, 1) * times, 10))];
         case 'punchToggle': return ['function dropper:punch_toggle'];
         case 'levelUp': return [`function dropper:up {n:${Math.min(99, n(a.amount, 1, 99, 1) * times)}}`];
         case 'levelDown': return [`function dropper:down {n:${Math.min(99, n(a.amount, 1, 99, 1) * times)}}`];
@@ -1414,7 +1404,7 @@ export function dropperAlertText(rule, count) {
     let color = 'white';
     const parts = rule.actions.map(a => {
         switch (a.type) {
-            case 'punch': { const k = n(a.amount, 1) * times; color = 'red'; return `punched you${k > 1 ? ` x${k}` : ''}`; }
+            case 'punch': { const k = n(a.amount, 1) * times; color = 'red'; return `${a.style === 'sword' ? 'hit you with a sword' : 'punched you'}${k > 1 ? ` x${k}` : ''}`; }
             case 'levelUp': { const k = n(a.amount, 1) * times; color = 'green'; return `+${k} level${k > 1 ? 's' : ''}`; }
             case 'levelDown': { const k = n(a.amount, 1) * times; color = 'red'; return `-${k} level${k > 1 ? 's' : ''}`; }
             case 'jail': color = 'red'; return `jailed you for ${n(a.seconds, 5) * times}s`;

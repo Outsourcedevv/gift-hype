@@ -144,7 +144,8 @@ WIPEOUT (Minecraft -> Wipeout)
       sliding across, waves of red walls coming down a corridor at you
       (duck into a hole in the side while one goes past, then run to the next hole), crushers slamming down, red
       blocks sweeping past the zipline.
-    - Punching gloves from the side (red and white wool) knock you off into the sea.
+    - Punching gloves (red and white wool) shoot out of holes in a big wall on metal arms and knock
+      you off into the sea. Wait for one to go back into its hole, then run past.
     - Red and white boxing gloves bounce you up: jump from glove to glove over the water.
     - The zipline: step on the gold pressure plate and you ride under the iron bars, past up to three
       red blocks sweeping side to side. They're timed together: step on when the light on top of the
@@ -159,6 +160,7 @@ WIPEOUT (Minecraft -> Wipeout)
     on the last one). Get to the gold on the very top to win. Fall off and you land lower down (or in
     the sea).
   The next level's obstacles are already moving before you get there, so nothing pops in.
+  Every level has been checked tick by tick to make sure it can be done (at a little under a sprint).
   There are no checkpoints: fall in the sea (a wipeout) or touch red and the level starts again.
   Levels 1 to 80 take about 10 seconds, 81 to 100 a bit longer. The gifts are the Dropper's: levels up
   and down, punches (on/off), jail, the level slot machine, the reset countdown and the save.
@@ -201,7 +203,7 @@ THE DROPPER (Minecraft -> Dropper)
   the seconds left and "Send Glowing Jellyfish to SAVE me!", and the reset's sound (I Need a Hero)
   plays on for the whole countdown until someone saves you. Jail locks you in a cage on your level's
   bridge.
-  Starting gifts: Finger Heart = punch arrow (only while punches are on), Doughnut = punches on/off,
+  Starting gifts: Finger Heart = punch (only while punches are on), Doughnut = punches on/off,
     Rosa = jail 5s, Paper Crane / Corgi = up 1 / 5 levels, Hat and Mustache / Boxing Gloves = down 1 / 5,
     Galaxy = 60s reset countdown (back to level 1), Glowing Jellyfish = saves you (or a shield if no
     countdown is running), Hand Hearts = level slot machine. Change any of them like other gifts.
@@ -209,6 +211,8 @@ THE DROPPER (Minecraft -> Dropper)
     numbers go past) and stops on one of the amounts you typed for that gift (e.g. -10, -5, -1, 1, 5, 10).
     Green + sends you up that many levels, red - sends you down. Numbers are in Monocraft, a free
     Minecraft-style font (publiconts, SIL Open Font License).
+  PUNCHES: each punch action can be an arrow (Punch II) or a sword hit (pick "hit with" on the action).
+    Every one lands, from a random side, and several come one after another. You never lose health.
 
 GIFTS
   + Add gift / Browse all gifts   - every TikTok gift with its picture and price

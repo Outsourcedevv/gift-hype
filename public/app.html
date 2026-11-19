@@ -2111,8 +2111,8 @@ async function renderMinecraftBox() {
 const ACTION_TYPES = {
   nuke: { label: 'Nuke', conn: 'minecraft', desc: 'A nuke falls on you and goes up in a mushroom cloud, leaving a huge crater down to y -20: a wide flat middle, then a steep wall you can just climb. Size = how far the flat middle goes out (40 makes a hole about 18 chunks across)', fields: { size: { label: 'crater size', def: 40, min: 16, max: 64 } } },
   jail: { label: 'Jail', conn: 'minecraft', desc: 'Locks you in a jail (in the Dropper: a cell at the start of your level; in Wipeout: a cage where you are)', fields: { seconds: { label: 'seconds', def: 30, min: 1, max: 3600 } } },
-  punch: { label: 'Punch arrow', conn: 'minecraft', desc: 'An arrow with Punch II knocks you from a random side. Only while punches are on', fields: { amount: { label: 'arrows', def: 1, min: 1, max: 10 } } },
-  punchToggle: { label: 'Punches on/off', conn: 'minecraft', desc: 'Turns punch arrows off if they are on, and back on if they are off' },
+  punch: { label: 'Punch (arrow or sword)', conn: 'minecraft', desc: 'Knocks you from a random side: an arrow with Punch II, or a sword hit. Every one lands; several come one after another. Only while punches are on', fields: { style: { label: 'hit with', def: 'arrow', choices: [['arrow', 'an arrow'], ['sword', 'a sword']] }, amount: { label: 'hits', def: 1, min: 1, max: 10 } } },
+  punchToggle: { label: 'Punches on/off', conn: 'minecraft', desc: 'Turns punches (arrows and sword hits) off if they are on, and back on if they are off' },
   levelUp: { label: 'Level up', conn: 'minecraft', desc: 'Skips you ahead to the start of a later level', fields: { amount: { label: 'levels', def: 1, min: 1, max: 99 } } },
   levelDown: { label: 'Level down', conn: 'minecraft', desc: 'Sends you back to the start of an earlier level', fields: { amount: { label: 'levels', def: 1, min: 1, max: 99 } } },
   resetTimer: { label: 'Reset countdown', conn: 'minecraft', desc: 'A countdown starts on screen. At 0 you go back to level 1, unless someone sends the save gift', fields: { seconds: { label: 'seconds', def: 60, min: 5, max: 600 } } },
@@ -2142,6 +2142,7 @@ function actionFields(a) {
   const parts = Object.entries(t.fields || {}).map(([k, f]) => {
     const v = a[k] ?? f.def;
     if (f.mob) return `<select data-a="${k}" aria-label="Mob">${(mobs.length ? mobs : [{ id: v, name: v }]).map(m => `<option value="${esc(m.id)}" ${m.id === v ? 'selected' : ''}>${esc(m.name)}</option>`).join('')}</select>`;
+    if (f.choices) return `<span>${esc(f.label)}</span><select data-a="${k}" aria-label="${esc(f.label)}">${f.choices.map(([cv, cl]) => `<option value="${esc(cv)}" ${cv === v ? 'selected' : ''}>${esc(cl)}</option>`).join('')}</select>`;
     if (f.text) return `<input type="text" data-a="${k}" value="${esc(v)}" placeholder="${esc(f.text)}" spellcheck="false">`;
     return `<span>${esc(f.label)}</span><input type="number" data-a="${k}" value="${esc(v)}" ${f.min != null ? `min="${f.min}"` : ''} ${f.max != null ? `max="${f.max}"` : ''} step="${f.step || 1}">`;
   });
