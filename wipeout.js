@@ -21,7 +21,7 @@ import { knockFiles, knockCommand } from './knock.js';
 
 export const WIPEOUT_WORLD = 'Unbound Wipeout 10';    // 10: shorter emerald pads on quartz (the layout moved)
 export const WIPEOUT_MC = '26.2';
-export const WIPEOUT_BUILD = 14;                  // bump when the levels change, to rebuild them
+export const WIPEOUT_BUILD = 15;                  // bump when the levels change, to rebuild them
 export const LEVELS = 100;
 
 // Settings for making the world the first time: nothing but the levels (and sea), warm ocean colours
@@ -180,33 +180,47 @@ function obstacle(type, ctx) {
         case 'punch': {
             const count = Math.min(5, 2 + Math.floor(d * 3) + r.int(0, 1)), L = count * 4 + 2, side = r.chance(0.5) ? 1 : -1;
             floorRow(lo, z, hi, z + L - 1);
-            // each glove sits in a small square frame at the course's edge and comes out of it on its arm
-            // (the arm moves with it, and knocks you back too: you can't run through it)
-            const reach = w + 0.4, arm = reach - 0.5;
-            const wallX = side > 0 ? hi + 1 : lo - 1;
-            const out = Math.max(3, Math.round(reach / sp(0.55, 0.85))), back = Math.round(reach / 0.15);
+            // each glove sits in a small frame at the course's edge, black right behind it, and shoots out on
+            // an iron arm that grows out of the frame with it and goes back in with it (hidden while it's in).
+            // The arm knocks you back too: you can't run through it
+            const reach = w + 0.4, G = 1.6, cuff = 0.35;
+            const wallX = side > 0 ? hi + 1 : lo - 1, back = wallX + 2 * side;    // the hole is 2 deep, then black
+            const out = Math.max(3, Math.round(reach / sp(0.55, 0.85))), ret = Math.round(reach / 0.15);
             const wait = Math.round(42 - 22 * d) + r.int(0, 10);
-            const vo = +(reach / out).toFixed(3), vb = +(reach / back).toFixed(3);
+            const vo = +(reach / out).toFixed(3), vb = +(reach / ret).toFixed(3);
             for (let i = 0; i < count; i++) {
-                const pz = z + 2 + i * 4, pid = `${id}p${i}`;
-                o.blocks.push(`fill ${wallX} ${F - 1} ${pz - 1} ${wallX} ${F + 2} ${pz + 2} ${B('blue_concrete')}`,
-                    `fill ${wallX} ${F + 2} ${pz - 1} ${wallX} ${F + 2} ${pz + 2} ${B('white_concrete')}`,
-                    `fill ${wallX} ${F} ${pz} ${wallX} ${F + 1} ${pz + 1} ${B('air')}`);
-                const steps = [{ d: [0, 0, 0], t: wait }, { d: [-side * vo, 0, 0], t: out }, { d: [0, 0, 0], t: 6 }, { d: [side * vb, 0, 0], t: back }];
-                const tot = wait + out + 6 + back, off = Math.round(i * tot / count + r.int(0, 8)) % tot;
-                // resting: the glove's front level with the frame
-                const gx = side > 0 ? wallX : wallX + 1 - 1.6, gy = F + 0.2, gz = pz + 0.2;
+                const pz = z + 2 + i * 4, pid = `${id}p${i}`, aid = `${pid}a`;
+                const x1 = Math.min(wallX, back), x2 = Math.max(wallX, back);
+                o.blocks.push(`fill ${x1} ${F - 1} ${pz - 1} ${x2} ${F + 2} ${pz + 2} ${B('blue_concrete')}`,
+                    `fill ${x1} ${F + 2} ${pz - 1} ${x2} ${F + 2} ${pz + 2} ${B('white_concrete')}`,
+                    `fill ${Math.min(wallX, wallX + side)} ${F} ${pz} ${Math.max(wallX, wallX + side)} ${F + 1} ${pz + 1} ${B('air')}`,
+                    `fill ${back} ${F} ${pz} ${back} ${F + 1} ${pz + 1} ${B('black_concrete')}`);
+                const steps = [{ d: [0, 0, 0], t: wait }, { d: [-side * vo, 0, 0], t: out }, { d: [0, 0, 0], t: 6 }, { d: [side * vb, 0, 0], t: ret }];
+                const tot = wait + out + 6 + ret, off = Math.round(i * tot / count + r.int(0, 8)) % tot;
+                // resting: in the hole, its front level with the frame
+                const gx = side > 0 ? wallX : wallX + 1 - G, gy = F + 0.2, gz = pz + 0.2;
                 const at = (dx, dy, dz) => posAt([gx + dx, gy + dy, gz + dz], steps, off);
-                const armAt = [side > 0 ? 2.05 : -0.45 - arm, 0.55, 0.55];
+                // the arm: fixed to the black at the back of the hole, as long as the glove is out
+                const face = side > 0 ? back : back + 1, now = Math.abs(at(0, 0, 0)[0] - gx);
+                const armT = len => `{left_rotation:[0f,0f,0f,1f],right_rotation:[0f,0f,0f,1f],translation:[${side > 0 ? -len.toFixed(3) : 0}f,0f,0f],scale:[${Math.max(0.001, len).toFixed(3)}f,0.5f,0.5f]}`;
                 o.spawn.push(
-                    display([id, pid, 'wo_glove'], ...at(0, 0, 0), 'red_wool', 1.6, 1.6, 1.6),
-                    display([id, pid], ...at(side > 0 ? 1.6 : -0.45, 0.3, 0.3), 'white_wool', 0.45, 1.0, 1.0),           // the cuff
-                    display([id, pid, 'wo_garm'], ...at(...armAt), 'iron_block', arm, 0.5, 0.5),                        // the arm
+                    display([id, pid, 'wo_glove'], ...at(0, 0, 0), 'red_wool', G, G, G),
+                    display([id, pid], ...at(side > 0 ? G : -cuff, 0.3, 0.3), 'white_wool', cuff, 1.0, 1.0),           // the cuff
+                    `summon minecraft:block_display ${face.toFixed(3)} ${(gy + 0.55).toFixed(3)} ${(gz + 0.55).toFixed(3)} {Tags:["wo_mv","wo_new","${id}","${aid}"],block_state:{Name:"minecraft:iron_block"},transformation:${armT(now)}}`,
                     `scoreboard players set @e[tag=${pid}] wo_ph ${off}`);
-                o.sim.push({ kind: 'lane', axis: 'x', p0: [gx, gy, gz], steps, off, size: [1.6, 1.6, 1.6], lo, hi,
-                    also: [{ p0: [gx + armAt[0], gy + armAt[1], gz + armAt[2]], size: [arm, 0.5, 0.5] }] });
-                o.tick.push(...moveLines(pid, steps), hitBox(pid, 1.6, 1.6, 1.6, `tag=${pid},tag=wo_glove`, 'hit {p:2}'),
-                    hitBox(pid, arm, 0.5, 0.5, `tag=${pid},tag=wo_garm`, 'hit {p:1}'));
+                o.sim.push({ kind: 'lane', axis: 'x', p0: [gx, gy, gz], steps, off, size: [G, G, G], lo, hi, arm: { face, side, back: side > 0 ? G + cuff : -cuff } });
+                o.tick.push(...moveLines(pid, steps), hitBox(pid, G, G, G, `tag=${pid},tag=wo_glove`, 'hit {p:2}'),
+                    // the arm grows out with the glove, and goes back in with it
+                    `execute if entity @e[tag=${pid},tag=wo_glove,scores={wo_ph=${wait}}] run data merge entity @e[tag=${aid},limit=1] {start_interpolation:0,interpolation_duration:${out},transformation:${armT(reach)}}`,
+                    `execute if entity @e[tag=${pid},tag=wo_glove,scores={wo_ph=${wait + out + 6}}] run data merge entity @e[tag=${aid},limit=1] {start_interpolation:0,interpolation_duration:${ret},transformation:${armT(0)}}`);
+                // ...and knocks you back wherever it is: each block across, while the glove is past it
+                for (let k = 0; k < Math.ceil(reach); k++) {
+                    const sx = side > 0 ? wallX - k - 1 : wallX + k + 1;          // this block of the course (its low corner)
+                    // (the glove's corner is a point: the box goes half a block round it up and down)
+                    const past = side > 0 ? `positioned ${sx - 60} ${gy - 0.5} ${gz - 0.5} if entity @e[tag=${pid},tag=wo_glove,dx=${(60 - G - cuff - 1).toFixed(2)},dy=0,dz=0]`
+                        : `positioned ${sx + 1 + cuff} ${gy - 0.5} ${gz - 0.5} if entity @e[tag=${pid},tag=wo_glove,dx=59,dy=0,dz=0]`;
+                    o.tick.push(`execute ${past} positioned ${sx + 0.1} ${gy + 0.65} ${gz + 0.65} if entity @a[tag=wo_in,dx=-0.2,dy=-0.7,dz=-0.7] positioned ${sx + 0.5} ${gy + 0.8} ${gz + 0.8} as @a[tag=wo_in,sort=nearest,limit=1] run function wipeout:hit {p:1}`);
+                }
             }
             o.len = L; o.secs = 1.2 + count * 1.0;
             break;
@@ -646,18 +660,16 @@ function levelCommands(L) {
                 c.push(`fill ${cx2} ${top + 1} ${zz} ${cx2} ${top + cr.int(1, 3)} ${zz} ${B('birch_planks')}`);
             }
         }
-        // sea lanterns standing on the sea floor, 3x3x3 cubes (up to the top of the water) in a line a
-        // little in from the wall
+        // sea lanterns set in the sea floor, 3x3x3 cubes in a line a little in from the wall
         for (let zz = s1 + (((ORIGIN_Z + 1 - s1) % 9) + 9) % 9; zz + 1 <= s2; zz += 9) if (zz - 1 >= s1) {
             const lx = x + side * (IN - 3);
-            c.push(`fill ${lx - 1} ${SEA - 2} ${zz - 1} ${lx + 1} ${SEA} ${zz + 1} ${B('sea_lantern')}`);
+            c.push(`fill ${lx - 1} ${SEA - 5} ${zz - 1} ${lx + 1} ${SEA - 3} ${zz + 1} ${B('sea_lantern')}`);
         }
-        // floodlights: a white pole twelve blocks up, a 3x3 of sea lanterns at the top facing the course
+        // floodlights: a white pole with a 3x3x3 cube of sea lanterns on top, twelve blocks up in all
         for (let zz = s1 + (((ORIGIN_Z + 20 - s1) % 48) + 48) % 48; zz <= s2; zz += 48) {
             const px = x + side * (IN + 4);
-            c.push(`fill ${px} ${top + 1} ${zz} ${px} ${top + 12} ${zz} ${B('white_concrete')}`,
-                `fill ${px} ${top + 10} ${zz - 1} ${px} ${top + 12} ${zz + 1} ${B('white_concrete')}`,
-                `fill ${px - side} ${top + 10} ${zz - 1} ${px - side} ${top + 12} ${zz + 1} ${B('sea_lantern')}`);
+            c.push(`fill ${px} ${top + 1} ${zz} ${px} ${top + 9} ${zz} ${B('white_concrete')}`,
+                `fill ${px - 1} ${top + 10} ${zz - 1} ${px + 1} ${top + 12} ${zz + 1} ${B('sea_lantern')}`);
         }
     }
     // the level's number over the start, and the finish sign
