@@ -19,9 +19,9 @@ import path from 'node:path';
 import { SAVES_DIR } from './singleplayer.js';
 import { knockFiles, knockCommand } from './knock.js';
 
-export const WIPEOUT_WORLD = 'Unbound Wipeout 8';     // 8: lower walls with a crowd, clouds (made fresh)
+export const WIPEOUT_WORLD = 'Unbound Wipeout 9';     // 9: shallower sea, lantern cubes, glove frames (made fresh)
 export const WIPEOUT_MC = '26.2';
-export const WIPEOUT_BUILD = 11;                  // bump when the levels change, to rebuild them
+export const WIPEOUT_BUILD = 12;                  // bump when the levels change, to rebuild them
 export const LEVELS = 100;
 
 // Settings for making the world the first time: nothing but the levels (and sea), warm ocean colours
@@ -180,34 +180,33 @@ function obstacle(type, ctx) {
         case 'punch': {
             const count = Math.min(5, 2 + Math.floor(d * 3) + r.int(0, 1)), L = count * 4 + 2, side = r.chance(0.5) ? 1 : -1;
             floorRow(lo, z, hi, z + L - 1);
-            const reach = w + 0.4, arm = reach + 1.6;
-            // the wall: its face along the course's edge, out to the side wall (the arms go back into that)
-            const wallX = side > 0 ? hi + 1 : lo - 1, backX = x + side * (WALL_X + 1);
-            const xa = Math.min(wallX, backX), xb = Math.max(wallX, backX);
-            o.blocks.push(`fill ${xa} ${F - 1} ${z - 1} ${xb} ${F + 3} ${z + L} ${B('light_blue_concrete')}`, `fill ${xa} ${F + 4} ${z - 1} ${xb} ${F + 4} ${z + L} ${B('blue_concrete')}`,
-                `fill ${wallX} ${F + 3} ${z - 1} ${wallX} ${F + 3} ${z + L} ${B('white_concrete')}`);
+            // each glove sits in a small square frame at the course's edge and comes out of it on its arm
+            // (the arm moves with it, and knocks you back too: you can't run through it)
+            const reach = w + 0.4, arm = reach - 0.5;
+            const wallX = side > 0 ? hi + 1 : lo - 1;
             const out = Math.max(3, Math.round(reach / sp(0.55, 0.85))), back = Math.round(reach / 0.15);
             const wait = Math.round(42 - 22 * d) + r.int(0, 10);
             const vo = +(reach / out).toFixed(3), vb = +(reach / back).toFixed(3);
             for (let i = 0; i < count; i++) {
                 const pz = z + 2 + i * 4, pid = `${id}p${i}`;
-                // its hole: two wide, two high, two deep, dark at the back
-                const h1 = wallX, h2 = wallX + side;
-                o.blocks.push(`fill ${Math.min(h1, h2)} ${F} ${pz} ${Math.max(h1, h2)} ${F + 1} ${pz + 1} ${B('air')}`,
-                    `fill ${wallX + 2 * side} ${F} ${pz} ${wallX + 2 * side} ${F + 1} ${pz + 1} ${B('gray_concrete')}`,
-                    `fill ${wallX} ${F + 2} ${pz} ${wallX} ${F + 2} ${pz + 1} ${B('blue_concrete')}`);
+                o.blocks.push(`fill ${wallX} ${F - 1} ${pz - 1} ${wallX} ${F + 2} ${pz + 2} ${B('blue_concrete')}`,
+                    `fill ${wallX} ${F + 2} ${pz - 1} ${wallX} ${F + 2} ${pz + 2} ${B('white_concrete')}`,
+                    `fill ${wallX} ${F} ${pz} ${wallX} ${F + 1} ${pz + 1} ${B('air')}`);
                 const steps = [{ d: [0, 0, 0], t: wait }, { d: [-side * vo, 0, 0], t: out }, { d: [0, 0, 0], t: 6 }, { d: [side * vb, 0, 0], t: back }];
                 const tot = wait + out + 6 + back, off = Math.round(i * tot / count + r.int(0, 8)) % tot;
-                // resting: the glove sits in its hole, its front level with the wall
+                // resting: the glove's front level with the frame
                 const gx = side > 0 ? wallX : wallX + 1 - 1.6, gy = F + 0.2, gz = pz + 0.2;
                 const at = (dx, dy, dz) => posAt([gx + dx, gy + dy, gz + dz], steps, off);
+                const armAt = [side > 0 ? 2.05 : -0.45 - arm, 0.55, 0.55];
                 o.spawn.push(
                     display([id, pid, 'wo_glove'], ...at(0, 0, 0), 'red_wool', 1.6, 1.6, 1.6),
                     display([id, pid], ...at(side > 0 ? 1.6 : -0.45, 0.3, 0.3), 'white_wool', 0.45, 1.0, 1.0),           // the cuff
-                    display([id, pid], ...at(side > 0 ? 2.05 : -0.45 - arm, 0.55, 0.55), 'iron_block', arm, 0.5, 0.5),   // the arm, back into the wall
+                    display([id, pid, 'wo_garm'], ...at(...armAt), 'iron_block', arm, 0.5, 0.5),                        // the arm
                     `scoreboard players set @e[tag=${pid}] wo_ph ${off}`);
-                o.sim.push({ kind: 'lane', axis: 'x', p0: [gx, gy, gz], steps, off, size: [1.6, 1.6, 1.6], lo, hi });
-                o.tick.push(...moveLines(pid, steps), hitBox(pid, 1.6, 1.6, 1.6, `tag=${pid},tag=wo_glove`, 'hit {p:2}'));
+                o.sim.push({ kind: 'lane', axis: 'x', p0: [gx, gy, gz], steps, off, size: [1.6, 1.6, 1.6], lo, hi,
+                    also: [{ p0: [gx + armAt[0], gy + armAt[1], gz + armAt[2]], size: [arm, 0.5, 0.5] }] });
+                o.tick.push(...moveLines(pid, steps), hitBox(pid, 1.6, 1.6, 1.6, `tag=${pid},tag=wo_glove`, 'hit {p:2}'),
+                    hitBox(pid, arm, 0.5, 0.5, `tag=${pid},tag=wo_garm`, 'hit {p:1}'));
             }
             o.len = L; o.secs = 1.2 + count * 1.0;
             break;
@@ -462,9 +461,9 @@ function tower(ctx, z0) {
         const armL = 3, armC = [cx + 0.5 + ux * (rest - G / 2 - armL / 2), y + 0.45, cz + 0.5 + uz * (rest - G / 2 - armL / 2)];
         const asx = ux ? armL : 0.5, asz = uz ? armL : 0.5;
         o.spawn.push(display([id, gid, 'wo_glove'], ...posAt(gc, st, off), 'red_wool', G, G, G),
-            display([id, gid], ...posAt([armC[0] - asx / 2, armC[1], armC[2] - asz / 2], st, off), 'iron_block', asx, 0.5, asz),
+            display([id, gid, 'wo_garm'], ...posAt([armC[0] - asx / 2, armC[1], armC[2] - asz / 2], st, off), 'iron_block', asx, 0.5, asz),
             `scoreboard players set @e[tag=${gid}] wo_ph ${off}`);
-        o.tick.push(...moveLines(gid, st), hitBox(gid, G, G, G, `tag=${gid},tag=wo_glove`, 'hit {p:2}'));
+        o.tick.push(...moveLines(gid, st), hitBox(gid, G, G, G, `tag=${gid},tag=wo_glove`, 'hit {p:2}'), hitBox(gid, asx, 0.5, asz, `tag=${gid},tag=wo_garm`, 'hit {p:1}'));
     }
     // a red arm sweeping round each landing (faster going up; two on the last one)
     for (let i = 0; i < T.floors; i++) {
@@ -607,19 +606,13 @@ const levelStart = L => [L.x, F, L.z0 + 2];
 function levelCommands(L) {
     const { x, z0, w } = L, lo = x - Math.floor((w - 1) / 2), hi = lo + w - 1, end = L.z0 + L.length;
     const c = [];
-    // the sea under it all, with a sandy, coral-dotted floor (each level fills its stretch of the line;
+    // the sea under it all, with a sandy floor (each level fills its stretch of the line;
     // the first and last go on a bit further)
     const [sx1, sx2, sz1, sz2] = seaArea(L);
     for (let zz = sz1; zz <= sz2; zz += 60) {
         const z2 = Math.min(sz2, zz + 59);
         // (sandstone under the sand: sand over nothing would fall)
-        c.push(`fill ${sx1} ${SEA - 5} ${zz} ${sx2} ${SEA - 5} ${z2} ${B('sandstone')}`, `fill ${sx1} ${SEA - 4} ${zz} ${sx2} ${SEA - 4} ${z2} ${B('sand')}`, `fill ${sx1} ${SEA - 3} ${zz} ${sx2} ${SEA} ${z2} ${B('water')}`);
-    }
-    const r = rngFor(L.n * 31 + 7);
-    for (let i = 0; i < Math.round(L.length * 0.6); i++) {
-        const cx = r.int(sx1, sx2), cz = r.int(sz1, sz2);
-        c.push(`setblock ${cx} ${SEA - 3} ${cz} ${B(r.pick(['brain_coral_block', 'tube_coral_block', 'fire_coral_block', 'horn_coral_block', 'bubble_coral_block', 'sea_lantern']))}`);
-        if (r.chance(0.5)) c.push(`setblock ${cx} ${SEA - 2} ${cz} ${B(r.pick(['brain_coral[waterlogged=true]', 'tube_coral[waterlogged=true]', 'fire_coral[waterlogged=true]', 'horn_coral[waterlogged=true]', 'bubble_coral[waterlogged=true]', 'seagrass']))}`);
+        c.push(`fill ${sx1} ${SEA - 4} ${zz} ${sx2} ${SEA - 4} ${z2} ${B('sandstone')}`, `fill ${sx1} ${SEA - 3} ${zz} ${sx2} ${SEA - 3} ${z2} ${B('sand')}`, `fill ${sx1} ${SEA - 2} ${zz} ${sx2} ${SEA} ${z2} ${B('water')}`);
     }
     // the start pad, the course parts (a short run of course between them), the emerald pad at the end
     c.push(...floorFill(lo - 1, z0, hi + 1, z0 + 5, L.style));
@@ -634,7 +627,7 @@ function levelCommands(L) {
     // crowd: colourful concrete people and birch planks, scattered, up to three high. Floodlights on
     // tall white poles every so often, and a line of sea lanterns in the water a little in from the walls
     // (it all runs the whole way along, at the same place for every level)
-    const s1 = z0, s2 = end - 1, IN = L.tower ? TOWER_WALL_X : WALL_X, top = F - 4;
+    const s1 = z0, s2 = end - 1, IN = L.tower ? TOWER_WALL_X : WALL_X, top = F - 3;
     const cr = rngFor(L.n * 131 + 5);
     const PEOPLE = ['red', 'orange', 'yellow', 'lime', 'green', 'cyan', 'light_blue', 'blue', 'purple', 'magenta', 'pink', 'white', 'black', 'gray', 'brown'];
     for (const side of [-1, 1]) {
@@ -644,15 +637,18 @@ function levelCommands(L) {
         c.push(`fill ${face} ${top} ${s1} ${face} ${top} ${s2} ${B('blue_concrete')}`);
         for (let zz = s1; zz <= s2; zz++) for (let k = 0; k < 6; k++) {
             const cx2 = face + side * k, roll = cr.next();
-            if (roll < 0.42) {                                       // someone watching: one or two blocks
+            if (roll < 0.2) {                                        // someone watching: one or two blocks
                 const h = cr.chance(0.7) ? 2 : 1;
                 c.push(`fill ${cx2} ${top + 1} ${zz} ${cx2} ${top + h} ${zz} ${B(`${cr.pick(PEOPLE)}_concrete`)}`);
-            } else if (roll < 0.72) {                                // birch planks, one to three high
+            } else if (roll < 0.5) {                                 // birch planks, one to three high
                 c.push(`fill ${cx2} ${top + 1} ${zz} ${cx2} ${top + cr.int(1, 3)} ${zz} ${B('birch_planks')}`);
             }
         }
-        // sea lanterns in the water, in a line a little in from the wall
-        for (let zz = s1 + (((ORIGIN_Z - s1) % 5) + 5) % 5; zz <= s2; zz += 5) c.push(`setblock ${x + side * (IN - 2)} ${SEA} ${zz} ${B('sea_lantern')}`);
+        // sea lanterns set in the sea floor, 3x3x3 cubes in a line a little in from the wall
+        for (let zz = s1 + (((ORIGIN_Z + 1 - s1) % 9) + 9) % 9; zz + 1 <= s2; zz += 9) if (zz - 1 >= s1) {
+            const lx = x + side * (IN - 3);
+            c.push(`fill ${lx - 1} ${SEA - 5} ${zz - 1} ${lx + 1} ${SEA - 3} ${zz + 1} ${B('sea_lantern')}`);
+        }
         // floodlights: a white pole twelve blocks up, a 3x3 of sea lanterns at the top facing the course
         for (let zz = s1 + (((ORIGIN_Z + 20 - s1) % 48) + 48) % 48; zz <= s2; zz += 48) {
             const px = x + side * (IN + 4);
