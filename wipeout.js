@@ -2,7 +2,7 @@
 //
 // The whole course is one straight line of white and blue concrete floating high above warm sea
 // water, with birch wood stands on both sides (a different concrete design on each level). Each level
-// is a short run of two obstacles (three after level 80) ending at a emerald pad: step on it and you're
+// is a short run of two obstacles (three after level 80) ending at an emerald pad: step on it and you're
 // on the next level, which starts right after. There are no checkpoints: touch anything red (spinners
 // to jump over, cubes sliding across, walls coming at you, crushers, red blocks sweeping past the
 // zipline) and you're dead, back at the start of the level. The punching gloves knock you off; red and
@@ -19,9 +19,9 @@ import path from 'node:path';
 import { SAVES_DIR } from './singleplayer.js';
 import { knockFiles, knockCommand } from './knock.js';
 
-export const WIPEOUT_WORLD = 'Unbound Wipeout 9';     // 9: shallower sea, lantern cubes, glove frames (made fresh)
+export const WIPEOUT_WORLD = 'Unbound Wipeout 10';    // 10: shorter emerald pads on quartz (the layout moved)
 export const WIPEOUT_MC = '26.2';
-export const WIPEOUT_BUILD = 12;                  // bump when the levels change, to rebuild them
+export const WIPEOUT_BUILD = 13;                  // bump when the levels change, to rebuild them
 export const LEVELS = 100;
 
 // Settings for making the world the first time: nothing but the levels (and sea), warm ocean colours
@@ -590,8 +590,8 @@ function design() {
             secs += o.secs;
             if (parts.length < count) { z += 3; secs += 0.6; }      // a short run of course before the next
         }
-        const finish = z;                                      // the emerald pad (3 long), then the next level
-        const length = finish + 3 - z0;
+        const finish = z;                                      // the emerald pad (2 long), then the next level
+        const length = finish + 2 - z0;
         out.push({ n, x, z0, w, style, stand, parts, finish, length, secs: Math.round(secs), name: NAMES[(n * 7) % NAMES.length], periods: [...ctx.periods],
             kinds: used });
         z0 += length;
@@ -619,7 +619,9 @@ function levelCommands(L) {
     c.push(`fill ${lo - 1} ${F - 1} ${z0} ${hi + 1} ${F - 1} ${z0} ${B('blue_concrete')}`);
     L.parts.forEach((p, i) => { if (i) c.push(...floorFill(lo, p.z - 3, hi, p.z - 1, L.style)); c.push(...p.blocks); });
     if (L.tower) c.push(`fill ${lo - 1} ${F - 1} ${z0} ${hi + 1} ${F - 1} ${z0} ${B('yellow_concrete')}`);
-    if (!L.tower) c.push(`fill ${lo - 2} ${F - 1} ${L.finish} ${hi + 2} ${F - 1} ${L.finish + 2} ${B('emerald_block')}`,
+    // (quartz under it all the way down to the sea floor)
+    if (!L.tower) c.push(`fill ${lo - 2} ${SEA - 3} ${L.finish} ${hi + 2} ${F - 2} ${L.finish + 1} ${B('quartz_block')}`,
+        `fill ${lo - 2} ${F - 1} ${L.finish} ${hi + 2} ${F - 1} ${L.finish + 1} ${B('emerald_block')}`,
     // the arch over the emerald pad
     `fill ${lo - 2} ${F} ${L.finish + 1} ${lo - 2} ${F + 4} ${L.finish + 1} ${B('light_blue_concrete')}`, `fill ${hi + 2} ${F} ${L.finish + 1} ${hi + 2} ${F + 4} ${L.finish + 1} ${B('light_blue_concrete')}`,
         `fill ${lo - 2} ${F + 5} ${L.finish + 1} ${hi + 2} ${F + 5} ${L.finish + 1} ${B('blue_concrete')}`);
@@ -960,7 +962,7 @@ export function packFiles() {
             ...L.parts.flatMap(p => p.tick),
             // the emerald pad: on to the next level (on the tower: the emerald on top wins)
             L.tower ? `execute positioned ${L.tower.cx - 2} ${L.tower.top + 0.5} ${L.tower.cz - 2} as @a[tag=wo_in,dx=4,dy=2,dz=4] unless score @s wo_jail matches 1.. unless score @s wo_level matches 101.. run function wipeout:finish`
-                : `execute positioned ${glo - 1} ${F - 0.5} ${L.finish} as @a[tag=wo_in,dx=${L.w + 3},dy=2,dz=2] unless score @s wo_jail matches 1.. unless score @s wo_level matches 101.. run function wipeout:finish`,
+                : `execute positioned ${glo - 1} ${F - 0.5} ${L.finish} as @a[tag=wo_in,dx=${L.w + 3},dy=2,dz=1] unless score @s wo_jail matches 1.. unless score @s wo_level matches 101.. run function wipeout:finish`,
         ]);
         fn(`lvl/${L.n}/ready`, [`execute if loaded ${lo} 0 ${L.z0} if loaded ${hi} 0 ${zEnd} if loaded ${lo} 0 ${zEnd} if loaded ${hi} 0 ${L.z0} run function wipeout:lvl/${L.n}/spawn`]);
         // once it's all loaded: this level's moving parts (fresh after a wipeout or a gift; kept when you

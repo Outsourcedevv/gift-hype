@@ -167,7 +167,7 @@ WIPEOUT (Minecraft -> Wipeout)
   There are no checkpoints: fall in the sea (a wipeout) or touch red and the level starts again.
   Levels 1 to 80 take about 10 seconds, 81 to 100 a bit longer. The gifts are the Dropper's: levels up
   and down, punches (on/off), jail, the level slot machine, the reset countdown and the save.
-  ("Unbound Wipeout 1" to "8", the older Wipeout worlds, aren't used any more. You
+  ("Unbound Wipeout 1" to "9", the older Wipeout worlds, aren't used any more. You
   can delete them in Minecraft's Singleplayer list.)
 
 THE DROPPER (Minecraft -> Dropper)
