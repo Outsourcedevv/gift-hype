@@ -211,7 +211,8 @@ THE DROPPER (Minecraft -> Dropper)
   On the stream overlay (see ON STREAM) each gift pops up with its picture on spinning sun rays, the
   sender's name and what it did ("punched you x2", "+5 levels"). During a reset countdown a box shows
   the seconds left and "Send Glowing Jellyfish to SAVE me!", and the reset's sound (I Need a Hero)
-  plays on for the whole countdown until someone saves you. Jail locks you in a cage on your level's
+  plays on for the whole countdown until someone saves you. The save gift also floats round the
+  middle of the stream (bobbing up and down and drifting round) until someone sends it. Jail locks you in a cage on your level's
   bridge.
   Starting gifts: Finger Heart = punch (only while punches are on), Doughnut = punches on/off,
     Rosa = jail 5s, Paper Crane / Corgi = up 1 / 5 levels, Hat and Mustache / Boxing Gloves = down 1 / 5,
@@ -226,7 +227,8 @@ THE DROPPER (Minecraft -> Dropper)
     and arrows never stay stuck in you (they go through and are cleared away).
 
 GIFTS
-  + Add gift / Browse all gifts   - every TikTok gift with its picture and price
+  + Add gift / Browse all gifts   - every TikTok gift with its picture and price (new ones, like a
+                                    new campaign's, are added by themselves when Unbound opens)
   + Any other gift                - plays for any gift you didn't set up
   Follow (first in Browse all gifts) - when someone follows you: give it a sound, a popup and actions
     like a gift. It goes off once per person each time you connect (the popup says "<name> followed!").

@@ -56,6 +56,28 @@ body.pst-neon .pop .who, body.pst-neon .pop .did { text-shadow: 0 0 10px current
 body.pst-minecraft .pop { font-family: 'Monocraft', monospace; border-radius: 0; background: rgba(16, 16, 16, .88); border: 4px solid #3f3f3f; box-shadow: inset -4px -4px 0 #1c1c1c, inset 4px 4px 0 #5a5a5a, 0 10px 30px rgba(0, 0, 0, .5); }
 @keyframes out { to { transform: translateY(-20px) scale(.9); opacity: 0; } }
 @keyframes wiggle { 0%, 100% { transform: rotate(-6deg) scale(1); } 50% { transform: rotate(6deg) scale(1.08); } }
+/* During a reset: the gift that saves you floats round the middle of the screen. Three slow movements
+   at different speeds (a loop round, a bob up and down, a little tilt) so it never looks repeated */
+#saveFloat { position: absolute; left: 50%; top: 46%; width: 0; height: 0; pointer-events: none; z-index: 5; }
+#saveFloat .loop { animation: sfLoop 9s linear infinite; }
+#saveFloat .bob { animation: sfBob 2.6s ease-in-out infinite alternate; }
+#saveFloat .tilt { animation: sfTilt 3.4s ease-in-out infinite alternate; transform-origin: 50% 50%; }
+#saveFloat .card { position: absolute; left: -230px; top: -150px; width: 460px; display: flex; flex-direction: column; align-items: center; gap: 6px;
+  animation: sfIn .6s cubic-bezier(.2,1.4,.4,1); }
+#saveFloat .card.out { animation: sfOut .5s ease forwards; }
+#saveFloat .card.saved { animation: sfSaved .9s cubic-bezier(.2,1.2,.4,1) forwards; }
+#saveFloat .glow { position: absolute; left: 50%; top: 110px; width: 280px; height: 280px; margin: -140px 0 0 -140px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(37,244,238,.45), rgba(37,244,238,0) 65%); animation: sfPulse 1.4s ease-in-out infinite alternate; }
+#saveFloat img { position: relative; width: 220px; height: 220px; object-fit: contain; filter: drop-shadow(0 8px 24px rgba(0,0,0,.55)); }
+#saveFloat .say { position: relative; font-weight: 800; font-size: 30px; text-align: center; color: #fff; text-shadow: 0 3px 0 #000, 0 0 18px rgba(0,0,0,.7); letter-spacing: .02em; }
+#saveFloat .say b { color: var(--accent); }
+@keyframes sfLoop { 0% { transform: translate(60px, 0); } 25% { transform: translate(0, 34px); } 50% { transform: translate(-60px, 0); } 75% { transform: translate(0, -34px); } 100% { transform: translate(60px, 0); } }
+@keyframes sfBob { from { transform: translateY(-38px); } to { transform: translateY(38px); } }
+@keyframes sfTilt { from { transform: rotate(-7deg) scale(.97); } to { transform: rotate(7deg) scale(1.04); } }
+@keyframes sfPulse { from { transform: scale(.85); opacity: .7; } to { transform: scale(1.1); opacity: 1; } }
+@keyframes sfIn { from { opacity: 0; transform: scale(.3); } to { opacity: 1; transform: scale(1); } }
+@keyframes sfOut { to { opacity: 0; transform: scale(.4); } }
+@keyframes sfSaved { 30% { transform: scale(1.35); opacity: 1; } 100% { transform: scale(1.6) translateY(-80px); opacity: 0; } }
 /* The Dropper's gift popup: the gift on spinning sun rays, the sender's name big, what they did under it */
 .burst { position: relative; display: flex; flex-direction: column; align-items: center; animation: pop .5s cubic-bezier(.2, 1.6, .4, 1) both; pointer-events: none; }
 .burst.out { animation: out .4s ease forwards; }
@@ -266,6 +288,7 @@ body.editing { background: #18202e; background-image: linear-gradient(rgba(255,2
 <div id="stage">
 <div id="stack"></div>
 <div id="resetBox"></div>
+<div id="saveFloat"></div>
 <div id="slots"></div>
 <div id="chatDel"></div>
 <div id="chunkChat"></div>
@@ -554,7 +577,21 @@ function showReveal(d) {
 
 // ----- the reset countdown (the Dropper) -----
 let resultTimer = null;
+// the save gift floating round the middle while a reset counts down
+function saveFloat(r) {
+  const f = document.getElementById('saveFloat'), save = r.saveGift;
+  if (r.active && save) {
+    if (!f.querySelector('.card:not(.out):not(.saved)')) f.innerHTML = `<div class="loop"><div class="bob"><div class="tilt"><div class="card"><div class="glow"></div>
+      ${save.image ? `<img src="${pic(save.image)}" alt="">` : ''}<div class="say">Send <b>${esc(save.name)}</b><br>to SAVE!</div></div></div></div></div>`;
+  } else {
+    const c = f.querySelector('.card:not(.out):not(.saved)');
+    if (!c) return;
+    c.classList.add(r.event === 'saved' ? 'saved' : 'out');
+    setTimeout(() => { if (f.contains(c)) f.innerHTML = ''; }, 950);
+  }
+}
 function showReset(r) {
+  saveFloat(r);
   const box = document.getElementById('resetBox');
   if (r.active) {
     clearTimeout(resultTimer);
