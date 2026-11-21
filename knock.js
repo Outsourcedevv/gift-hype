@@ -11,6 +11,8 @@
 // ns: the pack's namespace, p: its scoreboard prefix (e.g. 'wo_'). The game's own #punch <p>v score
 // (1 on, 0 off) turns them on and off.
 const J = o => JSON.stringify(o);
+const MAX_QUEUE = 2000;
+export const MAX_PUNCHES_PER_GIFT = 500;
 
 export function knockFiles(ns, p) {
     const f = {
@@ -21,9 +23,10 @@ export function knockFiles(ns, p) {
     const fn = (name, lines) => { f[`data/${ns}/function/${name}.mcfunction`] = lines.join('\n') + '\n'; };
     const off = `title @s actionbar ${J({ text: 'Punches are OFF', color: 'green', bold: true })}`;
 
-    // a gift: n more to come
-    fn('knock/add_arrow', [`execute if score #punch ${p}v matches 0 run return run ${off}`, `$scoreboard players add @s ${p}pq $(n)`, `execute if score @s ${p}pq matches 11.. run scoreboard players set @s ${p}pq 10`]);
-    fn('knock/add_sword', [`execute if score #punch ${p}v matches 0 run return run ${off}`, `$scoreboard players add @s ${p}sq $(n)`, `execute if score @s ${p}sq matches 11.. run scoreboard players set @s ${p}sq 10`]);
+    // a gift: n more to come. They wait their turn and keep coming (through wipeouts, respawns and
+    // deaths) until they're all done: up to 2000 at once
+    fn('knock/add_arrow', [`execute if score #punch ${p}v matches 0 run return run ${off}`, `$scoreboard players add @s ${p}pq $(n)`, `execute if score @s ${p}pq matches ${MAX_QUEUE + 1}.. run scoreboard players set @s ${p}pq ${MAX_QUEUE}`]);
+    fn('knock/add_sword', [`execute if score #punch ${p}v matches 0 run return run ${off}`, `$scoreboard players add @s ${p}sq $(n)`, `execute if score @s ${p}sq matches ${MAX_QUEUE + 1}.. run scoreboard players set @s ${p}sq ${MAX_QUEUE}`]);
     // each tick, for anyone with some waiting: one every 7 ticks
     for (const [k, q, t] of [['arrow', 'pq', 'pt'], ['sword', 'sq', 'st']]) {
         fn(`knock/${k}_q`, [

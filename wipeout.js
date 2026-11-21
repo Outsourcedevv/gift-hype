@@ -17,7 +17,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { SAVES_DIR } from './singleplayer.js';
-import { knockFiles, knockCommand } from './knock.js';
+import { knockFiles, knockCommand, MAX_PUNCHES_PER_GIFT } from './knock.js';
 
 export const WIPEOUT_WORLD = 'Unbound Wipeout 11';    // 11: new obstacles (the layout moved)
 export const WIPEOUT_MC = '26.2';
@@ -1312,7 +1312,7 @@ export const WIPEOUT_ACTIONS = new Set(['punch', 'punchToggle', 'levelUp', 'leve
 export function wipeoutCommands(a, times, { saveGift = 'Glowing Jellyfish' } = {}) {
     const n = (v, lo, hi, def) => Math.max(lo, Math.min(hi, Number.isFinite(+v) && +v > 0 ? Math.round(+v) : def));
     switch (a.type) {
-        case 'punch': return [knockCommand('wipeout', a, Math.min(n(a.amount, 1, 10, 1) * times, 10))];
+        case 'punch': return [knockCommand('wipeout', a, Math.min(n(a.amount, 1, 10, 1) * times, MAX_PUNCHES_PER_GIFT))];
         case 'punchToggle': return ['function wipeout:punch_toggle'];
         case 'levelUp': return [`function wipeout:up {n:${Math.min(99, n(a.amount, 1, 99, 1) * times)}}`];
         case 'levelDown': return [`function wipeout:down {n:${Math.min(99, n(a.amount, 1, 99, 1) * times)}}`];

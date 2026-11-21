@@ -22,7 +22,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { SAVES_DIR } from './singleplayer.js';
-import { knockFiles, knockCommand } from './knock.js';
+import { knockFiles, knockCommand, MAX_PUNCHES_PER_GIFT } from './knock.js';
 
 // "2": the levels got twice as tall, so the world needs a taller sky than an existing world can be
 // given. The first Dropper world ("Gift Hype Dropper") is left as it was.
@@ -1390,7 +1390,7 @@ export function wheelAmounts(a) {
 export function dropperCommands(a, times, { saveGift = 'Glowing Jellyfish' } = {}) {
     const n = (v, lo, hi, def) => Math.max(lo, Math.min(hi, Number.isFinite(+v) && +v > 0 ? Math.round(+v) : def));
     switch (a.type) {
-        case 'punch': return [knockCommand('dropper', a, Math.min(n(a.amount, 1, 10, 1) * times, 10))];
+        case 'punch': return [knockCommand('dropper', a, Math.min(n(a.amount, 1, 10, 1) * times, MAX_PUNCHES_PER_GIFT))];
         case 'punchToggle': return ['function dropper:punch_toggle'];
         case 'levelUp': return [`function dropper:up {n:${Math.min(99, n(a.amount, 1, 99, 1) * times)}}`];
         case 'levelDown': return [`function dropper:down {n:${Math.min(99, n(a.amount, 1, 99, 1) * times)}}`];

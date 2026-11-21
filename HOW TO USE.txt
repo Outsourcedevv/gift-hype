@@ -225,6 +225,8 @@ THE DROPPER (Minecraft -> Dropper)
   PUNCHES: each punch action can be an arrow (Punch II) or a sword hit (pick "hit with" on the action).
     Every one lands, from a random side, and several come one after another. You never lose health,
     and arrows never stay stuck in you (they go through and are cleared away).
+    Lots of punches wait their turn (up to 2000) and keep coming until they're all done, even
+    after a wipeout or a death.
 
 GIFTS
   + Add gift / Browse all gifts   - every TikTok gift with its picture and price (new ones, like a
