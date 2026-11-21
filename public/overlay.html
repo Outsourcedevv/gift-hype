@@ -71,6 +71,9 @@ body.pst-minecraft .pop { font-family: 'Monocraft', monospace; border-radius: 0;
 #saveFloat img { position: relative; width: 220px; height: 220px; object-fit: contain; filter: drop-shadow(0 8px 24px rgba(0,0,0,.55)); }
 #saveFloat .say { position: relative; font-weight: 800; font-size: 30px; text-align: center; color: #fff; text-shadow: 0 3px 0 #000, 0 0 18px rgba(0,0,0,.7); letter-spacing: .02em; }
 #saveFloat .say b { color: var(--accent); }
+#saveFloat .secs { position: relative; margin-top: 4px; padding: 4px 22px; border-radius: 999px; background: rgba(20,4,10,.85); border: 3px solid var(--pink);
+  font-weight: 800; font-size: 44px; line-height: 1.1; color: #fff; font-variant-numeric: tabular-nums; box-shadow: 0 0 22px rgba(254,44,85,.5); }
+#saveFloat .secs.urgent { color: var(--pink); animation: throb .5s ease-in-out infinite alternate; }
 @keyframes sfLoop { 0% { transform: translate(60px, 0); } 25% { transform: translate(0, 34px); } 50% { transform: translate(-60px, 0); } 75% { transform: translate(0, -34px); } 100% { transform: translate(60px, 0); } }
 @keyframes sfBob { from { transform: translateY(-38px); } to { transform: translateY(38px); } }
 @keyframes sfTilt { from { transform: rotate(-7deg) scale(.97); } to { transform: rotate(7deg) scale(1.04); } }
@@ -582,7 +585,10 @@ function saveFloat(r) {
   const f = document.getElementById('saveFloat'), save = r.saveGift;
   if (r.active && save) {
     if (!f.querySelector('.card:not(.out):not(.saved)')) f.innerHTML = `<div class="loop"><div class="bob"><div class="tilt"><div class="card"><div class="glow"></div>
-      ${save.image ? `<img src="${pic(save.image)}" alt="">` : ''}<div class="say">Send <b>${esc(save.name)}</b><br>to SAVE!</div></div></div></div></div>`;
+      ${save.image ? `<img src="${pic(save.image)}" alt="">` : ''}<div class="say">Send <b>${esc(save.name)}</b><br>to SAVE!</div><div class="secs"></div></div></div></div></div>`;
+    // the countdown under it
+    const secs = f.querySelector('.card:not(.out):not(.saved) .secs');
+    if (secs) { const n = Math.max(0, r.secondsLeft | 0); secs.textContent = `${Math.floor(n / 60)}:${String(n % 60).padStart(2, '0')}`; secs.classList.toggle('urgent', n <= 10); }
   } else {
     const c = f.querySelector('.card:not(.out):not(.saved)');
     if (!c) return;

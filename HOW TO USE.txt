@@ -171,6 +171,9 @@ WIPEOUT (Minecraft -> Wipeout)
   Knocked onto the stands is a wipeout too.
   The next level's obstacles are already moving before you get there, so nothing pops in.
   Every level has been checked tick by tick to make sure it can be done (at a little under a sprint).
+  RESET THE MAP: if something in the Dropper's or Wipeout's map breaks, press "Reset the map" (next to
+    Reopen world). The world is made again and every level built fresh (under a minute), and you start
+    again on level 1 with 0 fails / wipeouts.
   There are no checkpoints: fall in the sea (a wipeout) or touch red and the level starts again.
   Levels 1 to 80 take about 10 seconds, 81 to 100 a bit longer. The gifts are the Dropper's: levels up
   and down, punches (on/off), jail, the level slot machine, the reset countdown and the save.
@@ -212,7 +215,8 @@ THE DROPPER (Minecraft -> Dropper)
   sender's name and what it did ("punched you x2", "+5 levels"). During a reset countdown a box shows
   the seconds left and "Send Glowing Jellyfish to SAVE me!", and the reset's sound (I Need a Hero)
   plays on for the whole countdown until someone saves you. The save gift also floats round the
-  middle of the stream (bobbing up and down and drifting round) until someone sends it. Jail locks you in a cage on your level's
+  middle of the stream (bobbing up and down and drifting round) with the time left under it, until
+  someone sends it. Jail locks you in a cage on your level's
   bridge.
   Starting gifts: Finger Heart = punch (only while punches are on), Doughnut = punches on/off,
     Rosa = jail 5s, Paper Crane / Corgi = up 1 / 5 levels, Hat and Mustache / Boxing Gloves = down 1 / 5,
