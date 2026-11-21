@@ -675,22 +675,44 @@ const feed = [];
 
 // ---------- Gift catalog (names, pictures, prices) ----------
 
-let catalog = readJson(path.join(DATA, 'gift-catalog.json'), []);
+// (with the program, so updates bring new gifts; an older copy in data is only used if it's missing)
+let catalog = readJson(path.join(ROOT, 'gift-catalog.json'), null) || readJson(path.join(DATA, 'gift-catalog.json'), []);
 const learnedPath = path.join(DATA, 'learned-gifts.json');
 let learned = readJson(learnedPath, []);
 // A follow works like a gift called "Follow": give it sounds, a popup and actions like any gift
 const FOLLOW = { name: 'Follow', coins: null, image: '/img/follow.svg', event: 'follow' };
+const giftKey = name => String(name || '').trim().replace(/\s+/g, ' ').toLowerCase();   // (TikTok's names sometimes have extra spaces)
 const findGift = name => {
-    const n = String(name || '').toLowerCase();
+    const n = giftKey(name);
     if (n === 'follow') return FOLLOW;
-    return learned.find(g => g.name.toLowerCase() === n) || catalog.find(g => g.name.toLowerCase() === n) || null;
+    return learned.find(g => giftKey(g.name) === n) || catalog.find(g => giftKey(g.name) === n) || null;
 };
-function learnGift(name, coins, image) {
-    if (!name || !image) return;
-    const old = learned.find(g => g.name.toLowerCase() === name.toLowerCase());
-    if (old && old.image === image && old.coins === coins) return;
+function learnGift(name, coins, image, save = true) {
+    name = String(name || '').trim().replace(/\s+/g, ' ');
+    if (!name || !image) return false;
+    const old = learned.find(g => giftKey(g.name) === giftKey(name));
+    if (old && old.image === image && old.coins === coins) return false;
     learned = learned.filter(g => g !== old).concat({ name, coins: coins ?? old?.coins ?? 0, image });
-    writeJson(learnedPath, learned);
+    if (save) writeJson(learnedPath, learned);
+    return true;
+}
+// Every gift TikTok has right now (new campaigns included), fetched when Unbound opens: any that
+// aren't in the list yet are added. If TikTok can't be reached, the list just stays as it is.
+async function refreshGifts() {
+    const q = new URLSearchParams({ aid: '1988', app_language: 'en-US', app_name: 'tiktok_web', browser_language: 'en-US', browser_name: 'Mozilla', browser_online: 'true',
+        browser_platform: 'Win32', cookie_enabled: 'true', device_platform: 'web_pc', focus_state: 'true', from_page: 'user', is_fullscreen: 'false', is_page_visible: 'true',
+        screen_height: '1080', screen_width: '1920', tz_name: 'America/New_York', webcast_language: 'en' });
+    try {
+        const r = await fetch(`https://webcast.tiktok.com/webcast/gift/list/?${q}`, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36' }, signal: AbortSignal.timeout(20000) });
+        const gifts = (await r.json())?.data?.gifts || [];
+        let added = 0;
+        for (const g of gifts) {
+            const image = g.image?.url_list?.[0];
+            if (!/^https:\/\//.test(image || '') || findGift(g.name)) continue;
+            if (learnGift(g.name, g.diamond_count ?? 0, image, false)) added++;
+        }
+        if (added) { writeJson(learnedPath, learned); log(`Added ${added} new TikTok gift${added > 1 ? 's' : ''} to the list.`); }
+    } catch { }
 }
 
 // ---------- The overlay's gift list: what each gift does in the game you're playing ----------
@@ -1145,8 +1167,8 @@ async function runAction(game, a, ctx) {
 }
 
 function findRule(game, giftName) {
-    const n = giftName.toLowerCase(), rules = rulesOf(game);
-    return rules.find(r => r.gift.toLowerCase() === n) || rules.find(r => r.gift === '*') || null;
+    const n = giftKey(giftName), rules = rulesOf(game);
+    return rules.find(r => giftKey(r.gift) === n) || rules.find(r => r.gift === '*') || null;
 }
 
 // ---------- The Dropper's reset countdown, kept in step with the game for the stream overlay ----------
@@ -1243,7 +1265,7 @@ function onFollow(data) {
 }
 
 function onGift(data) {
-    const name = data.gift?.name || `gift ${data.giftId}`;
+    const name = String(data.gift?.name || `gift ${data.giftId}`).trim().replace(/\s+/g, ' ');
     const image = data.gift?.image?.urlList?.[0] || null;
     learnGift(data.gift?.name, data.gift?.diamondCount, image);
     const repeat = data.repeatCount || 1;
@@ -1447,7 +1469,7 @@ const routes = {
         return r;
     },
     'POST /api/chatdel/clear': async () => ({ cleared: await chatDelete.clear() }),
-    'GET /api/catalog': () => [FOLLOW, ...[...learned, ...catalog.filter(c => !learned.some(l => l.name.toLowerCase() === c.name.toLowerCase()))].sort((a, b) => (a.coins ?? 0) - (b.coins ?? 0) || a.name.localeCompare(b.name))],
+    'GET /api/catalog': () => [FOLLOW, ...[...learned, ...catalog.filter(c => !learned.some(l => giftKey(l.name) === giftKey(c.name)))].sort((a, b) => (a.coins ?? 0) - (b.coins ?? 0) || a.name.localeCompare(b.name))],
     'POST /api/connect': async b => { await connectTikTok(b.username); return { ok: true }; },
     'POST /api/disconnect': async () => { await disconnectTikTok(); return { ok: true }; },
     'POST /api/settings': b => {
@@ -1910,6 +1932,8 @@ server.listen(settings.port, '127.0.0.1', () => {
     const server6 = http.createServer(server.listeners('request')[0]);
     server6.on('error', () => {});
     server6.listen(settings.port, '::1');
+    // new TikTok gifts (a new campaign) are added to the list
+    setTimeout(refreshGifts, 3000);
     // Gift Hype is now Unbound: the new look once, and the desktop icon gets the new name (Windows)
     if (settings.brand !== 'unbound') {
         settings.brand = 'unbound';
