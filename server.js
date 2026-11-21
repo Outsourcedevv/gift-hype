@@ -927,6 +927,8 @@ async function connectMinecraft() {
         r.on('error', () => {});
         setStatus({ minecraft: 'connected' });
         if (courseOf(g) && !courseOf(g).built()) buildCourseWorld(courseOf(g));
+        // a jail cage left from before (Unbound closed while someone was in jail) is taken away
+        if (!isSingle(g) && !courseOf(g)) PRESETS.clearOldCages().catch(() => {});
         if (!isSingle(g)) log(`Connected to Minecraft${g.minecraft.serverFolder ? ` (${path.basename(path.dirname(g.minecraft.serverFolder))})` : ` at ${target.host}:${target.port}`}.`);
     } catch (e) {
         if (rconFor !== key) return;
@@ -1036,7 +1038,7 @@ const fill = (text, ctx) => String(text)
 const MAX_REPEAT = 50;
 
 // Ready-made Minecraft actions (nuke, jail, chunk fills, kits...), in minecraft-presets.js.
-const PRESETS = makePresets({ mc, log });
+const PRESETS = makePresets({ mc, log, jailFile: path.join(DATA, 'jail-cages.json') });
 
 // Chat block delete (chatdelete.js): a block typed in the LIVE chat is removed around you when its countdown ends.
 const chatDelete = makeChatDelete({
@@ -1256,11 +1258,17 @@ async function handleGift(giftName, count, from, image, coins) {
 
 let tiktok = null, tiktokTimer = null;
 const streaks = new Map();
-// a follow: once per person each time you connect (TikTok can send it again if they follow, unfollow, follow)
-let followed = new Set();
+// a follow: once per person, ever. Unfollowing and following again doesn't set it off again, even
+// after Unbound reconnects or restarts: everyone who has followed is kept in data/followed.json
+const followedPath = path.join(DATA, 'followed.json');
+const followed = new Set(readJson(followedPath, []));
+let followedSave = null;
 function onFollow(data) {
-    const id = data.user?.userId || data.user?.uniqueId;
-    if (id) { if (followed.has(id)) return; followed.add(id); }
+    const ids = [data.user?.userId, data.user?.uniqueId && `@${String(data.user.uniqueId).toLowerCase()}`].filter(Boolean).map(String);
+    if (ids.some(id => followed.has(id))) return;
+    for (const id of ids) followed.add(id);
+    clearTimeout(followedSave);
+    followedSave = setTimeout(() => writeJson(followedPath, [...followed].slice(-200000)), 2000);
     handleGift('Follow', 1, data.user?.nickname || data.user?.uniqueId || 'someone', FOLLOW.image, null);
 }
 
@@ -1297,7 +1305,6 @@ async function connectTikTok(username) {
     conn.on(WebcastEvent.GIFT, onGift);
     conn.on(WebcastEvent.CHAT, onChat);
     conn.on(WebcastEvent.FOLLOW, onFollow);
-    followed = new Set();
     conn.on('disconnected', () => {
         if (tiktok !== conn) return;
         log('TikTok disconnected. Reconnecting in 10s...');

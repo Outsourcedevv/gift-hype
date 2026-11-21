@@ -348,16 +348,24 @@ function packFiles(nukeSizes) {
     for (const r of discs) fn(`disc/r${r}`, discFills(r).map(([x1, z1, x2, z2]) => `fill ~${x1} ~ ~${z1} ~${x2} ~ ~${z2} minecraft:air`));
 
     // ----- Jail: bedrock and iron bars, no breaking out, more gifts add time -----
+    // The cage only goes where there's nothing solid (your ground and walls stay as they are), its place
+    // is kept with a marker whose chunk stays loaded, and when you're let out only the cage's own bedrock
+    // and bars are taken away, wherever you are by then.
     fn('jail', [
         'execute unless score @s gh_jail matches 1.. align xyz run function gifthype:jail/build',
         '$scoreboard players add @s gh_jail $(ticks)',
     ]);
     fn('jail/build', [
-        'kill @e[type=minecraft:marker,tag=gh_jailpos]',
-        'fill ~-2 ~-1 ~-2 ~2 ~3 ~2 minecraft:bedrock hollow',
-        'fill ~-2 ~ ~-2 ~2 ~2 ~2 minecraft:iron_bars outline',
+        'function gifthype:jail/clear',
+        'forceload add ~ ~',
+        'summon minecraft:marker ~0.5 ~0.5 ~0.5 {Tags:["gh_jailpos"]}',              // (in the middle of the block)
+        'fill ~-2 ~-1 ~-2 ~2 ~-1 ~2 minecraft:bedrock replace #minecraft:replaceable',
+        'fill ~-2 ~3 ~-2 ~2 ~3 ~2 minecraft:bedrock replace #minecraft:replaceable',
+        'fill ~-2 ~ ~-2 ~2 ~2 ~-2 minecraft:iron_bars replace #minecraft:replaceable',
+        'fill ~-2 ~ ~2 ~2 ~2 ~2 minecraft:iron_bars replace #minecraft:replaceable',
+        'fill ~-2 ~ ~-2 ~-2 ~2 ~2 minecraft:iron_bars replace #minecraft:replaceable',
+        'fill ~2 ~ ~-2 ~2 ~2 ~2 minecraft:iron_bars replace #minecraft:replaceable',
         'tp @s ~0.5 ~ ~0.5',
-        'summon minecraft:marker ~ ~ ~ {Tags:["gh_jailpos"]}',
         'playsound minecraft:block.iron_door.close master @a ~ ~ ~ 1 0.6',
         'title @s times 5 30 10', `title @s title ${T('JAILED', 'red')}`,
     ]);
@@ -368,9 +376,20 @@ function packFiles(nukeSizes) {
         'title @s actionbar [{"text":"Jail: ","color":"red","bold":true},{"score":{"name":"@s","objective":"gh_js"},"color":"red","bold":true},{"text":"s","color":"red","bold":true}]',
         'execute if score @s gh_jail matches ..0 run function gifthype:jail/free',
     ]);
-    fn('jail/free', [
-        'execute at @e[type=minecraft:marker,tag=gh_jailpos] run fill ~-2 ~-1 ~-2 ~2 ~3 ~2 minecraft:air',
+    // take the cage away (the bedrock only above the world's own bedrock layers)
+    fn('jail/clear', [
+        'execute as @e[type=minecraft:marker,tag=gh_jailpos] at @s align xyz run fill ~-2 ~ ~-2 ~2 ~2 ~2 minecraft:air replace minecraft:iron_bars',
+        'execute as @e[type=minecraft:marker,tag=gh_jailpos] at @s run function gifthype:jail/unbedrock',
+        'execute as @e[type=minecraft:marker,tag=gh_jailpos] at @s run forceload remove ~ ~',
         'kill @e[type=minecraft:marker,tag=gh_jailpos]',
+    ]);
+    fn('jail/unbedrock', [
+        'execute store result score #jy gh_v run data get entity @s Pos[1]',
+        'execute if score #jy gh_v matches -57.. align xyz run fill ~-2 ~-1 ~-2 ~2 ~-1 ~2 minecraft:air replace minecraft:bedrock',
+        'execute if score #jy gh_v matches -57.. align xyz run fill ~-2 ~3 ~-2 ~2 ~3 ~2 minecraft:air replace minecraft:bedrock',
+    ]);
+    fn('jail/free', [
+        'function gifthype:jail/clear',
         'effect clear @s minecraft:mining_fatigue',
         'scoreboard players reset @s gh_jail',
         `title @s actionbar ${T('Free!', 'green')}`,

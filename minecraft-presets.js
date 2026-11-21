@@ -1,6 +1,7 @@
 // Ready-made Minecraft gift actions: pick one from the list instead of typing a command.
 // Each one runs plain commands over RCON, so no mods or datapacks are needed (Java 1.21.5 or newer).
 
+import fs from 'node:fs';
 import { craterLayers, discFills } from './singleplayer.js';
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -52,7 +53,7 @@ export const FILL_CHUNK = Symbol('fillChunk');
 export const TELEPORT_TO = Symbol('teleportTo');
 export const WHERE = Symbol('where');
 
-export function makePresets({ mc, log }) {
+export function makePresets({ mc, log, jailFile = null }) {
     const sel = ctx => /^[\w]{1,16}$/.test(ctx.player) ? `@a[name=${ctx.player},limit=1]` : '@p';
 
     async function where(ctx) {
@@ -326,19 +327,53 @@ export function makePresets({ mc, log }) {
         }
     }
 
-    // Jails: one per player. A second jail gift while you're inside adds the time.
+    // Jails: one per player. A second jail gift while you're inside adds the time. The cage only goes
+    // where there's nothing solid (your ground stays), and only its own bedrock and bars are taken away
+    // at the end: tried again if the server doesn't answer, and written down (jailFile) so a cage left
+    // when Unbound closed is taken away the next time it connects.
     const jails = new Map();
+    const R = '#minecraft:replaceable';
+    const cageCommands = (dim, x, y, z) => [
+        `fill ${x - 2} ${y - 1} ${z - 2} ${x + 2} ${y - 1} ${z + 2} minecraft:bedrock replace ${R}`,
+        `fill ${x - 2} ${y + 3} ${z - 2} ${x + 2} ${y + 3} ${z + 2} minecraft:bedrock replace ${R}`,
+        `fill ${x - 2} ${y} ${z - 2} ${x + 2} ${y + 2} ${z - 2} minecraft:iron_bars replace ${R}`,
+        `fill ${x - 2} ${y} ${z + 2} ${x + 2} ${y + 2} ${z + 2} minecraft:iron_bars replace ${R}`,
+        `fill ${x - 2} ${y} ${z - 2} ${x - 2} ${y + 2} ${z + 2} minecraft:iron_bars replace ${R}`,
+        `fill ${x + 2} ${y} ${z - 2} ${x + 2} ${y + 2} ${z + 2} minecraft:iron_bars replace ${R}`,
+    ].map(c => `execute in ${dim} run ${c}`);
+    const uncageCommands = (dim, x, y, z) => [
+        `fill ${x - 2} ${y} ${z - 2} ${x + 2} ${y + 2} ${z + 2} minecraft:air replace minecraft:iron_bars`,
+        ...(y > -58 ? [`fill ${x - 2} ${y - 1} ${z - 2} ${x + 2} ${y - 1} ${z + 2} minecraft:air replace minecraft:bedrock`,
+            `fill ${x - 2} ${y + 3} ${z - 2} ${x + 2} ${y + 3} ${z + 2} minecraft:air replace minecraft:bedrock`] : []),
+    ].map(c => `execute in ${dim} run ${c}`);
+    const readCages = () => { try { return JSON.parse(fs.readFileSync(jailFile, 'utf8')); } catch { return []; } };
+    const writeCages = list => { if (jailFile) try { fs.writeFileSync(jailFile, JSON.stringify(list)); } catch { } };
+    async function uncage(c) {
+        for (let tries = 0; tries < 5; tries++) {
+            try {
+                await mc(`execute in ${c.dim} run forceload add ${c.x} ${c.z}`);
+                for (const cmd of uncageCommands(c.dim, c.x, c.y, c.z)) await mc(cmd);
+                await mc(`execute in ${c.dim} run forceload remove ${c.x} ${c.z}`);
+                writeCages(readCages().filter(o => !(o.dim === c.dim && o.x === c.x && o.y === c.y && o.z === c.z)));
+                return true;
+            } catch { await sleep(2000); }
+        }
+        log("A jail cage couldn't be taken away yet: it will be when Unbound next connects.");
+        return false;
+    }
+    // cages left from before (Unbound closed, or the server stopped, while someone was in jail)
+    async function clearOldCages() { if (jails.size) return; for (const c of readCages()) await uncage(c); }
     async function jail(ctx, seconds) {
         const key = ctx.player;
         if (jails.has(key)) { jails.get(key).until += seconds * 1000; return; }
         const p = await where(ctx);
         const x = Math.floor(p.x), y = Math.floor(p.y), z = Math.floor(p.z);
-        const box = `${x - 2} ${y - 1} ${z - 2} ${x + 2} ${y + 3} ${z + 2}`;
-        const jailRun = { until: Date.now() + seconds * 1000 };
+        const cage = { dim: p.dim, x, y, z };
+        const jailRun = { until: Date.now() + seconds * 1000, cage };
         jails.set(key, jailRun);
+        writeCages([...readCages(), cage]);
         try {
-            await mc(`execute in ${p.dim} run fill ${box} minecraft:bedrock hollow`);
-            await mc(`execute in ${p.dim} run fill ${x - 2} ${y} ${z - 2} ${x + 2} ${y + 2} ${z + 2} minecraft:iron_bars outline`);
+            for (const cmd of cageCommands(p.dim, x, y, z)) await mc(cmd);
             await mc(`execute in ${p.dim} run tp ${p.s} ${x + 0.5} ${y} ${z + 0.5}`);
             await mc(`execute at ${p.s} run playsound minecraft:block.iron_door.close master @a ~ ~ ~ 1 0.6`);
             await mc(`title ${p.s} times 5 30 10`);
@@ -349,11 +384,11 @@ export function makePresets({ mc, log }) {
                 await mc(`title ${p.s} actionbar ${text(`Jail: ${left}s`, 'red', ',"bold":true')}`);
                 await sleep(1000);
             }
-            await mc(`execute in ${p.dim} run fill ${box} minecraft:air`);
-            await mc(`effect clear ${p.s} minecraft:mining_fatigue`);
-            await mc(`title ${p.s} actionbar ${text('Free!', 'green', ',"bold":true')}`);
+            await mc(`effect clear ${p.s} minecraft:mining_fatigue`).catch(() => {});
+            await mc(`title ${p.s} actionbar ${text('Free!', 'green', ',"bold":true')}`).catch(() => {});
         } finally {
             jails.delete(key);
+            await uncage(cage);
         }
     }
 
@@ -446,6 +481,7 @@ export function makePresets({ mc, log }) {
         [WHERE]: player => where({ player }),
         nuke: async (a, ctx, times) => { for (let i = 0; i < Math.min(times, 3); i++) await nuke(ctx, clamp(a.size, 16, 64, 40)); },
         jail: (a, ctx, times) => jail(ctx, Math.min(3600, clamp(a.seconds, 1, 3600, 30) * times)),
+        clearOldCages,
         cobwebChunk: (a, ctx) => chunk(ctx, 'minecraft:cobweb', 'COBWEB CHUNK', 'white'),
         lavaChunk: (a, ctx) => chunk(ctx, 'minecraft:lava', 'LAVA CHUNK', 'gold'),
         airChunk: (a, ctx) => chunk(ctx, 'minecraft:air', 'AIR CHUNK', 'aqua'),

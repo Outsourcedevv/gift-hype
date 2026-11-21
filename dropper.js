@@ -22,7 +22,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { SAVES_DIR } from './singleplayer.js';
-import { knockFiles, knockCommand } from './knock.js';
+import { knockFiles, knockCommand, MAX_PUNCHES_PER_GIFT } from './knock.js';
 
 // "2": the levels got twice as tall, so the world needs a taller sky than an existing world can be
 // given. The first Dropper world ("Gift Hype Dropper") is left as it was.
@@ -1262,16 +1262,20 @@ export function packFiles() {
         '$scoreboard players add @s dr_jail $(ticks)',
         'execute if score @s dr_jail matches 7200.. run scoreboard players set @s dr_jail 7200',
     ]);
+    // (the cage's place is kept with a marker, so it's always taken away, wherever you are by then)
     fn('jail/enter', [
+        'function dropper:jail/clear',
         'tag @s add dr_quiet', 'function dropper:goto', 'tag @s remove dr_quiet',
-        'execute at @s run fill ~-1 ~ ~-1 ~1 ~2 ~1 minecraft:iron_bars replace minecraft:air',
-        'execute at @s run fill ~ ~ ~ ~ ~1 ~ minecraft:air replace minecraft:iron_bars',
-        'execute at @s run fill ~-1 ~3 ~-1 ~1 ~3 ~1 minecraft:iron_bars replace minecraft:air',
+        'execute at @s align xyz run summon minecraft:marker ~ ~ ~ {Tags:["dr_jailpos"]}',
+        'execute at @s align xyz run fill ~-1 ~ ~-1 ~1 ~2 ~1 minecraft:iron_bars replace minecraft:air',
+        'execute at @s align xyz run fill ~ ~ ~ ~ ~1 ~ minecraft:air replace minecraft:iron_bars',
+        'execute at @s align xyz run fill ~-1 ~3 ~-1 ~1 ~3 ~1 minecraft:iron_bars replace minecraft:air',
         'effect give @s minecraft:jump_boost 9999 250 true',
         'playsound minecraft:block.iron_door.close master @s ~ ~ ~ 1 0.8', ...title('@s', 'JAILED', 'on the bridge', 'red'),
     ]);
     fn('jail/tick', ['scoreboard players remove @s dr_jail 1', 'execute if score @s dr_jail matches ..0 run function dropper:jail/free']);
-    fn('jail/free', ['scoreboard players set @s dr_jail 0', 'execute at @s run fill ~-1 ~ ~-1 ~1 ~3 ~1 minecraft:air replace minecraft:iron_bars', 'effect clear @s minecraft:jump_boost', 'playsound minecraft:block.iron_door.open master @s ~ ~ ~ 1 1', 'tag @s add dr_quiet', 'function dropper:goto', 'tag @s remove dr_quiet', ...title('@s', 'FREE', '', 'green')]);
+    fn('jail/clear', ['execute at @e[type=minecraft:marker,tag=dr_jailpos] run fill ~-1 ~ ~-1 ~1 ~3 ~1 minecraft:air replace minecraft:iron_bars', 'kill @e[type=minecraft:marker,tag=dr_jailpos]']);
+    fn('jail/free', ['scoreboard players set @s dr_jail 0', 'function dropper:jail/clear', 'execute at @s run fill ~-1 ~ ~-1 ~1 ~3 ~1 minecraft:air replace minecraft:iron_bars', 'effect clear @s minecraft:jump_boost', 'playsound minecraft:block.iron_door.open master @s ~ ~ ~ 1 1', 'tag @s add dr_quiet', 'function dropper:goto', 'tag @s remove dr_quiet', ...title('@s', 'FREE', '', 'green')]);
 
     // gifts: punches (arrows or sword hits: knock.js)
     fn('punch_toggle', [
@@ -1386,7 +1390,7 @@ export function wheelAmounts(a) {
 export function dropperCommands(a, times, { saveGift = 'Glowing Jellyfish' } = {}) {
     const n = (v, lo, hi, def) => Math.max(lo, Math.min(hi, Number.isFinite(+v) && +v > 0 ? Math.round(+v) : def));
     switch (a.type) {
-        case 'punch': return [knockCommand('dropper', a, Math.min(n(a.amount, 1, 10, 1) * times, 10))];
+        case 'punch': return [knockCommand('dropper', a, Math.min(n(a.amount, 1, 10, 1) * times, MAX_PUNCHES_PER_GIFT))];
         case 'punchToggle': return ['function dropper:punch_toggle'];
         case 'levelUp': return [`function dropper:up {n:${Math.min(99, n(a.amount, 1, 99, 1) * times)}}`];
         case 'levelDown': return [`function dropper:down {n:${Math.min(99, n(a.amount, 1, 99, 1) * times)}}`];
