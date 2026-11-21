@@ -26,7 +26,7 @@ import { hudPack, hudProps, hudInfo, hudSpot, blockIconPng } from './hudpack.js'
 import { makeChunkChat, normalizeChunkChat } from './chunkchat.js';
 import { makeChatDelete, normalizeChatDelete } from './chatdelete.js';
 import { listWorlds, installPack, singleplayerCommands, SAVES_DIR } from './singleplayer.js';
-import { makeLocalServer, setupLauncher, openLauncher, worldVersion } from './localserver.js';
+import { makeLocalServer, setupLauncher, openLauncher, worldVersion, installHudMod } from './localserver.js';
 import { checkForUpdate, applyUpdate, localVersion } from './updater.js';
 import { DROPPER_WORLD, DROPPER_MC, DROPPER_PROPS, DROPPER_ACTIONS, SECRET as DROPPER_LEVELS, installDropperPack, wheelAmounts, installDropperBuildPack, removeDropperBuildPack, dropperCommands, dropperAlertText, buildDropper, dropperBuilt, markDropperBuilt, dropperProgress } from './dropper.js';
 import { WIPEOUT_WORLD, WIPEOUT_MC, WIPEOUT_PROPS, WIPEOUT_ACTIONS, LEVELS as WIPEOUT_LEVELS, installWipeoutPack, installWipeoutBuildPack, removeWipeoutBuildPack, wipeoutCommands, buildWipeout, wipeoutBuilt, markWipeoutBuilt, wipeoutProgress } from './wipeout.js';
@@ -1380,8 +1380,14 @@ async function playWhenReady(g) {
         }
         if (!course.built()) throw new Error(`${course.name[0].toUpperCase() + course.name.slice(1)} is still being built. Wait a minute and press Play again`);
     }
-    let quick = true;
-    try { setupLauncher(worldVersion(worldOf(g))); }
+    let quick = true, mod = null;
+    const ver = worldVersion(worldOf(g));
+    // the Dropper and Wipeout: the Unbound HUD mod comes too (Esc > Unbound to move the info around)
+    if (course) {
+        try { mod = await installHudMod(ver, log, DATA); if (mod) log('The Unbound HUD mod is set up: in Minecraft, press Esc, then Unbound, to move your level, wipeouts and punches around.'); }
+        catch (e) { log(`The Unbound HUD mod couldn't be set up (${e.message}). Playing without it.`); }
+    }
+    try { setupLauncher(ver, mod); }
     catch (e) { quick = false; log(`Couldn't add "Unbound" to the launcher (${e.message}). In Minecraft: Multiplayer, then Unbound.`); }
     openLauncher();
     log(quick ? 'Minecraft launcher opened: press Play on "Unbound" and you go straight into your world.' : 'Minecraft launcher opened: play Minecraft, then Multiplayer, then Unbound.');

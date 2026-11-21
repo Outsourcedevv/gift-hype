@@ -1101,7 +1101,7 @@ export function packFiles() {
         'execute unless score #shield dr_v matches 0.. run scoreboard players set #shield dr_v 0',
         'execute unless score #reset dr_v matches 0.. run scoreboard players set #reset dr_v 0',
         'execute unless data storage dropper:s save run data modify storage dropper:s save set value "Glowing Jellyfish"',
-        `bossbar add dropper:level ${J({ text: 'LEVEL 01 / 100', bold: true })}`, 'bossbar set dropper:level color white', 'bossbar set dropper:level max 100', 'bossbar set dropper:level visible true',
+        `bossbar add dropper:level ${J({ text: 'LEVEL 01 / 100', bold: true })}`, 'bossbar set dropper:level color white', 'bossbar set dropper:level max 100', 'bossbar set dropper:level visible false',
         'scoreboard objectives add dr_life dummy', 'scoreboard objectives add dr_y dummy', 'scoreboard objectives add dr_top dummy', 'scoreboard objectives add dr_lf dummy',
         `bossbar add dropper:reset ${J({ text: 'Reset' })}`, 'bossbar set dropper:reset color red', 'bossbar set dropper:reset style notched_10',
         ...['immediate_respawn true', 'keep_inventory true', 'advance_time false', 'advance_weather false', 'spawn_mobs false', 'spawn_monsters false',
@@ -1136,13 +1136,9 @@ export function packFiles() {
     ]);
     fn('hud', [
         'effect give @s minecraft:night_vision infinite 0 true', 'effect give @s minecraft:saturation infinite 0 true',
-        // the level bar at the top of the screen
+        // your level is on the info line at the bottom with the rest (the Unbound HUD mod reads that line)
         'execute store result storage dropper:h level int 1 run scoreboard players get @s dr_level',
-        'data modify storage dropper:h pad set value ""', 'execute if score @s dr_level matches ..9 run data modify storage dropper:h pad set value "0"',
-        'execute if score @s dr_level matches ..100 run function dropper:hud_bar with storage dropper:h',
-        `execute if score @s dr_level matches 101 run bossbar set dropper:level name ${J([{ text: 'SECRET LEVEL 101', color: 'light_purple', bold: true }, { text: '   ONE TRY', color: 'red', bold: true }])}`,
-        'execute if score @s dr_level matches 101.. run bossbar set dropper:level value 100',
-        `execute if score @s dr_level matches 102.. run bossbar set dropper:level name ${J({ text: 'EVERY LEVEL DONE, EVEN THE SECRET ONE', color: 'gold', bold: true })}`,
+        'execute if score @s dr_level matches 101 run data modify storage dropper:h level set value "101-SECRET"',
         'scoreboard players operation @s dr_js = @s dr_jail', 'scoreboard players add @s dr_js 19', 'scoreboard players operation @s dr_js /= #20 dr_v',
         `execute if score @s dr_jail matches 1.. run return run title @s actionbar ${J([{ text: 'IN JAIL  ', color: 'red', bold: true }, { score: { name: '@s', objective: 'dr_js' }, color: 'white', bold: true }, { text: 's', color: 'red', bold: true }])}`,
         `execute if score @s dr_level matches 102.. run return run title @s actionbar ${J({ text: 'EVERY LEVEL DONE', color: 'gold', bold: true })}`,
@@ -1176,8 +1172,8 @@ export function packFiles() {
         'execute if entity @s[tag=dr_alert_sun] if score #m dr_v matches 0 run data merge entity @s {start_interpolation:0,interpolation_duration:10,transformation:{left_rotation:[0f,0f,1f,0f]}}',
         'execute if entity @s[tag=dr_alert_sun] if score #m dr_v matches 10 run data merge entity @s {start_interpolation:0,interpolation_duration:10,transformation:{left_rotation:[0f,0f,0f,1f]}}',
     ]);
-    fn('hud_line', [`$title @s actionbar [${J({ text: 'Fails ', color: 'gold' })},${J({ text: '$(fails)', color: 'white' })},${J({ text: '     Punches ', color: 'gold' })},{"text":"$(punch)","color":"$(pc)","bold":true}]`]);
-    fn('hud_shield', [`$title @s actionbar [${J({ text: 'Fails ', color: 'gold' })},${J({ text: '$(fails)', color: 'white' })},${J({ text: '     Punches ', color: 'gold' })},{"text":"$(punch)","color":"$(pc)","bold":true},${J({ text: '     Shield x$(shield)', color: 'aqua', bold: true })}]`]);
+    fn('hud_line', [`$title @s actionbar [${J({ text: 'Level ', color: 'gold' })},{"text":"$(level)","color":"white","bold":true},${J({ text: '     Fails ', color: 'gold' })},${J({ text: '$(fails)', color: 'white' })},${J({ text: '     Punches ', color: 'gold' })},{"text":"$(punch)","color":"$(pc)","bold":true}]`]);
+    fn('hud_shield', [`$title @s actionbar [${J({ text: 'Level ', color: 'gold' })},{"text":"$(level)","color":"white","bold":true},${J({ text: '     Fails ', color: 'gold' })},${J({ text: '$(fails)', color: 'white' })},${J({ text: '     Punches ', color: 'gold' })},{"text":"$(punch)","color":"$(pc)","bold":true},${J({ text: '     Shield x$(shield)', color: 'aqua', bold: true })}]`]);
 
     // go to the start of your level (not while you're in jail: you go there when you're let out)
     const levels = Array.from({ length: SECRET }, (_, i) => levelInfo(i + 1));

@@ -1,0 +1,13 @@
+{
+	"schemaVersion": 1,
+	"id": "unbound_hud",
+	"version": "${version}",
+	"name": "Unbound HUD",
+	"description": "Unbound's game info (level, wipeouts, punches) where you want it: Esc > Unbound to move, resize and give them backgrounds.",
+	"authors": ["Unbound"],
+	"license": "MIT",
+	"environment": "client",
+	"entrypoints": { "client": ["net.unbound.hud.UnboundHud"] },
+	"mixins": [ { "config": "unbound_hud.mixins.json", "environment": "client" } ],
+	"depends": { "fabricloader": ">=0.20.1", "minecraft": "~26.2", "java": ">=25", "fabric-api": "*" }
+}

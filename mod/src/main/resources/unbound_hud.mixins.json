@@ -1,0 +1,1 @@
+{ "required": true, "package": "net.unbound.hud.mixin", "compatibilityLevel": "JAVA_25", "client": ["HudMixin"], "injectors": { "defaultRequire": 1 } }

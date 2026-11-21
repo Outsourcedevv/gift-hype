@@ -953,7 +953,7 @@ export function packFiles() {
         'scoreboard players set #pend wo_v 0',
         'execute unless score #nxt wo_v matches -1.. run scoreboard players set #nxt wo_v -1',
         'execute unless data storage wipeout:s save run data modify storage wipeout:s save set value "Glowing Jellyfish"',
-        `bossbar add wipeout:level ${J({ text: 'LEVEL 01 / 100', bold: true })}`, 'bossbar set wipeout:level color blue', 'bossbar set wipeout:level max 100', 'bossbar set wipeout:level visible true',
+        `bossbar add wipeout:level ${J({ text: 'LEVEL 01 / 100', bold: true })}`, 'bossbar set wipeout:level color blue', 'bossbar set wipeout:level max 100', 'bossbar set wipeout:level visible false',
         `bossbar add wipeout:reset ${J({ text: 'Reset' })}`, 'bossbar set wipeout:reset color red', 'bossbar set wipeout:reset style notched_10',
         ...['immediate_respawn true', 'keep_inventory true', 'advance_time false', 'advance_weather false', 'spawn_mobs false', 'spawn_monsters false',
             'show_death_messages false', 'spawn_phantoms false', 'spawn_wandering_traders false', 'fall_damage false', 'mob_griefing false', 'drowning_damage false',
@@ -1004,10 +1004,9 @@ export function packFiles() {
     ]);
     fn('hud', [
         'effect give @s minecraft:night_vision infinite 0 true', 'effect give @s minecraft:saturation infinite 0 true', 'effect give @s minecraft:resistance infinite 4 true',
+        // your level is on the info line at the bottom with the rest (the Unbound HUD mod reads that line)
         'execute store result storage wipeout:h level int 1 run scoreboard players get @s wo_level',
-        'data modify storage wipeout:h pad set value ""', 'execute if score @s wo_level matches ..9 run data modify storage wipeout:h pad set value "0"',
-        'execute if score @s wo_level matches ..100 run function wipeout:hud_bar with storage wipeout:h',
-        `execute if score @s wo_level matches 101.. run bossbar set wipeout:level name ${J({ text: 'EVERY LEVEL DONE', color: 'gold', bold: true })}`,
+        'execute if score @s wo_level matches 101.. run data modify storage wipeout:h level set value "DONE"',
         'scoreboard players operation @s wo_js = @s wo_jail', 'scoreboard players add @s wo_js 19', 'scoreboard players operation @s wo_js /= #20 wo_v',
         `execute if score @s wo_jail matches 1.. run return run title @s actionbar ${J([{ text: 'IN JAIL  ', color: 'red', bold: true }, { score: { name: '@s', objective: 'wo_js' }, color: 'white', bold: true }, { text: 's', color: 'red', bold: true }])}`,
         'execute store result storage wipeout:h shield int 1 run scoreboard players get #shield wo_v',
@@ -1022,8 +1021,8 @@ export function packFiles() {
         'execute store result bossbar wipeout:level value run scoreboard players get @s wo_level',
         'bossbar set wipeout:level players @a[tag=wo_in]',
     ]);
-    fn('hud_line', [`$title @s actionbar [${J({ text: 'Wipeouts ', color: 'aqua' })},${J({ text: '$(fails)', color: 'white' })},${J({ text: '     Punches ', color: 'aqua' })},{"text":"$(punch)","color":"$(pc)","bold":true}]`]);
-    fn('hud_shield', [`$title @s actionbar [${J({ text: 'Wipeouts ', color: 'aqua' })},${J({ text: '$(fails)', color: 'white' })},${J({ text: '     Punches ', color: 'aqua' })},{"text":"$(punch)","color":"$(pc)","bold":true},${J({ text: '     Shield x$(shield)', color: 'aqua', bold: true })}]`]);
+    fn('hud_line', [`$title @s actionbar [${J({ text: 'Level ', color: 'aqua' })},{"text":"$(level)","color":"white","bold":true},${J({ text: '     Wipeouts ', color: 'aqua' })},${J({ text: '$(fails)', color: 'white' })},${J({ text: '     Punches ', color: 'aqua' })},{"text":"$(punch)","color":"$(pc)","bold":true}]`]);
+    fn('hud_shield', [`$title @s actionbar [${J({ text: 'Level ', color: 'aqua' })},{"text":"$(level)","color":"white","bold":true},${J({ text: '     Wipeouts ', color: 'aqua' })},${J({ text: '$(fails)', color: 'white' })},${J({ text: '     Punches ', color: 'aqua' })},{"text":"$(punch)","color":"$(pc)","bold":true},${J({ text: '     Shield x$(shield)', color: 'aqua', bold: true })}]`]);
     // a gift's alert in front of you (the same as the Dropper's)
     fn('alert', [
         'kill @e[tag=wo_alert]',

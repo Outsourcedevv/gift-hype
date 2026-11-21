@@ -12,6 +12,7 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 import crypto from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { Rcon } from 'rcon-client';
 import { SAVES_DIR } from './singleplayer.js';
 
@@ -374,7 +375,69 @@ export function makeLocalServer({ dir, log, onState }) {
 // A launcher version "gift-hype-<version>" that is just the normal game plus "join localhost:25566 as
 // soon as you start" (Minecraft's own quick-play option), and a "Gift Hype" launcher profile that
 // uses it, marked as last used so the launcher has it picked. Then the launcher is opened.
-export function setupLauncher(version) {
+// ---------- The Unbound HUD mod (the Dropper and Wipeout) ----------
+// A small client mod (mod/ in this folder): Esc > Unbound to move your level, wipeouts and punches
+// around, resize them and give them backgrounds. Set up by itself when you press Play: Fabric (from
+// Fabric's own server), Fabric API (from Modrinth, checked against its sha1) and the mod, in a game
+// folder of its own (.minecraft/unbound, your settings copied in the first time) so it never clashes
+// with other mods you have. If any of it can't be got, you play without it.
+const HUD_MC = '26.2', FABRIC_LOADER = '0.20.1';
+const HUD_JAR = path.join(path.dirname(fileURLToPath(import.meta.url)), 'mod', 'unbound-hud.jar');
+export const HUD_GAME_DIR = path.join(MC_DIR, 'unbound');
+const web = async (url, as) => {
+    const r = await fetch(url, { headers: { 'User-Agent': 'Unbound (Minecraft mod installer)' }, signal: AbortSignal.timeout(60000) });
+    if (!r.ok) throw new Error(`${new URL(url).hostname} answered ${r.status}`);
+    return as === 'json' ? r.json() : Buffer.from(await r.arrayBuffer());
+};
+export async function installHudMod(version, log = () => {}, cacheDir = null) {
+    if (version !== HUD_MC || !fs.existsSync(HUD_JAR)) return null;
+    const id = `unbound-fabric-${version}`;
+    // Fabric (the launcher downloads its parts from what this lists)
+    let prof;
+    const cache = cacheDir && path.join(cacheDir, `fabric-${FABRIC_LOADER}-${version}.json`);
+    try {
+        prof = await web(`https://meta.fabricmc.net/v2/versions/loader/${version}/${FABRIC_LOADER}/profile/json`, 'json');
+        if (cache) fs.writeFileSync(cache, JSON.stringify(prof));
+    } catch (e) {
+        if (cache && fs.existsSync(cache)) prof = JSON.parse(fs.readFileSync(cache, 'utf8'));
+        else throw new Error(`couldn't get Fabric: ${e.message}`);
+    }
+    const now = new Date().toISOString(), vdir = path.join(MC_DIR, 'versions', id);
+    fs.mkdirSync(vdir, { recursive: true });
+    const game = [...(prof.arguments?.game || []), '--quickPlayMultiplayer', `localhost:${SERVER_PORT}`];
+    fs.writeFileSync(path.join(vdir, `${id}.json`), JSON.stringify({ ...prof, id, inheritsFrom: version, time: now, releaseTime: now, arguments: { ...(prof.arguments || {}), game } }, null, 2));
+    // the mods: Fabric API and Unbound HUD (older copies of either taken out)
+    const mods = path.join(HUD_GAME_DIR, 'mods');
+    fs.mkdirSync(mods, { recursive: true });
+    let apiName = null;
+    try {
+        const q = `game_versions=${encodeURIComponent(JSON.stringify([version]))}&loaders=${encodeURIComponent('["fabric"]')}`;
+        const list = await web(`https://api.modrinth.com/v2/project/fabric-api/version?${q}`, 'json');
+        const v = list.find(x => x.version_type === 'release') || list[0];
+        const f = v && (v.files.find(x => x.primary) || v.files[0]);
+        if (!f) throw new Error('no Fabric API for this version yet');
+        apiName = f.filename;
+        if (!fs.existsSync(path.join(mods, apiName))) {
+            log(`Downloading Fabric API (for the Unbound HUD mod, ${Math.round(f.size / 1e6)} MB, only the first time)...`);
+            const buf = await web(f.url, 'buffer');
+            if (sha1(buf) !== f.hashes.sha1) throw new Error('the Fabric API download was damaged');
+            fs.writeFileSync(path.join(mods, apiName + '.part'), buf);
+            fs.renameSync(path.join(mods, apiName + '.part'), path.join(mods, apiName));
+        }
+    } catch (e) {
+        apiName = fs.readdirSync(mods).find(n => /^fabric-api-.*\.jar$/.test(n)) || null;
+        if (!apiName) throw new Error(`couldn't get Fabric API: ${e.message}`);
+    }
+    for (const n of fs.readdirSync(mods)) if ((/^fabric-api-.*\.jar$/.test(n) && n !== apiName) || /^unbound-hud.*\.jar$/.test(n)) fs.rmSync(path.join(mods, n), { force: true });
+    fs.copyFileSync(HUD_JAR, path.join(mods, 'unbound-hud.jar'));
+    // your settings (keys, video...) the first time
+    const opts = path.join(HUD_GAME_DIR, 'options.txt');
+    if (!fs.existsSync(opts) && fs.existsSync(path.join(MC_DIR, 'options.txt'))) fs.copyFileSync(path.join(MC_DIR, 'options.txt'), opts);
+    return { id, gameDir: HUD_GAME_DIR };
+}
+
+// mod: what installHudMod set up (the Dropper and Wipeout), or null for plain Minecraft
+export function setupLauncher(version, mod = null) {
     const id = `gift-hype-${version}`;
     const vdir = path.join(MC_DIR, 'versions', id);
     fs.mkdirSync(vdir, { recursive: true });
@@ -391,9 +454,11 @@ export function setupLauncher(version) {
     const j = JSON.parse(raw);
     j.profiles ||= {};
     const old = j.profiles['gift-hype'] || {};
-    j.profiles['gift-hype'] = { ...old, name: 'Unbound', type: 'custom', icon: 'TNT', lastVersionId: id, created: old.created || now, lastUsed: now };
+    const profile = { ...old, name: 'Unbound', type: 'custom', icon: 'TNT', lastVersionId: mod ? mod.id : id, created: old.created || now, lastUsed: now };
+    if (mod) profile.gameDir = mod.gameDir; else delete profile.gameDir;
+    j.profiles['gift-hype'] = profile;
     fs.writeFileSync(pf, JSON.stringify(j, null, 2));
-    return id;
+    return mod ? mod.id : id;
 }
 
 export function openLauncher() {
