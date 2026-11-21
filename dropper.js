@@ -1262,16 +1262,20 @@ export function packFiles() {
         '$scoreboard players add @s dr_jail $(ticks)',
         'execute if score @s dr_jail matches 7200.. run scoreboard players set @s dr_jail 7200',
     ]);
+    // (the cage's place is kept with a marker, so it's always taken away, wherever you are by then)
     fn('jail/enter', [
+        'function dropper:jail/clear',
         'tag @s add dr_quiet', 'function dropper:goto', 'tag @s remove dr_quiet',
-        'execute at @s run fill ~-1 ~ ~-1 ~1 ~2 ~1 minecraft:iron_bars replace minecraft:air',
-        'execute at @s run fill ~ ~ ~ ~ ~1 ~ minecraft:air replace minecraft:iron_bars',
-        'execute at @s run fill ~-1 ~3 ~-1 ~1 ~3 ~1 minecraft:iron_bars replace minecraft:air',
+        'execute at @s align xyz run summon minecraft:marker ~ ~ ~ {Tags:["dr_jailpos"]}',
+        'execute at @s align xyz run fill ~-1 ~ ~-1 ~1 ~2 ~1 minecraft:iron_bars replace minecraft:air',
+        'execute at @s align xyz run fill ~ ~ ~ ~ ~1 ~ minecraft:air replace minecraft:iron_bars',
+        'execute at @s align xyz run fill ~-1 ~3 ~-1 ~1 ~3 ~1 minecraft:iron_bars replace minecraft:air',
         'effect give @s minecraft:jump_boost 9999 250 true',
         'playsound minecraft:block.iron_door.close master @s ~ ~ ~ 1 0.8', ...title('@s', 'JAILED', 'on the bridge', 'red'),
     ]);
     fn('jail/tick', ['scoreboard players remove @s dr_jail 1', 'execute if score @s dr_jail matches ..0 run function dropper:jail/free']);
-    fn('jail/free', ['scoreboard players set @s dr_jail 0', 'execute at @s run fill ~-1 ~ ~-1 ~1 ~3 ~1 minecraft:air replace minecraft:iron_bars', 'effect clear @s minecraft:jump_boost', 'playsound minecraft:block.iron_door.open master @s ~ ~ ~ 1 1', 'tag @s add dr_quiet', 'function dropper:goto', 'tag @s remove dr_quiet', ...title('@s', 'FREE', '', 'green')]);
+    fn('jail/clear', ['execute at @e[type=minecraft:marker,tag=dr_jailpos] run fill ~-1 ~ ~-1 ~1 ~3 ~1 minecraft:air replace minecraft:iron_bars', 'kill @e[type=minecraft:marker,tag=dr_jailpos]']);
+    fn('jail/free', ['scoreboard players set @s dr_jail 0', 'function dropper:jail/clear', 'execute at @s run fill ~-1 ~ ~-1 ~1 ~3 ~1 minecraft:air replace minecraft:iron_bars', 'effect clear @s minecraft:jump_boost', 'playsound minecraft:block.iron_door.open master @s ~ ~ ~ 1 1', 'tag @s add dr_quiet', 'function dropper:goto', 'tag @s remove dr_quiet', ...title('@s', 'FREE', '', 'green')]);
 
     // gifts: punches (arrows or sword hits: knock.js)
     fn('punch_toggle', [

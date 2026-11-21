@@ -231,7 +231,8 @@ GIFTS
                                     new campaign's, are added by themselves when Unbound opens)
   + Any other gift                - plays for any gift you didn't set up
   Follow (first in Browse all gifts) - when someone follows you: give it a sound, a popup and actions
-    like a gift. It goes off once per person each time you connect (the popup says "<name> followed!").
+    like a gift. It goes off once per person, ever: unfollowing and following again doesn't set it
+    off again (the popup says "<name> followed!").
   Each gift has: a sound (and volume), "Pop up on stream", what it does, and actions.
   Actions: press "+ Add an action..." and pick one. For Minecraft there are ready-made ones:
     Nuke (falls from the sky, goes up in a mushroom cloud and leaves a crater down to y -20 with a steep wall you can climb;
