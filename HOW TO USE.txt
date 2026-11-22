@@ -234,6 +234,8 @@ THE DROPPER (Minecraft -> Dropper)
     Rosa = jail 5s, Paper Crane / Corgi = up 1 / 5 levels, Hat and Mustache / Boxing Gloves = down 1 / 5,
     Galaxy = 60s reset countdown (back to level 1), Glowing Jellyfish = saves you (or a shield if no
     countdown is running), Hand Hearts = level slot machine. Change any of them like other gifts.
+  Level up / down: a big green LEVEL UP (or red LEVEL DOWN) across your screen with how many and the
+    level you're on now, its own sound and sparkles; the stream popup says LEVEL UP +3 / LEVEL DOWN -3.
   Level slot machine: a slot machine spins on the stream overlay (about 4 seconds, ticking as the
     numbers go past) and stops on one of the amounts you typed for that gift (e.g. -10, -5, -1, 1, 5, 10).
     Green + sends you up that many levels, red - sends you down. Numbers are in Monocraft, a free

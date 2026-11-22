@@ -1236,20 +1236,30 @@ export function packFiles() {
     ]);
 
     // gifts: levels up and down (you can't be gifted past level 100: the last one is yours to land)
+    // a level up / down is unmistakable: a big green LEVEL UP (or red LEVEL DOWN) across the screen, how
+    // many and the level you're on now, its own sound and sparkles (after the new level's own title)
     fn('up', [
-        'execute if score @s dr_level matches 100.. run return 0',
+        `execute if score @s dr_level matches 100.. run return run title @s actionbar ${J({ text: 'Already on the last level', color: 'gold', bold: true })}`,
         '$scoreboard players add @s dr_level $(n)',
         'execute if score @s dr_level matches 101.. run scoreboard players set @s dr_level 100',
-        'playsound minecraft:entity.player.levelup master @s ~ ~ ~ 1 1.5',
-        '$title @s actionbar {"text":"+$(n) level(s)!","color":"green","bold":true}',
         'function dropper:goto',
+        'title @s times 4 60 14',
+        `title @s title ${J({ text: '\u2B06 LEVEL UP \u2B06', color: 'green', bold: true })}`,
+        '$title @s subtitle [{"text":"+$(n)   ","color":"green","bold":true},{"text":"now Level ","color":"white"},{"score":{"name":"@s","objective":"dr_level"},"color":"white","bold":true}]',
+        'playsound minecraft:entity.player.levelup master @s ~ ~ ~ 1 1.2', 'playsound minecraft:block.beacon.activate master @s ~ ~ ~ 0.8 1.6',
+        'execute at @s run particle minecraft:happy_villager ~ ~1 ~ 0.6 0.8 0.6 0 30 force @s',
+        'execute at @s run particle minecraft:totem_of_undying ~ ~1 ~ 0.5 0.7 0.5 0.3 40 force @s',
     ]);
     fn('down', [
         '$scoreboard players remove @s dr_level $(n)',
         'execute if score @s dr_level matches ..0 run scoreboard players set @s dr_level 1',
-        'playsound minecraft:entity.villager.no master @s ~ ~ ~ 1 0.8',
-        '$title @s actionbar {"text":"-$(n) level(s)","color":"red","bold":true}',
         'function dropper:goto',
+        'title @s times 4 60 14',
+        `title @s title ${J({ text: '\u2B07 LEVEL DOWN \u2B07', color: 'red', bold: true })}`,
+        '$title @s subtitle [{"text":"-$(n)   ","color":"red","bold":true},{"text":"now Level ","color":"white"},{"score":{"name":"@s","objective":"dr_level"},"color":"white","bold":true}]',
+        'playsound minecraft:entity.villager.no master @s ~ ~ ~ 1 0.8', 'playsound minecraft:block.beacon.deactivate master @s ~ ~ ~ 0.8 0.8',
+        'execute at @s run particle minecraft:angry_villager ~ ~1.2 ~ 0.6 0.6 0.6 0 12 force @s',
+        'execute at @s run particle minecraft:large_smoke ~ ~1 ~ 0.4 0.6 0.4 0.02 20 force @s',
     ]);
 
     // gifts: jail. Back to the top of your level, locked in a cage on the bridge for a while.
@@ -1417,8 +1427,8 @@ export function dropperAlertText(rule, count) {
     const parts = rule.actions.map(a => {
         switch (a.type) {
             case 'punch': { const k = n(a.amount, 1) * times; color = 'red'; return `${a.style === 'sword' ? 'hit you with a sword' : 'punched you'}${k > 1 ? ` x${k}` : ''}`; }
-            case 'levelUp': { const k = n(a.amount, 1) * times; color = 'green'; return `+${k} level${k > 1 ? 's' : ''}`; }
-            case 'levelDown': { const k = n(a.amount, 1) * times; color = 'red'; return `-${k} level${k > 1 ? 's' : ''}`; }
+            case 'levelUp': { const k = n(a.amount, 1) * times; color = 'green'; return `\u2B06 LEVEL UP +${k}`; }
+            case 'levelDown': { const k = n(a.amount, 1) * times; color = 'red'; return `\u2B07 LEVEL DOWN -${k}`; }
             case 'jail': color = 'red'; return `jailed you for ${n(a.seconds, 5) * times}s`;
             case 'resetTimer': color = 'red'; return 'started a RESET';
             case 'saveReset': color = 'aqua'; return 'saved you!';
