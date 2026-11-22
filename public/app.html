@@ -384,6 +384,35 @@ svg.i { width: 14px; height: 14px; flex: none; vertical-align: -2px; }
 .add-act select { font-size: 13px; padding: 6px 10px; }
 .toolbar { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; align-items: center; }
 .saved { color: var(--green); font-size: 13px; opacity: 0; transition: opacity .3s; margin-left: auto; }
+/* the gift list: a toolbar on top (add, find, sort), a gift's picture opens the gallery to change it */
+/* getting started: four steps with ticks */
+.start ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.start li { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--well); }
+.start li .tick { width: 22px; height: 22px; flex: none; border-radius: 50%; border: 2px solid var(--line); display: grid; place-items: center; font-size: 13px; font-weight: 800; }
+.start li.done .tick { background: var(--green); border-color: var(--green); color: #04130a; }
+.start li.done .what { opacity: .55; }
+#startCard { margin-bottom: 22px; }
+.start li .what { flex: 1; }
+.start li .what small { display: block; color: var(--muted); font-size: 12px; text-decoration: none; }
+.chip { cursor: pointer; font-family: inherit; color: inherit; }
+.volpct { font-size: 12px; color: var(--muted); min-width: 34px; display: inline-block; }
+.rules-top { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 12px; }
+.rules-top input[type=search] { flex: 1 1 200px; min-width: 160px; }
+.gimg.change { cursor: pointer; position: relative; border: 0; padding: 0; }
+.gimg.change::after { content: 'Change'; position: absolute; inset: auto 0 0 0; font-size: 10px; font-weight: 700; text-align: center; padding: 2px 0; background: rgba(0,0,0,.65); color: #fff; border-radius: 0 0 8px 8px; opacity: 0; transition: opacity .15s; }
+.gimg.change:hover::after, .gimg.change:focus-visible::after { opacity: 1; }
+.linkbtn { background: none; border: 0; padding: 0 0 0 6px; color: var(--accent); font-size: 12px; cursor: pointer; text-decoration: underline; box-shadow: none; }
+.rule.flash { animation: ruleflash 1.4s ease; }
+input.bad { border-color: var(--red, #ff5a5a) !important; box-shadow: 0 0 0 2px color-mix(in srgb, var(--red, #ff5a5a) 30%, transparent); }
+@keyframes ruleflash { 0%, 60% { box-shadow: 0 0 0 3px var(--accent); } 100% { box-shadow: 0 0 0 0 transparent; } }
+.gcard { position: relative; }
+.gcard .setup { position: absolute; top: 6px; right: 6px; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 999px; background: var(--green); color: #04130a; }
+.gcard.current { outline: 2px solid var(--accent); outline-offset: -2px; }
+.toast button { margin-left: 12px; padding: 3px 12px; font-size: 13px; pointer-events: auto; }
+.toast.withbtn { pointer-events: auto; }
+.feed .item .fix { margin-left: auto; align-self: center; white-space: nowrap; }
+.feed .item.jump { cursor: pointer; }
+.clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .saved.show { opacity: 1; }
 .empty { color: var(--muted); font-size: 14px; padding: 6px 0; }
 
@@ -758,8 +787,8 @@ ubIntro.start();
   </div>
   <button class="jump" id="jumpBtn" title="Find any game, sound or setting (Ctrl + K)"><svg class="i" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/></svg><span>Find anything…</span><kbd>Ctrl K</kbd></button>
   <div class="chips">
-    <div class="chip"><span class="dot" id="ttDot"></span><span id="ttText">TikTok offline</span></div>
-    <div class="chip"><span class="dot idle" id="gmDot"></span><span id="gmText">No game link</span></div>
+    <button class="chip" id="ttChip" title="Your TikTok LIVE connection (click to connect)"><span class="dot" id="ttDot"></span><span id="ttText">TikTok offline</span></button>
+    <button class="chip" id="gmChip" title="Your game's connection (click to see its settings)"><span class="dot idle" id="gmDot"></span><span id="gmText">No game link</span></button>
   </div>
   <p class="tterr" id="ttErr"></p>
   <nav class="tabs" id="tabs" aria-label="Pages" role="tablist">
@@ -774,6 +803,10 @@ ubIntro.start();
   <div class="col">
    <div class="page col" data-page="games">
     <div id="home">
+      <section id="startCard" class="start" hidden>
+        <h2>Getting started <span class="right"><button class="small ghost" id="startHide" title="Hide this list">Hide</button></span></h2>
+        <ol id="startSteps"></ol>
+      </section>
       <div class="lib-head"><h1>Games</h1><p>Click a game to set up its gifts. The one marked LIVE is where your gifts go.</p></div>
       <div class="covers" id="covers"></div>
     </div>
@@ -793,8 +826,8 @@ ubIntro.start();
             <div class="ghead">
               <input type="text" class="gtitle" id="gName" maxlength="60" aria-label="Game name">
               <div class="btns">
-                <button class="small" id="gDup" title="Make a copy of this game">Copy</button>
-                <button class="small danger" id="gDel">Delete</button>
+                <button class="small" id="gDup" title="Make a copy of this game, with all its gifts">Duplicate game</button>
+                <button class="small danger" id="gDel" title="Delete this game and all its gifts">Delete game</button>
               </div>
             </div>
             <div id="playBox"></div>
@@ -805,7 +838,7 @@ ubIntro.start();
             <div id="typeBox"></div>
           </div>
         </div>
-        <h2 style="margin-top:22px">Connects to</h2>
+        <h2 style="margin-top:22px">What gifts control <span class="right" style="font-weight:400;text-transform:none">pick where the gifts' actions happen</span></h2>
         <div class="seg" role="radiogroup" aria-label="How gifts reach the game">
           <button data-conn="minecraft" role="radio">Minecraft</button>
           <button data-conn="keys" role="radio">Key presses</button>
@@ -815,7 +848,13 @@ ubIntro.start();
       </section>
 
       <section>
-        <h2>Gifts &amp; what they do <span class="right"><span class="saved" id="saved">Saved</span></span></h2>
+        <h2>Gifts &amp; what they do <span class="count" id="ruleCount"></span> <span class="right"><span class="saved" id="saved">Saved</span></span></h2>
+        <div class="rules-top">
+          <button class="primary small" id="addGiftTop">+ Add gift</button>
+          <button class="small" id="browseTop">Browse all gifts</button>
+          <input type="search" id="ruleFind" placeholder="Find a gift in this list…" aria-label="Find a gift in this list">
+          <button class="small" id="sortRules" title="Put the list in price order, cheapest first">Sort by price</button>
+        </div>
         <div class="rules" id="rules"></div>
         <div class="toolbar">
           <button class="primary" id="addGift">+ Add gift</button>
@@ -842,6 +881,7 @@ ubIntro.start();
         <button id="sRandom" title="Play a random sound from what's shown">🎲 Random</button>
         <button id="stopAll2"><svg class="i" viewBox="0 0 16 16"><rect x="3" y="3" width="10" height="10" rx="1.5" fill="currentColor"/></svg> Stop</button>
       </div>
+      <p class="hint" style="margin:8px 0 0">Click a sound to hear it. ☆ keeps it in Quick sounds (on the right), ✎ renames it. Esc stops every sound.</p>
       <div class="gchips" id="sGroups" role="radiogroup" aria-label="Sound groups"></div>
       <div id="sounds" class="board"></div>
       <p class="hint"><b>Click</b> a sound to hear it. <b>☆</b> adds it to Quick sounds on the right (and to the top of every list). <b>✎</b> gives it your own name.
@@ -915,6 +955,7 @@ ubIntro.start();
         <label data-cardonly class="check" style="flex-direction:row"><input type="checkbox" data-m="popImage"> Show the gift's picture</label>
         <label data-cardonly class="check" style="flex-direction:row"><input type="checkbox" data-m="popWiggle"> Wiggle the picture</label>
         <label data-cardonly class="check" style="flex-direction:row"><input type="checkbox" data-m="popCount"> Show streaks (3×)</label>
+        <label class="check" style="flex-direction:row" title="During a reset countdown (the Dropper and Wipeout), the gift that saves you floats round the middle of the stream with the time left"><input type="checkbox" data-m="saveFloat"> Float the save gift round the middle during a reset</label>
         <label class="check wide" style="flex-direction:row"><input type="checkbox" data-m="popColors"> Use my own colours (instead of the app's colour theme)</label>
         <label data-popcol data-cardonly>Border<input type="color" data-m="popBorder"></label>
         <label data-popcol>Name<input type="color" data-m="popName"></label>
@@ -1000,7 +1041,7 @@ ubIntro.start();
       </div>
     </section>
     <section id="logSec">
-      <h2>Activity log</h2>
+      <h2>Activity log <span class="right"><button class="small" id="copyLog" title="Copy the whole log, e.g. to send it when something isn't working">Copy</button></span></h2>
       <pre class="log" id="log"></pre>
     </section>
    </div>
@@ -1021,7 +1062,7 @@ ubIntro.start();
 </main>
 
 <dialog id="gallery">
-  <div class="dlg-head"><h3>All gifts</h3><input type="text" id="gSearch" placeholder="Search gifts...">
+  <div class="dlg-head"><h3 id="gTitle">All gifts</h3><input type="search" id="gSearch" placeholder="Search gifts... (Enter picks the first)">
     <select id="gRange" aria-label="Price"><option value="">All prices</option><option value="1-99">1–99 coins</option><option value="100-999">100–999 coins</option><option value="1000-9999">1,000–9,999 coins</option><option value="10000-">10,000+ coins</option></select>
     <select id="gSort" aria-label="Order"><option value="up">Cheapest first</option><option value="down">Most expensive first</option></select>
     <span class="pill" id="gCount"></span><button class="ghost" id="gClose" aria-label="Close"><svg class="i" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button></div>
@@ -1114,9 +1155,18 @@ async function api(path, body) {
   return j;
 }
 let toastTimer;
-function toast(msg, err) {
+function toast(msg, err, action) {
   const t = $('toast');
-  t.textContent = msg; t.className = 'toast show' + (err ? ' err' : '');
+  t.textContent = msg; t.className = 'toast show' + (err ? ' err' : '') + (action ? ' withbtn' : '');
+  // a button on it (e.g. Undo): stays up a bit longer
+  if (action) {
+    const b = document.createElement('button'); b.className = 'small'; b.textContent = action.label;
+    b.onclick = ev => { ev.stopPropagation(); clearTimeout(toastTimer); t.className = 'toast'; action.run(); };
+    t.append(b);
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => t.className = 'toast', 7000);
+    t.onclick = null;
+    return;
+  }
   // problems stay up long enough to read (longer for longer ones); a click closes it
   t.onclick = () => { clearTimeout(toastTimer); t.className = 'toast'; };
   clearTimeout(toastTimer); toastTimer = setTimeout(() => t.className = 'toast', err ? Math.min(30000, Math.max(8000, String(msg).length * 70)) : 2600);
@@ -1666,9 +1716,10 @@ function jumpAll() {
     if (game.mode !== m.id) { game.mode = m.id; queueSave(); await flushSave(); renderTypes(); renderRules(); if (game.connector === 'minecraft') renderMinecraftBox(); }
     showView('game');
   }, `${m.rules.length} gifts`);
+  if (game) R().forEach((r, i) => go('Gift', r.gift === '*' ? 'Any other gift' : r.gift || '(no gift picked)', () => { setPage('games'); showView('game'); setTimeout(() => flashRule(i), 60); }, r.label || ''));
   if (game) {
     go('Do', 'Add a gift', () => { setPage('games'); showView('game'); addRule(); });
-    go('Do', 'Browse all gifts', () => { setPage('games'); showView('game'); $('browse').click(); });
+    go('Do', 'Browse all gifts', () => { setPage('games'); showView('game'); openGallery(); });
   }
   go('Do', 'Add a game', () => { setPage('games'); showView('home'); openNewGame(); });
   go('Do', status.tiktok && status.tiktok !== 'offline' ? 'Disconnect from TikTok' : 'Connect to TikTok', () => $('ttBtn').click());
@@ -1736,8 +1787,13 @@ $('ttBtn').onclick = async () => {
 };
 $('ttUser').onkeydown = e => { if (e.key === 'Enter') $('ttBtn').click(); };
 
+let lastTikTok = null;
 function renderStatus() {
   const t = status.tiktok;
+  // say so when TikTok connects (once each time)
+  if (t === 'connected' && lastTikTok && lastTikTok !== 'connected') toast(`Connected to @${settings.tiktokUsername}'s LIVE: gifts will work now`);
+  if (lastTikTok !== t) { lastTikTok = t; setTimeout(renderStart, 0); }
+  if (status.overlayView) setTimeout(renderStart, 0);
   $('ttDot').className = 'dot' + (t === 'connected' ? ' on' : t === 'connecting' || t === 'waiting' ? ' wait' : '');
   $('ttText').textContent = t === 'connected' ? `Live: @${settings.tiktokUsername}` : t === 'connecting' ? 'Connecting…' : t === 'waiting' ? 'Waiting for your live…' : 'TikTok offline';
   $('ttBtn').textContent = t && t !== 'offline' ? 'Disconnect' : 'Connect';
@@ -1817,6 +1873,7 @@ function renderTypeCovers() {
 }
 $('typesBack').onclick = () => showView('home');
 function renderGames() {
+  setTimeout(renderStart, 0);
   $('covers').innerHTML = gamesList.map(g => `<button class="cover-card ${g.id === settings.activeGame ? 'on' : ''}" data-game="${esc(g.id)}">
       <div class="art">${coverHtml(g)}${g.id === settings.activeGame ? '<span class="badge">LIVE</span>' : ''}</div>
       <div class="meta"><b>${esc(g.name)}</b><span>${g.mode ? esc(g.mode) : CONN_NAMES[g.connector]} · ${g.gifts} gift${g.gifts === 1 ? '' : 's'}</span></div>
@@ -1879,13 +1936,13 @@ const isWipeoutMode = () => game?.connector === 'minecraft' && /wipe ?out/i.test
 const courseName = () => isWipeoutMode() ? 'Wipeout' : 'the Dropper';
 function renderTypes() {
   const box = $('typeBox'), many = game.modes.length > 1;
-  box.innerHTML = many ? `<h2 style="margin-top:18px">Type <span class="right" style="font-weight:400;text-transform:none">gifts do what the picked one says</span></h2>
+  box.innerHTML = many ? `<h2 style="margin-top:18px">Type <span class="right" style="font-weight:400;text-transform:none">each type has its own gifts: the picked one is used</span></h2>
     <div class="row">
       <div class="seg" role="radiogroup" aria-label="Which type you're playing">
         ${game.modes.map(m => `<button data-mode="${esc(m.id)}" role="radio" aria-checked="${m.id === game.mode}">${esc(m.name || 'Untitled')}</button>`).join('')}
       </div>
-      <button class="small ghost" id="mAdd">+ Type</button>
-      <button class="small ghost" id="mRen">Rename</button>
+      <button class="small ghost" id="mAdd" title="Add another type: a list of gifts of its own you can switch to">+ Type</button>
+      <button class="small ghost" id="mRen" title="Rename the picked type">Rename</button>
       <button class="small ghost danger" id="mDel">Remove</button>
     </div>` : `<div class="row" style="margin-top:12px"><button class="small ghost" id="mAdd" title="e.g. Parkour and Survival, each with its own gifts">+ Add a type</button></div>`;
   box.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => {
@@ -1985,7 +2042,7 @@ function renderPlay() {
   const box = $('playBox');
   if (!box) return;
   if (!game || game.connector !== 'minecraft' || !(game.minecraft.single || isDropperMode())) { box.innerHTML = ''; return; }
-  box.innerHTML = `<button class="hot play-btn" id="playMc" ${playing_ ? 'disabled' : ''}>${playing_ ? 'Opening your world…' : 'Play Minecraft'}</button>`;
+  box.innerHTML = `<button class="hot play-btn" id="playMc" title="Gets everything ready (the first time it downloads what's needed), then opens Minecraft straight into your world" ${playing_ ? 'disabled' : ''}>${playing_ ? 'Opening your world…' : 'Play Minecraft'}</button>`;
   $('playMc').onclick = async () => {
     playing_ = true; renderPlay();
     try {
@@ -2017,13 +2074,16 @@ async function renderMinecraftBox() {
   const m = game.minecraft;
   if (isDropperMode()) {
     box.innerHTML = `<div class="conn-box">
-        ${isWipeoutMode() ? `<p class="wide" style="margin:0"><b>Wipeout has its own world</b>, made by Unbound: 100 levels in one straight line just above warm sea water, between low walls with a crowd and floodlights. Each level is two obstacles (three after level 80): spinners, sliding cubes, waves of red walls (duck into the holes in the sides), bridges that keep going yellow, red and vanishing (time your run), punching gloves, crushers, the zipline (go when its light is green), the doors, laser gates, rolling bars, big bouncy balls, stepping stones, and arms to jump and duck. Reach the emerald pad and you're on the next level, right ahead. Touch anything red and you're dead; punching gloves knock you into the sea; red and white boxing gloves bounce you up. No checkpoints: die or fall and the level starts again. Level 100 is a black and yellow tower: climb the spiral steps round it, past disappearing steps, red arms and punching gloves, to the emerald on top to win.</p>`
+        ${isWipeoutMode() ? `<p class="wide clamp" id="typeDesc" style="margin:0"><b>Wipeout has its own world</b>, made by Unbound: 100 levels in one straight line just above warm sea water, between low walls with a crowd and floodlights. Each level is two obstacles (three after level 80): spinners, sliding cubes, waves of red walls (duck into the holes in the sides), bridges that keep going yellow, red and vanishing (time your run), punching gloves, crushers, the zipline (go when its light is green), the doors, laser gates, rolling bars, big bouncy balls, stepping stones, and arms to jump and duck. Reach the emerald pad and you're on the next level, right ahead. Touch anything red and you're dead; punching gloves knock you into the sea; red and white boxing gloves bounce you up. No checkpoints: die or fall and the level starts again. Level 100 is a black and yellow tower: climb the spiral steps round it, past disappearing steps, red arms and punching gloves, to the emerald on top to win.</p>`
           : `<p class="wide" style="margin:0"><b>The Dropper has its own world</b>, made by Unbound: 100 levels that get harder as you go. Fall through the gaps and land in the water to go to the next level. Hit anything else and you start that level again.</p>`}
         <div class="wide"><label class="check"><input type="checkbox" id="mcEula" ${settings.mcEula ? 'checked' : ''}> I agree to the <a href="https://aka.ms/MinecraftEULA" target="_blank" rel="noopener" style="color:var(--main-text)">Minecraft EULA</a> (needed to open the world for gifts)</label></div>
-        <div class="wide row"><button class="small" id="mcRestart">Reopen world</button><button class="small ghost danger" id="mcResetMap" title="If something in the map breaks: the world is made again and the levels built fresh">Reset the map</button><span class="pill" id="mcState"></span></div>
+        <div class="wide row"><button class="small" id="mcRestart" title="Close the world and open it again (if something seems stuck)">Reopen world</button><button class="small ghost danger" id="mcResetMap" title="If something in the map breaks: the world is made again and the levels built fresh">Reset the map</button><span class="pill" id="mcState"></span></div>
       </div>
       <p class="hint"><b>How to play:</b> press <b>Play Minecraft</b>. The first time, Unbound makes the world and builds the levels (${isWipeoutMode() ? 'under a minute' : 'about a minute'}). Your level, ${isWipeoutMode() ? 'wipeouts' : 'fails'}, punches on/off and any shield are shown at the bottom of your screen, and the reset countdown at the top.</p>`;
     $('mcEula').onchange = () => { settings.mcEula = $('mcEula').checked; api('/api/settings', { mcEula: settings.mcEula }); };
+    // the long description: two lines, More for the rest
+    const desc = $('typeDesc');
+    if (desc) { const more = document.createElement('button'); more.className = 'linkbtn wide'; more.style.cssText = 'padding:0;justify-self:start;margin-top:-6px'; more.textContent = 'More…'; desc.after(more); more.onclick = () => { desc.classList.toggle('clamp'); more.textContent = desc.classList.contains('clamp') ? 'More…' : 'Less'; }; }
     $('mcRestart').onclick = async () => { try { await api('/api/minecraft/restart-world', {}); toast(`Reopening ${courseName()}…`); } catch (e) { toast(e.message, true); } };
     // if something in the map breaks: back to how it was at the start (levels built fresh, level 1, 0 ${isWipeoutMode() ? 'wipeouts' : 'fails'})
     $('mcResetMap').onclick = async () => {
@@ -2053,7 +2113,7 @@ async function renderMinecraftBox() {
           </select>
         </label>
         <div class="wide"><label class="check"><input type="checkbox" id="mcEula" ${settings.mcEula ? 'checked' : ''}> I agree to the <a href="https://aka.ms/MinecraftEULA" target="_blank" rel="noopener" style="color:var(--main-text)">Minecraft EULA</a> (needed to open the world for gifts)</label></div>
-        <div class="wide row"><button class="small" id="mcRestart">Reopen world</button><button class="small ghost" id="mcWorlds">Look for worlds again</button><span class="pill" id="mcState"></span></div>
+        <div class="wide row"><button class="small" id="mcRestart" title="Close the world and open it again (if something seems stuck)">Reopen world</button><button class="small ghost" id="mcWorlds">Look for worlds again</button><span class="pill" id="mcState"></span></div>
       </div>
       <p class="hint"><b>How to play:</b> keep Unbound open. In Minecraft go to <b>Multiplayer</b> and join <b>Unbound</b> (it's added to your list; if not, Direct Connection: <code>localhost:25566</code>). It's your own world, with your stuff. Gifts happen instantly, nothing is typed.<br>
       Don't open the same world in Singleplayer at the same time. Closing Unbound saves and closes the world.</p>`;
@@ -2115,7 +2175,7 @@ async function renderMinecraftBox() {
 // is still there for anything else. fields = the settings each one has, with their starting values.
 const ACTION_TYPES = {
   nuke: { label: 'Nuke', conn: 'minecraft', desc: 'A nuke falls on you and goes up in a mushroom cloud, leaving a huge crater down to y -20: a wide flat middle, then a steep wall you can just climb. Size = how far the flat middle goes out (40 makes a hole about 18 chunks across)', fields: { size: { label: 'crater size', def: 40, min: 16, max: 64 } } },
-  jail: { label: 'Jail', conn: 'minecraft', desc: 'Locks you in a jail (in the Dropper: a cell at the start of your level; in Wipeout: a cage where you are)', fields: { seconds: { label: 'seconds', def: 30, min: 1, max: 3600 } } },
+  jail: { label: 'Jail', conn: 'minecraft', desc: 'Locks you in a jail (in the Dropper: a cell at the start of your level; in Wipeout: a cage at the start of your level). Gifts still work while you are in it', fields: { seconds: { label: 'seconds', def: 30, min: 1, max: 3600 } } },
   punch: { label: 'Punch (arrow or sword)', conn: 'minecraft', desc: 'Knocks you from a random side: an arrow with Punch II, or a sword hit. Every one lands; several come one after another. Only while punches are on', fields: { style: { label: 'hit with', def: 'arrow', choices: [['arrow', 'an arrow'], ['sword', 'a sword']] }, amount: { label: 'hits', def: 1, min: 1, max: 10 } } },
   punchToggle: { label: 'Punches on/off', conn: 'minecraft', desc: 'Turns punches (arrows and sword hits) off if they are on, and back on if they are off' },
   levelUp: { label: 'Level up', conn: 'minecraft', desc: 'Skips you ahead to the start of a later level', fields: { amount: { label: 'levels', def: 1, min: 1, max: 99 } } },
@@ -2173,7 +2233,8 @@ function giftImgHtml(r) {
   if (r.gift === '*') return `<div class="gimg">${IC.gift}</div>`;
   const k = known(r.gift);
   const img = k?.image || r.image;
-  return `<div class="gimg">${img ? `<img src="${pic(img)}" alt="" onerror="this.outerHTML=IC.gift">` : IC.gift}</div>`;
+  // click it to pick another gift from the gallery
+  return `<button class="gimg change" data-change title="Change the gift (opens the gallery)" aria-label="Change the gift">${img ? `<img src="${pic(img)}" alt="" onerror="this.outerHTML=IC.gift">` : IC.gift}</button>`;
 }
 
 // ----- Chunk Chat: on a timer, your chunk turns into the block chat picked -----
@@ -2494,6 +2555,7 @@ function renderChat() {
 function renderRules() {
   renderChat();
   const box = $('rules');
+  $('ruleCount').textContent = R().length ? String(R().length) : '';
   if (!R().length) { box.innerHTML = '<div class="empty">No gifts yet. Press <b>+ Add gift</b> or <b>Browse all gifts</b>.</div>'; return; }
   const addOpts = addActionOptions();
   box.innerHTML = R().map((r, i) => {
@@ -2505,27 +2567,28 @@ function renderRules() {
         ${giftImgHtml(r)}
         <div class="gname">
           ${r.gift === '*' ? '<input type="text" value="Any other gift" disabled>' : `<input type="text" list="giftNames" value="${esc(r.gift)}" placeholder="Gift name" data-f="gift">`}
-          <span class="coins">${r.gift === '*' ? 'gifts not on this list' : coinText(k?.coins ?? r.coins) || '&nbsp;'}</span>
+          <span class="coins">${r.gift === '*' ? 'gifts not on this list' : coinText(k?.coins ?? r.coins) || '&nbsp;'}${r.gift === '*' ? '' : '<button class="linkbtn" data-change>change gift</button>'}</span>
         </div>
         <input type="text" data-f="label" value="${esc(r.label)}" placeholder="What it does (shows on stream)">
         <div class="rule-actions">
           <button class="small" data-test>Test</button>
+          <button class="small" data-copy title="Copy this gift (sound, popup and actions) to another gift">Copy</button>
           <button class="small ghost danger" data-del aria-label="Remove gift">${IC.x}</button>
         </div>
       </div>
       <div class="rule-sound">
         <button class="small pickbtn" data-pick title="Pick the sound">🔊 ${esc(r.sound ? soundName(r.sound) : 'No sound')} ▾</button>
         <button class="small" data-prev aria-label="Play sound" ${r.sound ? '' : 'disabled'}>${IC.play}</button>
-        <label class="small ghost" style="cursor:pointer"><input type="file" accept=".mp3,.wav,.ogg,.m4a,audio/*" data-upsound hidden><span class="pill" style="text-decoration:underline">upload…</span></label>
-        <label class="vol">vol <input type="range" min="0" max="1" step="0.05" value="${r.volume}" data-f="volume"></label>
+        <label class="small ghost" style="cursor:pointer"><input type="file" accept=".mp3,.wav,.ogg,.m4a,audio/*" data-upsound hidden><span class="pill" style="text-decoration:underline">Upload sound…</span></label>
+        <label class="vol" title="How loud this gift's sound is">vol <input type="range" min="0" max="1" step="0.05" value="${r.volume}" data-f="volume"> <span class="volpct">${Math.round(r.volume * 100)}%</span></label>
         <button class="small cutbtn ${partText(r) ? 'on' : ''}" data-cut title="Pick the part of the sound that plays (cut out the start or the end)" ${r.sound && !/^random:/.test(r.sound) ? '' : 'disabled'}>✂ ${partText(r) || 'Cut'}</button>
         <label class="check"><input type="checkbox" data-f="alert" ${r.alert ? 'checked' : ''}> Pop up on stream</label>
-        <label class="check" title="A streak of 5 does the actions 5 times"><input type="checkbox" data-f="perCount" ${r.perCount ? 'checked' : ''}> Once per gift in a streak</label>
+        <label class="check" title="On: a streak of 5 Roses does it 5 times. Off: once per streak, however many are sent"><input type="checkbox" data-f="perCount" ${r.perCount ? 'checked' : ''}> Repeat for every gift in a streak</label>
       </div>
       <div class="acts">
         ${usable.map(([a, j]) => `<div class="act" data-j="${j}"><span class="tag">${ACTION_TYPES[a.type].label}</span><div class="fields">${actionFields(a)}</div><button class="small ghost danger" data-delact aria-label="Remove action">${IC.x}</button></div>`).join('')}
         ${hidden ? `<div class="hint" style="margin:0">${hidden} action${hidden > 1 ? 's' : ''} for another game type ${hidden > 1 ? 'are' : 'is'} kept but not used.</div>` : ''}
-        ${addOpts ? `<div class="add-act"><select data-addact aria-label="Add an action"><option value="">+ Add an action…</option>${addOpts}</select></div>` : ''}
+        ${addOpts ? `<div class="add-act"><select data-addact aria-label="Add an action"><option value="">+ Add an action (what happens in the game)…</option>${addOpts}</select></div>` : ''}
       </div>
     </div>`;
   }).join('');
@@ -2537,9 +2600,13 @@ function renderRules() {
       const ev = inp.type === 'checkbox' || inp.tagName === 'SELECT' ? 'change' : 'input';
       inp.addEventListener(ev, () => {
         r[f] = inp.type === 'checkbox' ? inp.checked : inp.type === 'range' ? +inp.value : inp.type === 'number' ? Math.max(0, Math.min(120, +inp.value || 0)) : inp.value;
+        if (f === 'volume') { const pc = el.querySelector('.volpct'); if (pc) pc.textContent = Math.round(+inp.value * 100) + '%'; }
         if (f === 'gift') {
+          const dup = inp.value.trim() && R().some(x => x !== r && x.gift.trim().toLowerCase() === inp.value.trim().toLowerCase());
+          inp.classList.toggle('bad', !!dup);
+          inp.title = dup ? 'This gift is already in your list (only the first one is used)' : '';
           const k = known(inp.value);
-          if (k) { r.image = k.image; r.coins = k.coins; el.querySelector('.gimg').outerHTML = giftImgHtml(r); el.querySelector('.coins').textContent = coinText(k.coins); }
+          if (k) { r.image = k.image; r.coins = k.coins; el.querySelector('.gimg').outerHTML = giftImgHtml(r); el.querySelector('.coins').firstChild.textContent = coinText(k.coins); el.querySelector('.gimg[data-change]')?.addEventListener('click', () => openGallery(r)); }
         }
         queueSave();
       });
@@ -2556,10 +2623,25 @@ function renderRules() {
       const file = await uploadFiles([...e.target.files]);
       if (file) { r.sound = file; renderRules(); queueSave(); }
     };
-    el.querySelector('[data-del]').onclick = () => { R().splice(+el.dataset.i, 1); renderRules(); queueSave(); };
-    el.querySelector('[data-test]').onclick = async () => {
+    el.querySelectorAll('[data-change]').forEach(b => b.onclick = () => openGallery(r));
+    // removed by mistake? Undo puts it back where it was
+    el.querySelector('[data-del]').onclick = () => {
+      const at = +el.dataset.i, [gone] = R().splice(at, 1);
+      renderRules(); queueSave();
+      toast(`Removed ${gone.gift === '*' ? '"Any other gift"' : gone.gift || 'the gift'}`, false, { label: 'Undo', run: () => { R().splice(Math.min(at, R().length), 0, gone); renderRules(); queueSave(); flashRule(at); } });
+    };
+    // the same sound, popup and actions on another gift: pick which one from the gallery
+    el.querySelector('[data-copy]').onclick = () => {
+      const copy = JSON.parse(JSON.stringify(r));
+      copy.id = Math.random().toString(16).slice(2, 12); copy.gift = ''; copy.image = null; copy.coins = null;
+      R().splice(+el.dataset.i + 1, 0, copy);
+      renderRules(); queueSave();
+      openGallery(copy);
+    };
+    el.querySelector('[data-test]').onclick = async e => {
       await flushSave();
-      try { await api('/api/test', { ruleId: r.id }); } catch (e) { toast(e.message, true); }
+      try { await api('/api/test', { ruleId: r.id }); toast(`Sent a test ${r.gift === '*' ? 'gift' : r.gift || 'gift'}`); }
+      catch (err) { toast(err.message, true); }
     };
     el.querySelectorAll('.act').forEach(row => {
       const a = r.actions[+row.dataset.j];
@@ -2577,7 +2659,62 @@ function renderRules() {
       acts[acts.length - 1]?.querySelector('input, select')?.focus();
     };
   });
+  filterRules();
 }
+
+// ----- Getting started (the Games home): what to do first, ticked off as it's done -----
+function renderStart() {
+  let hidden = false; try { hidden = localStorage.getItem('gh-start-hidden') === '1'; } catch {}
+  let overlaySeen = !!status.overlayView;
+  try { if (overlaySeen) localStorage.setItem('gh-overlay-seen', '1'); else overlaySeen = localStorage.getItem('gh-overlay-seen') === '1'; } catch {}
+  const g = gamesList.find(x => x.id === settings.activeGame);
+  const steps = [
+    { done: status.tiktok === 'connected' || (!!settings.tiktokUsername && settings.autoConnect !== false), what: 'Connect your TikTok', tip: 'Type your TikTok name at the top and press Connect (Unbound waits for you to go live)', btn: 'Connect', run: () => $('ttUser')?.focus() },
+    { done: !!g, what: 'Pick a game', tip: 'Click a game below (or add one). The one marked LIVE is where gifts go', btn: null },
+    { done: !!g && g.gifts > 0, what: 'Set up your gifts', tip: 'Give each gift a sound, a popup and what it does in the game', btn: 'Set up gifts', run: () => showView(g?.mode ? 'types' : 'game') },
+    { done: overlaySeen, what: 'Add the overlay to your stream', tip: 'In TikTok LIVE Studio or OBS: Stream overlay shows you how (one link to add)', btn: 'Show me', run: () => setPage('overlay') },
+  ];
+  const all = steps.every(x => x.done);
+  $('startCard').hidden = hidden || all;
+  $('startSteps').innerHTML = steps.map((x, i) => `<li class="${x.done ? 'done' : ''}"><span class="tick">${x.done ? '✓' : i + 1}</span>
+    <span class="what">${esc(x.what)}<small>${esc(x.tip)}</small></span>${!x.done && x.btn ? `<button class="small" data-step="${i}">${esc(x.btn)}</button>` : ''}</li>`).join('');
+  $('startSteps').querySelectorAll('[data-step]').forEach(b => b.onclick = () => steps[+b.dataset.step].run());
+}
+$('startHide').onclick = () => { try { localStorage.setItem('gh-start-hidden', '1'); } catch {} renderStart(); toast('Hidden. Everything is still in the tabs at the top'); };
+$('ttChip').onclick = () => { setPage('games'); const u = $('ttUser'); if (status.tiktok !== 'connected' && u) { u.focus(); u.select?.(); } };
+$('gmChip').onclick = () => { if (!game) return setPage('games'); setPage('games'); showView('game'); setTimeout(() => $('connBox')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 60); };
+
+// ----- finding your way round a long gift list -----
+function filterRules() {
+  const q = ($('ruleFind').value || '').trim().toLowerCase();
+  let shown = 0;
+  $('rules').querySelectorAll('.rule').forEach(el => {
+    const r = R()[+el.dataset.i];
+    const text = [r.gift === '*' ? 'any other gift' : r.gift, r.label, ...r.actions.map(a => ACTION_TYPES[a.type]?.label || '')].join(' ').toLowerCase();
+    el.hidden = !!q && !text.includes(q);
+    if (!el.hidden) shown++;
+  });
+  let none = $('rules').querySelector('.nomatch');
+  if (q && !shown) { if (!none) { none = document.createElement('div'); none.className = 'empty nomatch'; $('rules').append(none); } none.textContent = `No gift here matches "${q}".`; }
+  else none?.remove();
+}
+$('ruleFind').oninput = filterRules;
+$('copyLog').onclick = async () => { try { await navigator.clipboard.writeText($('log').textContent); toast('Activity log copied'); } catch { toast("Couldn't copy: select the log and press Ctrl + C", true); } };
+function flashRule(i) {
+  const el = $('rules').querySelector(`.rule[data-i="${i}"]`);
+  if (!el) return;
+  if (el.hidden) { $('ruleFind').value = ''; filterRules(); }
+  el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+}
+$('addGiftTop').onclick = () => addRule();
+$('browseTop').onclick = () => openGallery();
+$('sortRules').onclick = () => {
+  const before = R().slice(), price = r => r.gift === '*' ? Infinity : known(r.gift)?.coins ?? r.coins ?? Infinity;
+  R().sort((a, b) => price(a) - price(b));
+  renderRules(); queueSave();
+  toast('Sorted by price, cheapest first', false, { label: 'Undo', run: () => { R().splice(0, R().length, ...before); renderRules(); queueSave(); } });
+};
 
 function defaultActions() {
   if (game.connector === 'minecraft') return [];
@@ -2587,6 +2724,8 @@ function defaultActions() {
 }
 const randomSound = () => { const f = sounds.filter(s => s.fav), b = f.length ? f : sounds.filter(s => ['edits', 'brainrot', 'memes'].includes(s.group)); return b.length ? b[Math.floor(Math.random() * b.length)].file : null; };
 function addRule(name = '', image = null, coins = null) {
+  const have = name ? R().findIndex(r => r.gift.trim().toLowerCase() === String(name).trim().toLowerCase()) : -1;
+  if (have >= 0) { flashRule(have); return toast(`${name === '*' ? '"Any other gift"' : name} is already in your list: here it is`); }
   R().push({ id: Math.random().toString(16).slice(2, 12), gift: name, image, coins, sound: randomSound(), volume: 1, alert: true, label: '', perCount: true, actions: defaultActions() });
   renderRules(); queueSave();
   const inputs = $('rules').querySelectorAll('.rule');
@@ -2743,23 +2882,55 @@ async function loadCatalog() {
   $('giftNames').innerHTML = catalog.map(g => `<option value="${esc(g.name)}">`).join('');
   if (game) renderRules();
 }
+let galleryFor = null;            // the gift being changed (null: adding a new one)
+function openGallery(forRule = null) {
+  galleryFor = forRule;
+  $('gTitle').textContent = forRule ? (forRule.gift ? `Change "${forRule.gift}" to…` : 'Pick the gift') : 'All gifts';
+  $('gSearch').value = '';
+  renderGallery();
+  $('gallery').showModal(); $('gSearch').focus();
+  // the gift it is now, in view
+  if (forRule?.gift) setTimeout(() => $('gGrid').querySelector('.gcard.current')?.scrollIntoView({ block: 'center' }), 30);
+}
+function pickGift(g) {
+  $('gallery').close();
+  const r = galleryFor; galleryFor = null;
+  if (!r) return addRule(g.name, g.image, g.coins);
+  const other = R().findIndex(x => x !== r && x.gift.trim().toLowerCase() === g.name.toLowerCase());
+  if (other >= 0) { flashRule(other); return toast(`${g.name} is already in your list (here). Pick another gift, or remove that one first`, true); }
+  r.gift = g.name; r.image = g.image; r.coins = g.coins;
+  renderRules(); queueSave();
+  flashRule(R().indexOf(r));
+  toast(`Now: ${g.name}`);
+}
 function renderGallery() {
   const q = $('gSearch').value.trim().toLowerCase();
+  const used = new Set(R().map(r => r.gift.trim().toLowerCase())), cur = (galleryFor?.gift || '').toLowerCase();
   // every gift (no cut-off), filtered by name and price, cheapest or most expensive first
   const [lo, hi] = ($('gRange').value || '0-').split('-').map(v => v === '' ? Infinity : +v);
   const list = catalog.map((g, gi) => ({ g, gi })).filter(({ g }) => (!q || g.name.toLowerCase().includes(q)) && (g.coins ?? 0) >= lo && (g.coins ?? 0) <= hi);
   if ($('gSort').value === 'down') list.reverse();
   $('gCount').textContent = `${list.length} gift${list.length === 1 ? '' : 's'}`;
-  $('gGrid').innerHTML = list.map(({ g, gi }) => `<div class="gcard" data-gi="${gi}" tabindex="0" role="button">
-    <img src="${pic(g.image)}" alt="" loading="lazy"><span class="n">${esc(g.name)}</span><span class="coins">${g.event === 'follow' ? 'when someone follows you' : coinText(g.coins)}</span></div>`).join('')
+  $('gGrid').innerHTML = list.map(({ g, gi }) => `<div class="gcard ${g.name.toLowerCase() === cur ? 'current' : ''}" data-gi="${gi}" tabindex="0" role="button">
+    ${used.has(g.name.toLowerCase()) ? `<span class="setup">${g.name.toLowerCase() === cur ? 'now' : '✓ set up'}</span>` : ''}<img src="${pic(g.image)}" alt="" loading="lazy"><span class="n">${esc(g.name)}</span><span class="coins">${g.event === 'follow' ? 'when someone follows you' : coinText(g.coins)}</span></div>`).join('')
     || '<div class="empty">No gifts match.</div>';
   $('gGrid').querySelectorAll('[data-gi]').forEach(c => {
-    const pick = () => { const g = catalog[+c.dataset.gi]; $('gallery').close(); addRule(g.name, g.image, g.coins); };
+    const pick = () => pickGift(catalog[+c.dataset.gi]);
     c.onclick = pick; c.onkeydown = e => { if (e.key === 'Enter') pick(); };
   });
 }
-$('browse').onclick = () => { $('gSearch').value = ''; renderGallery(); $('gallery').showModal(); $('gSearch').focus(); };
+$('browse').onclick = () => openGallery();
 $('gSearch').oninput = renderGallery;
+// Enter in the search: the first gift it found
+// (the gift with exactly that name if there is one, then one that starts with it, then the first)
+$('gSearch').onkeydown = e => {
+  if (e.key !== 'Enter') return;
+  const q = $('gSearch').value.trim().toLowerCase(), cards = [...$('gGrid').querySelectorAll('.gcard')];
+  const name = c => c.querySelector('.n').textContent.trim().toLowerCase();
+  const c = cards.find(c => name(c) === q) || cards.find(c => name(c).startsWith(q)) || cards[0];
+  if (c) { e.preventDefault(); c.click(); }
+};
+$('gallery').addEventListener('close', () => { galleryFor = null; });
 $('gRange').onchange = renderGallery;
 $('gSort').onchange = renderGallery;
 $('gClose').onclick = () => $('gallery').close();
@@ -2773,7 +2944,11 @@ function addFeed(e, animate = true) {
   if (!animate) el.style.animation = 'none';
   el.innerHTML = `<div class="gimg">${e.image ? `<img src="${pic(e.image)}" alt="">` : IC.gift}</div>
     <div><div><span class="who">${esc(e.from)}</span> <span class="what">sent ${e.count > 1 ? e.count + ' × ' : ''}${esc(e.gift)}</span></div>
-    <div class="eff ${e.did ? '' : 'none'}">${e.did ? esc(e.did) : 'not set up in this game'}</div></div>`;
+    <div class="eff ${e.did ? '' : 'none'}">${e.did ? esc(e.did) : 'not set up in this game'}</div></div>
+    ${!e.did && game && e.gift && e.gift !== 'Any gift' ? '<button class="small fix" data-fix title="Add this gift to your list">+ Set up</button>' : ''}`;
+  const fix = el.querySelector('[data-fix]');
+  if (fix) fix.onclick = ev => { ev.stopPropagation(); setPage('games'); showView('game'); addRule(e.gift, e.image, e.coins); };
+  if (e.did && game) { el.classList.add('jump'); el.title = 'Show this gift in your list'; el.onclick = () => { const i = R().findIndex(r => r.gift.toLowerCase() === String(e.gift).toLowerCase()); if (i < 0) return; setPage('games'); showView('game'); setTimeout(() => flashRule(i), 60); }; }
   box.prepend(el);
   while (box.children.length > 60) box.lastChild.remove();
 }

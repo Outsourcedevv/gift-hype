@@ -15,6 +15,11 @@ GO LIVE
   3. Pick its type at the top, e.g. Minecraft: Parkour Paradise or Block Delete Survival.
   4. Every gift you set up for that type now plays its sound and does its actions.
 
+GETTING STARTED
+  The Games page starts with four steps (connect TikTok, pick a game, set up gifts, add the overlay),
+  ticked off as you do them. Hide takes the list away. The two pills at the top right (TikTok and your
+  game) can be clicked: they take you to where you'd fix that connection.
+
 GAMES
   The games screen shows a cover for every game with a TikTok LIVE mod. Right now that's Minecraft.
   Click a cover to open that game. "All games" takes you back. "Change cover" sets your own picture.
@@ -171,12 +176,17 @@ WIPEOUT (Minecraft -> Wipeout)
   Knocked onto the stands is a wipeout too.
   The next level's obstacles are already moving before you get there, so nothing pops in.
   Every level has been checked tick by tick to make sure it can be done (at a little under a sprint).
-  YOUR INFO ON SCREEN: your level, wipeouts / fails and punches are at the bottom of the screen. When
-    you press Play Minecraft, Unbound also sets up the Unbound HUD mod by itself (Fabric and Fabric API
-    come with it, in a game folder of its own, .minecraft/unbound, with your settings copied in). In
-    Minecraft press Esc, then Unbound (bottom left): drag each piece wherever you want, scroll to make
-    it bigger or smaller, right-click to give it a background or not. Hide takes one off the screen,
-    Reset all puts them back. If the mod can't be set up (no internet), you play without it.
+  YOUR STREAM OVERLAY IN MINECRAFT: when you press Play Minecraft, Unbound also sets up the Unbound HUD
+    mod by itself (Minecraft 26.2: the Dropper, Wipeout, or your own 26.2 world; Fabric and Fabric API come
+    with it, in a game folder of its own, .minecraft/unbound, with your settings copied in). In the game
+    you see everything your stream overlay shows: gift popups, the gift list, the reset countdown, the
+    level slot machine, Chunk Chat / Chat Teleport's timer and reveal, the block delete list, plus your
+    level, wipeouts / fails and punches. Press Esc, then Unbound (bottom left): drag a piece to move it,
+    drag its corner right / down to make it bigger (left / up: smaller), right-click to give it a
+    background or not. Click the red x on a piece to hide it (it isn't shown in the game; the green +
+    shows it again), or press Show / hide for a list of every piece to switch on or off (Show all,
+    Hide all). Reset all puts them all back. (Gift pictures don't show
+    in the game, only their names.) If the mod can't be set up (no internet), you play without it.
   RESET THE MAP: if something in the Dropper's or Wipeout's map breaks, press "Reset the map" (next to
     Reopen world). The world is made again and every level built fresh (under a minute), and you start
     again on level 1 with 0 fails / wipeouts.
@@ -229,6 +239,8 @@ THE DROPPER (Minecraft -> Dropper)
     Rosa = jail 5s, Paper Crane / Corgi = up 1 / 5 levels, Hat and Mustache / Boxing Gloves = down 1 / 5,
     Galaxy = 60s reset countdown (back to level 1), Glowing Jellyfish = saves you (or a shield if no
     countdown is running), Hand Hearts = level slot machine. Change any of them like other gifts.
+  Level up / down: a big green LEVEL UP (or red LEVEL DOWN) across your screen with how many and the
+    level you're on now, its own sound and sparkles; the stream popup says LEVEL UP +3 / LEVEL DOWN -3.
   Level slot machine: a slot machine spins on the stream overlay (about 4 seconds, ticking as the
     numbers go past) and stops on one of the amounts you typed for that gift (e.g. -10, -5, -1, 1, 5, 10).
     Green + sends you up that many levels, red - sends you down. Numbers are in Monocraft, a free
@@ -247,6 +259,11 @@ GIFTS
     like a gift. It goes off once per person, ever: unfollowing and following again doesn't set it
     off again (the popup says "<name> followed!").
   Each gift has: a sound (and volume), "Pop up on stream", what it does, and actions.
+  Handy: click a gift's picture (or "change gift") to swap it for another from the gallery, keeping its
+    sound and actions. Copy makes the same setup for another gift. Removed one by mistake? Press Undo.
+    "Find a gift in this list" and "Sort by price" are at the top of the list. In the gallery, gifts you
+    already have are marked, and Enter picks the gift you typed. A gift in Live gifts that isn't set up
+    has "+ Set up"; click one that is to jump to it. Ctrl + K finds your gifts too.
   Actions: press "+ Add an action..." and pick one. For Minecraft there are ready-made ones:
     Nuke (falls from the sky, goes up in a mushroom cloud and leaves a crater down to y -20 with a steep wall you can climb;
       crater size 40 = a hole about 290 blocks across, 18 chunks), Jail (pick the seconds),

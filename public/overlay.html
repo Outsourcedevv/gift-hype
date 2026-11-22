@@ -583,6 +583,8 @@ let resultTimer = null;
 // the save gift floating round the middle while a reset counts down
 function saveFloat(r) {
   const f = document.getElementById('saveFloat'), save = r.saveGift;
+  // (not while placing the boxes, where it would cover them; and it can be turned off)
+  if (EDITING || settings.overlay?.saveFloat === false) { f.innerHTML = ''; return; }
   if (r.active && save) {
     if (!f.querySelector('.card:not(.out):not(.saved)')) f.innerHTML = `<div class="loop"><div class="bob"><div class="tilt"><div class="card"><div class="glow"></div>
       ${save.image ? `<img src="${pic(save.image)}" alt="">` : ''}<div class="say">Send <b>${esc(save.name)}</b><br>to SAVE!</div><div class="secs"></div></div></div></div></div>`;

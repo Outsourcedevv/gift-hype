@@ -13,14 +13,16 @@ import net.minecraft.resources.Identifier;
 /**
  * Unbound HUD: the Dropper's and Wipeout's info (level, wipeouts / fails, punches, shield) as pieces you
  * can put anywhere, any size, with or without a background. Esc > Unbound opens the editor.
- * It reads the info line the game sends (the bottom of the screen) and draws it its own way instead.
+ * It reads the info line the game sends (the bottom of the screen) and draws it its own way instead, and
+ * listens to Unbound (on this PC) like the stream overlay does, to show the same things in the game.
  */
 public class UnboundHud implements ClientModInitializer {
 	@Override
 	public void onInitializeClient() {
+		UnboundLink.start();                // the stream overlay's events, from Unbound on this PC
 		HudElementRegistry.addLast(Identifier.fromNamespaceAndPath("unbound_hud", "pieces"), (g, delta) -> {
 			Minecraft mc = Minecraft.getInstance();
-			if (!HudState.active() || mc.gui.hud.isHidden()) return;
+			if (mc.gui.hud.isHidden()) return;
 			if (mc.gui.screen() instanceof HudEditorScreen) return;          // the editor draws them itself
 			for (String id : HudConfig.IDS) if (HudConfig.get().element(id).shown) HudDraw.draw(g, id, false);
 		});
