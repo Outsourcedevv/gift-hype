@@ -384,6 +384,24 @@ svg.i { width: 14px; height: 14px; flex: none; vertical-align: -2px; }
 .add-act select { font-size: 13px; padding: 6px 10px; }
 .toolbar { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; align-items: center; }
 .saved { color: var(--green); font-size: 13px; opacity: 0; transition: opacity .3s; margin-left: auto; }
+/* the gift list: a toolbar on top (add, find, sort), a gift's picture opens the gallery to change it */
+.rules-top { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 12px; }
+.rules-top input[type=search] { flex: 1 1 200px; min-width: 160px; }
+.gimg.change { cursor: pointer; position: relative; border: 0; padding: 0; }
+.gimg.change::after { content: 'Change'; position: absolute; inset: auto 0 0 0; font-size: 10px; font-weight: 700; text-align: center; padding: 2px 0; background: rgba(0,0,0,.65); color: #fff; border-radius: 0 0 8px 8px; opacity: 0; transition: opacity .15s; }
+.gimg.change:hover::after, .gimg.change:focus-visible::after { opacity: 1; }
+.linkbtn { background: none; border: 0; padding: 0 0 0 6px; color: var(--accent); font-size: 12px; cursor: pointer; text-decoration: underline; box-shadow: none; }
+.rule.flash { animation: ruleflash 1.4s ease; }
+input.bad { border-color: var(--red, #ff5a5a) !important; box-shadow: 0 0 0 2px color-mix(in srgb, var(--red, #ff5a5a) 30%, transparent); }
+@keyframes ruleflash { 0%, 60% { box-shadow: 0 0 0 3px var(--accent); } 100% { box-shadow: 0 0 0 0 transparent; } }
+.gcard { position: relative; }
+.gcard .setup { position: absolute; top: 6px; right: 6px; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 999px; background: var(--green); color: #04130a; }
+.gcard.current { outline: 2px solid var(--accent); outline-offset: -2px; }
+.toast button { margin-left: 12px; padding: 3px 12px; font-size: 13px; pointer-events: auto; }
+.toast.withbtn { pointer-events: auto; }
+.feed .item .fix { margin-left: auto; align-self: center; white-space: nowrap; }
+.feed .item.jump { cursor: pointer; }
+.clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .saved.show { opacity: 1; }
 .empty { color: var(--muted); font-size: 14px; padding: 6px 0; }
 
@@ -815,7 +833,13 @@ ubIntro.start();
       </section>
 
       <section>
-        <h2>Gifts &amp; what they do <span class="right"><span class="saved" id="saved">Saved</span></span></h2>
+        <h2>Gifts &amp; what they do <span class="count" id="ruleCount"></span> <span class="right"><span class="saved" id="saved">Saved</span></span></h2>
+        <div class="rules-top">
+          <button class="primary small" id="addGiftTop">+ Add gift</button>
+          <button class="small" id="browseTop">Browse all gifts</button>
+          <input type="search" id="ruleFind" placeholder="Find a gift in this list…" aria-label="Find a gift in this list">
+          <button class="small" id="sortRules" title="Put the list in price order, cheapest first">Sort by price</button>
+        </div>
         <div class="rules" id="rules"></div>
         <div class="toolbar">
           <button class="primary" id="addGift">+ Add gift</button>
@@ -915,6 +939,7 @@ ubIntro.start();
         <label data-cardonly class="check" style="flex-direction:row"><input type="checkbox" data-m="popImage"> Show the gift's picture</label>
         <label data-cardonly class="check" style="flex-direction:row"><input type="checkbox" data-m="popWiggle"> Wiggle the picture</label>
         <label data-cardonly class="check" style="flex-direction:row"><input type="checkbox" data-m="popCount"> Show streaks (3×)</label>
+        <label class="check" style="flex-direction:row" title="During a reset countdown (the Dropper and Wipeout), the gift that saves you floats round the middle of the stream with the time left"><input type="checkbox" data-m="saveFloat"> Float the save gift round the middle during a reset</label>
         <label class="check wide" style="flex-direction:row"><input type="checkbox" data-m="popColors"> Use my own colours (instead of the app's colour theme)</label>
         <label data-popcol data-cardonly>Border<input type="color" data-m="popBorder"></label>
         <label data-popcol>Name<input type="color" data-m="popName"></label>
@@ -1000,7 +1025,7 @@ ubIntro.start();
       </div>
     </section>
     <section id="logSec">
-      <h2>Activity log</h2>
+      <h2>Activity log <span class="right"><button class="small" id="copyLog" title="Copy the whole log, e.g. to send it when something isn't working">Copy</button></span></h2>
       <pre class="log" id="log"></pre>
     </section>
    </div>
@@ -1021,7 +1046,7 @@ ubIntro.start();
 </main>
 
 <dialog id="gallery">
-  <div class="dlg-head"><h3>All gifts</h3><input type="text" id="gSearch" placeholder="Search gifts...">
+  <div class="dlg-head"><h3 id="gTitle">All gifts</h3><input type="search" id="gSearch" placeholder="Search gifts... (Enter picks the first)">
     <select id="gRange" aria-label="Price"><option value="">All prices</option><option value="1-99">1–99 coins</option><option value="100-999">100–999 coins</option><option value="1000-9999">1,000–9,999 coins</option><option value="10000-">10,000+ coins</option></select>
     <select id="gSort" aria-label="Order"><option value="up">Cheapest first</option><option value="down">Most expensive first</option></select>
     <span class="pill" id="gCount"></span><button class="ghost" id="gClose" aria-label="Close"><svg class="i" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button></div>
@@ -1114,9 +1139,18 @@ async function api(path, body) {
   return j;
 }
 let toastTimer;
-function toast(msg, err) {
+function toast(msg, err, action) {
   const t = $('toast');
-  t.textContent = msg; t.className = 'toast show' + (err ? ' err' : '');
+  t.textContent = msg; t.className = 'toast show' + (err ? ' err' : '') + (action ? ' withbtn' : '');
+  // a button on it (e.g. Undo): stays up a bit longer
+  if (action) {
+    const b = document.createElement('button'); b.className = 'small'; b.textContent = action.label;
+    b.onclick = ev => { ev.stopPropagation(); clearTimeout(toastTimer); t.className = 'toast'; action.run(); };
+    t.append(b);
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => t.className = 'toast', 7000);
+    t.onclick = null;
+    return;
+  }
   // problems stay up long enough to read (longer for longer ones); a click closes it
   t.onclick = () => { clearTimeout(toastTimer); t.className = 'toast'; };
   clearTimeout(toastTimer); toastTimer = setTimeout(() => t.className = 'toast', err ? Math.min(30000, Math.max(8000, String(msg).length * 70)) : 2600);
@@ -1666,9 +1700,10 @@ function jumpAll() {
     if (game.mode !== m.id) { game.mode = m.id; queueSave(); await flushSave(); renderTypes(); renderRules(); if (game.connector === 'minecraft') renderMinecraftBox(); }
     showView('game');
   }, `${m.rules.length} gifts`);
+  if (game) R().forEach((r, i) => go('Gift', r.gift === '*' ? 'Any other gift' : r.gift || '(no gift picked)', () => { setPage('games'); showView('game'); setTimeout(() => flashRule(i), 60); }, r.label || ''));
   if (game) {
     go('Do', 'Add a gift', () => { setPage('games'); showView('game'); addRule(); });
-    go('Do', 'Browse all gifts', () => { setPage('games'); showView('game'); $('browse').click(); });
+    go('Do', 'Browse all gifts', () => { setPage('games'); showView('game'); openGallery(); });
   }
   go('Do', 'Add a game', () => { setPage('games'); showView('home'); openNewGame(); });
   go('Do', status.tiktok && status.tiktok !== 'offline' ? 'Disconnect from TikTok' : 'Connect to TikTok', () => $('ttBtn').click());
@@ -2017,13 +2052,16 @@ async function renderMinecraftBox() {
   const m = game.minecraft;
   if (isDropperMode()) {
     box.innerHTML = `<div class="conn-box">
-        ${isWipeoutMode() ? `<p class="wide" style="margin:0"><b>Wipeout has its own world</b>, made by Unbound: 100 levels in one straight line just above warm sea water, between low walls with a crowd and floodlights. Each level is two obstacles (three after level 80): spinners, sliding cubes, waves of red walls (duck into the holes in the sides), bridges that keep going yellow, red and vanishing (time your run), punching gloves, crushers, the zipline (go when its light is green), the doors, laser gates, rolling bars, big bouncy balls, stepping stones, and arms to jump and duck. Reach the emerald pad and you're on the next level, right ahead. Touch anything red and you're dead; punching gloves knock you into the sea; red and white boxing gloves bounce you up. No checkpoints: die or fall and the level starts again. Level 100 is a black and yellow tower: climb the spiral steps round it, past disappearing steps, red arms and punching gloves, to the emerald on top to win.</p>`
+        ${isWipeoutMode() ? `<p class="wide clamp" id="typeDesc" style="margin:0"><b>Wipeout has its own world</b>, made by Unbound: 100 levels in one straight line just above warm sea water, between low walls with a crowd and floodlights. Each level is two obstacles (three after level 80): spinners, sliding cubes, waves of red walls (duck into the holes in the sides), bridges that keep going yellow, red and vanishing (time your run), punching gloves, crushers, the zipline (go when its light is green), the doors, laser gates, rolling bars, big bouncy balls, stepping stones, and arms to jump and duck. Reach the emerald pad and you're on the next level, right ahead. Touch anything red and you're dead; punching gloves knock you into the sea; red and white boxing gloves bounce you up. No checkpoints: die or fall and the level starts again. Level 100 is a black and yellow tower: climb the spiral steps round it, past disappearing steps, red arms and punching gloves, to the emerald on top to win.</p>`
           : `<p class="wide" style="margin:0"><b>The Dropper has its own world</b>, made by Unbound: 100 levels that get harder as you go. Fall through the gaps and land in the water to go to the next level. Hit anything else and you start that level again.</p>`}
         <div class="wide"><label class="check"><input type="checkbox" id="mcEula" ${settings.mcEula ? 'checked' : ''}> I agree to the <a href="https://aka.ms/MinecraftEULA" target="_blank" rel="noopener" style="color:var(--main-text)">Minecraft EULA</a> (needed to open the world for gifts)</label></div>
         <div class="wide row"><button class="small" id="mcRestart">Reopen world</button><button class="small ghost danger" id="mcResetMap" title="If something in the map breaks: the world is made again and the levels built fresh">Reset the map</button><span class="pill" id="mcState"></span></div>
       </div>
       <p class="hint"><b>How to play:</b> press <b>Play Minecraft</b>. The first time, Unbound makes the world and builds the levels (${isWipeoutMode() ? 'under a minute' : 'about a minute'}). Your level, ${isWipeoutMode() ? 'wipeouts' : 'fails'}, punches on/off and any shield are shown at the bottom of your screen, and the reset countdown at the top.</p>`;
     $('mcEula').onchange = () => { settings.mcEula = $('mcEula').checked; api('/api/settings', { mcEula: settings.mcEula }); };
+    // the long description: two lines, More for the rest
+    const desc = $('typeDesc');
+    if (desc) { const more = document.createElement('button'); more.className = 'linkbtn wide'; more.style.cssText = 'padding:0;justify-self:start;margin-top:-6px'; more.textContent = 'More…'; desc.after(more); more.onclick = () => { desc.classList.toggle('clamp'); more.textContent = desc.classList.contains('clamp') ? 'More…' : 'Less'; }; }
     $('mcRestart').onclick = async () => { try { await api('/api/minecraft/restart-world', {}); toast(`Reopening ${courseName()}…`); } catch (e) { toast(e.message, true); } };
     // if something in the map breaks: back to how it was at the start (levels built fresh, level 1, 0 ${isWipeoutMode() ? 'wipeouts' : 'fails'})
     $('mcResetMap').onclick = async () => {
@@ -2173,7 +2211,8 @@ function giftImgHtml(r) {
   if (r.gift === '*') return `<div class="gimg">${IC.gift}</div>`;
   const k = known(r.gift);
   const img = k?.image || r.image;
-  return `<div class="gimg">${img ? `<img src="${pic(img)}" alt="" onerror="this.outerHTML=IC.gift">` : IC.gift}</div>`;
+  // click it to pick another gift from the gallery
+  return `<button class="gimg change" data-change title="Change the gift (opens the gallery)" aria-label="Change the gift">${img ? `<img src="${pic(img)}" alt="" onerror="this.outerHTML=IC.gift">` : IC.gift}</button>`;
 }
 
 // ----- Chunk Chat: on a timer, your chunk turns into the block chat picked -----
@@ -2494,6 +2533,7 @@ function renderChat() {
 function renderRules() {
   renderChat();
   const box = $('rules');
+  $('ruleCount').textContent = R().length ? String(R().length) : '';
   if (!R().length) { box.innerHTML = '<div class="empty">No gifts yet. Press <b>+ Add gift</b> or <b>Browse all gifts</b>.</div>'; return; }
   const addOpts = addActionOptions();
   box.innerHTML = R().map((r, i) => {
@@ -2505,11 +2545,12 @@ function renderRules() {
         ${giftImgHtml(r)}
         <div class="gname">
           ${r.gift === '*' ? '<input type="text" value="Any other gift" disabled>' : `<input type="text" list="giftNames" value="${esc(r.gift)}" placeholder="Gift name" data-f="gift">`}
-          <span class="coins">${r.gift === '*' ? 'gifts not on this list' : coinText(k?.coins ?? r.coins) || '&nbsp;'}</span>
+          <span class="coins">${r.gift === '*' ? 'gifts not on this list' : coinText(k?.coins ?? r.coins) || '&nbsp;'}${r.gift === '*' ? '' : '<button class="linkbtn" data-change>change gift</button>'}</span>
         </div>
         <input type="text" data-f="label" value="${esc(r.label)}" placeholder="What it does (shows on stream)">
         <div class="rule-actions">
           <button class="small" data-test>Test</button>
+          <button class="small" data-copy title="Copy this gift (sound, popup and actions) to another gift">Copy</button>
           <button class="small ghost danger" data-del aria-label="Remove gift">${IC.x}</button>
         </div>
       </div>
@@ -2538,8 +2579,11 @@ function renderRules() {
       inp.addEventListener(ev, () => {
         r[f] = inp.type === 'checkbox' ? inp.checked : inp.type === 'range' ? +inp.value : inp.type === 'number' ? Math.max(0, Math.min(120, +inp.value || 0)) : inp.value;
         if (f === 'gift') {
+          const dup = inp.value.trim() && R().some(x => x !== r && x.gift.trim().toLowerCase() === inp.value.trim().toLowerCase());
+          inp.classList.toggle('bad', !!dup);
+          inp.title = dup ? 'This gift is already in your list (only the first one is used)' : '';
           const k = known(inp.value);
-          if (k) { r.image = k.image; r.coins = k.coins; el.querySelector('.gimg').outerHTML = giftImgHtml(r); el.querySelector('.coins').textContent = coinText(k.coins); }
+          if (k) { r.image = k.image; r.coins = k.coins; el.querySelector('.gimg').outerHTML = giftImgHtml(r); el.querySelector('.coins').firstChild.textContent = coinText(k.coins); el.querySelector('.gimg[data-change]')?.addEventListener('click', () => openGallery(r)); }
         }
         queueSave();
       });
@@ -2556,10 +2600,25 @@ function renderRules() {
       const file = await uploadFiles([...e.target.files]);
       if (file) { r.sound = file; renderRules(); queueSave(); }
     };
-    el.querySelector('[data-del]').onclick = () => { R().splice(+el.dataset.i, 1); renderRules(); queueSave(); };
-    el.querySelector('[data-test]').onclick = async () => {
+    el.querySelectorAll('[data-change]').forEach(b => b.onclick = () => openGallery(r));
+    // removed by mistake? Undo puts it back where it was
+    el.querySelector('[data-del]').onclick = () => {
+      const at = +el.dataset.i, [gone] = R().splice(at, 1);
+      renderRules(); queueSave();
+      toast(`Removed ${gone.gift === '*' ? '"Any other gift"' : gone.gift || 'the gift'}`, false, { label: 'Undo', run: () => { R().splice(Math.min(at, R().length), 0, gone); renderRules(); queueSave(); flashRule(at); } });
+    };
+    // the same sound, popup and actions on another gift: pick which one from the gallery
+    el.querySelector('[data-copy]').onclick = () => {
+      const copy = JSON.parse(JSON.stringify(r));
+      copy.id = Math.random().toString(16).slice(2, 12); copy.gift = ''; copy.image = null; copy.coins = null;
+      R().splice(+el.dataset.i + 1, 0, copy);
+      renderRules(); queueSave();
+      openGallery(copy);
+    };
+    el.querySelector('[data-test]').onclick = async e => {
       await flushSave();
-      try { await api('/api/test', { ruleId: r.id }); } catch (e) { toast(e.message, true); }
+      try { await api('/api/test', { ruleId: r.id }); toast(`Sent a test ${r.gift === '*' ? 'gift' : r.gift || 'gift'}`); }
+      catch (err) { toast(err.message, true); }
     };
     el.querySelectorAll('.act').forEach(row => {
       const a = r.actions[+row.dataset.j];
@@ -2577,7 +2636,40 @@ function renderRules() {
       acts[acts.length - 1]?.querySelector('input, select')?.focus();
     };
   });
+  filterRules();
 }
+
+// ----- finding your way round a long gift list -----
+function filterRules() {
+  const q = ($('ruleFind').value || '').trim().toLowerCase();
+  let shown = 0;
+  $('rules').querySelectorAll('.rule').forEach(el => {
+    const r = R()[+el.dataset.i];
+    const text = [r.gift === '*' ? 'any other gift' : r.gift, r.label, ...r.actions.map(a => ACTION_TYPES[a.type]?.label || '')].join(' ').toLowerCase();
+    el.hidden = !!q && !text.includes(q);
+    if (!el.hidden) shown++;
+  });
+  let none = $('rules').querySelector('.nomatch');
+  if (q && !shown) { if (!none) { none = document.createElement('div'); none.className = 'empty nomatch'; $('rules').append(none); } none.textContent = `No gift here matches "${q}".`; }
+  else none?.remove();
+}
+$('ruleFind').oninput = filterRules;
+$('copyLog').onclick = async () => { try { await navigator.clipboard.writeText($('log').textContent); toast('Activity log copied'); } catch { toast("Couldn't copy: select the log and press Ctrl + C", true); } };
+function flashRule(i) {
+  const el = $('rules').querySelector(`.rule[data-i="${i}"]`);
+  if (!el) return;
+  if (el.hidden) { $('ruleFind').value = ''; filterRules(); }
+  el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+}
+$('addGiftTop').onclick = () => addRule();
+$('browseTop').onclick = () => openGallery();
+$('sortRules').onclick = () => {
+  const before = R().slice(), price = r => r.gift === '*' ? Infinity : known(r.gift)?.coins ?? r.coins ?? Infinity;
+  R().sort((a, b) => price(a) - price(b));
+  renderRules(); queueSave();
+  toast('Sorted by price, cheapest first', false, { label: 'Undo', run: () => { R().splice(0, R().length, ...before); renderRules(); queueSave(); } });
+};
 
 function defaultActions() {
   if (game.connector === 'minecraft') return [];
@@ -2587,6 +2679,8 @@ function defaultActions() {
 }
 const randomSound = () => { const f = sounds.filter(s => s.fav), b = f.length ? f : sounds.filter(s => ['edits', 'brainrot', 'memes'].includes(s.group)); return b.length ? b[Math.floor(Math.random() * b.length)].file : null; };
 function addRule(name = '', image = null, coins = null) {
+  const have = name ? R().findIndex(r => r.gift.trim().toLowerCase() === String(name).trim().toLowerCase()) : -1;
+  if (have >= 0) { flashRule(have); return toast(`${name === '*' ? '"Any other gift"' : name} is already in your list: here it is`); }
   R().push({ id: Math.random().toString(16).slice(2, 12), gift: name, image, coins, sound: randomSound(), volume: 1, alert: true, label: '', perCount: true, actions: defaultActions() });
   renderRules(); queueSave();
   const inputs = $('rules').querySelectorAll('.rule');
@@ -2743,23 +2837,55 @@ async function loadCatalog() {
   $('giftNames').innerHTML = catalog.map(g => `<option value="${esc(g.name)}">`).join('');
   if (game) renderRules();
 }
+let galleryFor = null;            // the gift being changed (null: adding a new one)
+function openGallery(forRule = null) {
+  galleryFor = forRule;
+  $('gTitle').textContent = forRule ? (forRule.gift ? `Change "${forRule.gift}" to…` : 'Pick the gift') : 'All gifts';
+  $('gSearch').value = '';
+  renderGallery();
+  $('gallery').showModal(); $('gSearch').focus();
+  // the gift it is now, in view
+  if (forRule?.gift) setTimeout(() => $('gGrid').querySelector('.gcard.current')?.scrollIntoView({ block: 'center' }), 30);
+}
+function pickGift(g) {
+  $('gallery').close();
+  const r = galleryFor; galleryFor = null;
+  if (!r) return addRule(g.name, g.image, g.coins);
+  const other = R().findIndex(x => x !== r && x.gift.trim().toLowerCase() === g.name.toLowerCase());
+  if (other >= 0) { flashRule(other); return toast(`${g.name} is already in your list (here). Pick another gift, or remove that one first`, true); }
+  r.gift = g.name; r.image = g.image; r.coins = g.coins;
+  renderRules(); queueSave();
+  flashRule(R().indexOf(r));
+  toast(`Now: ${g.name}`);
+}
 function renderGallery() {
   const q = $('gSearch').value.trim().toLowerCase();
+  const used = new Set(R().map(r => r.gift.trim().toLowerCase())), cur = (galleryFor?.gift || '').toLowerCase();
   // every gift (no cut-off), filtered by name and price, cheapest or most expensive first
   const [lo, hi] = ($('gRange').value || '0-').split('-').map(v => v === '' ? Infinity : +v);
   const list = catalog.map((g, gi) => ({ g, gi })).filter(({ g }) => (!q || g.name.toLowerCase().includes(q)) && (g.coins ?? 0) >= lo && (g.coins ?? 0) <= hi);
   if ($('gSort').value === 'down') list.reverse();
   $('gCount').textContent = `${list.length} gift${list.length === 1 ? '' : 's'}`;
-  $('gGrid').innerHTML = list.map(({ g, gi }) => `<div class="gcard" data-gi="${gi}" tabindex="0" role="button">
-    <img src="${pic(g.image)}" alt="" loading="lazy"><span class="n">${esc(g.name)}</span><span class="coins">${g.event === 'follow' ? 'when someone follows you' : coinText(g.coins)}</span></div>`).join('')
+  $('gGrid').innerHTML = list.map(({ g, gi }) => `<div class="gcard ${g.name.toLowerCase() === cur ? 'current' : ''}" data-gi="${gi}" tabindex="0" role="button">
+    ${used.has(g.name.toLowerCase()) ? `<span class="setup">${g.name.toLowerCase() === cur ? 'now' : '✓ set up'}</span>` : ''}<img src="${pic(g.image)}" alt="" loading="lazy"><span class="n">${esc(g.name)}</span><span class="coins">${g.event === 'follow' ? 'when someone follows you' : coinText(g.coins)}</span></div>`).join('')
     || '<div class="empty">No gifts match.</div>';
   $('gGrid').querySelectorAll('[data-gi]').forEach(c => {
-    const pick = () => { const g = catalog[+c.dataset.gi]; $('gallery').close(); addRule(g.name, g.image, g.coins); };
+    const pick = () => pickGift(catalog[+c.dataset.gi]);
     c.onclick = pick; c.onkeydown = e => { if (e.key === 'Enter') pick(); };
   });
 }
-$('browse').onclick = () => { $('gSearch').value = ''; renderGallery(); $('gallery').showModal(); $('gSearch').focus(); };
+$('browse').onclick = () => openGallery();
 $('gSearch').oninput = renderGallery;
+// Enter in the search: the first gift it found
+// (the gift with exactly that name if there is one, then one that starts with it, then the first)
+$('gSearch').onkeydown = e => {
+  if (e.key !== 'Enter') return;
+  const q = $('gSearch').value.trim().toLowerCase(), cards = [...$('gGrid').querySelectorAll('.gcard')];
+  const name = c => c.querySelector('.n').textContent.trim().toLowerCase();
+  const c = cards.find(c => name(c) === q) || cards.find(c => name(c).startsWith(q)) || cards[0];
+  if (c) { e.preventDefault(); c.click(); }
+};
+$('gallery').addEventListener('close', () => { galleryFor = null; });
 $('gRange').onchange = renderGallery;
 $('gSort').onchange = renderGallery;
 $('gClose').onclick = () => $('gallery').close();
@@ -2773,7 +2899,11 @@ function addFeed(e, animate = true) {
   if (!animate) el.style.animation = 'none';
   el.innerHTML = `<div class="gimg">${e.image ? `<img src="${pic(e.image)}" alt="">` : IC.gift}</div>
     <div><div><span class="who">${esc(e.from)}</span> <span class="what">sent ${e.count > 1 ? e.count + ' × ' : ''}${esc(e.gift)}</span></div>
-    <div class="eff ${e.did ? '' : 'none'}">${e.did ? esc(e.did) : 'not set up in this game'}</div></div>`;
+    <div class="eff ${e.did ? '' : 'none'}">${e.did ? esc(e.did) : 'not set up in this game'}</div></div>
+    ${!e.did && game && e.gift && e.gift !== 'Any gift' ? '<button class="small fix" data-fix title="Add this gift to your list">+ Set up</button>' : ''}`;
+  const fix = el.querySelector('[data-fix]');
+  if (fix) fix.onclick = ev => { ev.stopPropagation(); setPage('games'); showView('game'); addRule(e.gift, e.image, e.coins); };
+  if (e.did && game) { el.classList.add('jump'); el.title = 'Show this gift in your list'; el.onclick = () => { const i = R().findIndex(r => r.gift.toLowerCase() === String(e.gift).toLowerCase()); if (i < 0) return; setPage('games'); showView('game'); setTimeout(() => flashRule(i), 60); }; }
   box.prepend(el);
   while (box.children.length > 60) box.lastChild.remove();
 }

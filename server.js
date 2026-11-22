@@ -95,6 +95,7 @@ function normalizePop(o = {}) {
         popAnim: ['bounce', 'slide', 'zoom', 'fade', 'spin', 'none'].includes(o.popAnim) ? o.popAnim : 'bounce',
         popStyle: ['dark', 'light', 'glass', 'neon', 'minecraft'].includes(o.popStyle) ? o.popStyle : 'dark',
         popImage: o.popImage !== false, popWiggle: o.popWiggle !== false, popCount: o.popCount !== false,
+        saveFloat: o.saveFloat !== false,                               // during a reset, the save gift floats round the middle
         popColors: o.popColors === true,                                // own colours instead of the theme's
         popBorder: col(o.popBorder, '#4DB3EE'), popName: col(o.popName, '#4DB3EE'), popText: col(o.popText, '#FFFFFF'), popDoes: col(o.popDoes, '#FF6A3D'),
         popWord: String(o.popWord ?? 'sent').slice(0, 20),             // "<name> sent Rose"

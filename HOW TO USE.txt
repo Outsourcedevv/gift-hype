@@ -247,6 +247,11 @@ GIFTS
     like a gift. It goes off once per person, ever: unfollowing and following again doesn't set it
     off again (the popup says "<name> followed!").
   Each gift has: a sound (and volume), "Pop up on stream", what it does, and actions.
+  Handy: click a gift's picture (or "change gift") to swap it for another from the gallery, keeping its
+    sound and actions. Copy makes the same setup for another gift. Removed one by mistake? Press Undo.
+    "Find a gift in this list" and "Sort by price" are at the top of the list. In the gallery, gifts you
+    already have are marked, and Enter picks the gift you typed. A gift in Live gifts that isn't set up
+    has "+ Set up"; click one that is to jump to it. Ctrl + K finds your gifts too.
   Actions: press "+ Add an action..." and pick one. For Minecraft there are ready-made ones:
     Nuke (falls from the sky, goes up in a mushroom cloud and leaves a crater down to y -20 with a steep wall you can climb;
       crater size 40 = a hole about 290 blocks across, 18 chunks), Jail (pick the seconds),
