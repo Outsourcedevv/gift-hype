@@ -1765,9 +1765,10 @@ const server = http.createServer(async (req, res) => {
         const f = path.join(ROOT, 'public', url.pathname);
         if (fs.existsSync(f)) { res.writeHead(200, { 'Content-Type': 'font/ttf', 'Cache-Control': 'max-age=86400', 'Access-Control-Allow-Origin': '*' }); return res.end(fs.readFileSync(f)); }
     }
-    if (req.method === 'GET' && /^\/img\/[\w-]+\.svg$/.test(url.pathname)) {
-        const f = path.join(ROOT, 'public', url.pathname);
-        if (fs.existsSync(f)) { res.writeHead(200, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'max-age=3600' }); return res.end(fs.readFileSync(f)); }
+    if (req.method === 'GET' && /^\/img\/[\w-]+\.(svg|jpg|png|webp)$/.test(url.pathname)) {
+        const f = path.join(ROOT, 'public', url.pathname), ext = path.extname(url.pathname).slice(1);
+        const type = { svg: 'image/svg+xml', jpg: 'image/jpeg', png: 'image/png', webp: 'image/webp' }[ext];
+        if (fs.existsSync(f)) { res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'max-age=3600' }); return res.end(fs.readFileSync(f)); }
     }
 
     if (url.pathname === '/api/events') {
