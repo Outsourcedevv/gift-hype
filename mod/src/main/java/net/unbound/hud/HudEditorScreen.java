@@ -10,20 +10,21 @@ import net.minecraft.network.chat.Component;
 /**
  * Esc > Unbound: every piece (the game's info and everything on the stream overlay) with example values.
  * Drag a piece to move it; drag its corner handle right / down to make it bigger, left / up to make it
- * smaller (or scroll); right-click for a background or not. Hide takes one off the screen.
+ * smaller (or scroll); right-click for a background or not. The x on a piece takes it off the
+ * screen; Show / hide lists every piece to switch on or off.
  */
 public class HudEditorScreen extends Screen {
-	private static final String[][] NAMES = {
+	static final String[][] NAMES = {
 		{ "level", "Level" }, { "count", "Wipeouts / fails" }, { "punches", "Punches" }, { "shield", "Shield" },
 		{ "popups", "Gift popups" }, { "giftlist", "Gift list" }, { "reset", "Reset countdown" }, { "wheel", "Level slot machine" },
-		{ "timer", "Chunk Chat / Teleport timer" }, { "chatdel", "Block delete list" }, { "reveal", "Chunk reveal" },
+		{ "timer", "Chunk Chat timer" }, { "chatdel", "Block delete list" }, { "reveal", "Chunk reveal" },
 	};
 	private static final int HANDLE = 7;
 	private final Screen parent;
 	private String selected = "level", dragging = null, sizing = null;
 	private double grabX, grabY, startScale;
 	private int startW, startH;
-	private Button bgButton, showButton;
+	private Button bgButton;
 	private int rows = 1;
 
 	public HudEditorScreen(Screen parent) {
@@ -38,12 +39,12 @@ public class HudEditorScreen extends Screen {
 		rows = w < 64 ? 2 : 1;
 		int perRow = rows == 2 ? 3 : 6;
 		if (rows == 2) w = Math.min(110, (this.width - 16 - (perRow - 1) * gap) / perRow);
-		String[] labels = { "", "Smaller", "Bigger", "", "Reset all", "Done" };
+		String[] labels = { "", "Smaller", "Bigger", "Show / hide", "Reset all", "Done" };
 		Button.OnPress[] acts = {
 			b -> { cfg().background = !cfg().background; save(); },
 			b -> resize(-0.1),
 			b -> resize(0.1),
-			b -> { cfg().shown = !cfg().shown; save(); },
+			b -> { save(); this.minecraft.setScreenAndShow(new HudPiecesScreen(this)); },
 			b -> HudConfig.get().resetAll(),
 			b -> onClose(),
 		};
@@ -54,7 +55,6 @@ public class HudEditorScreen extends Screen {
 			made[i] = addRenderableWidget(Button.builder(Component.literal(labels[i]), acts[i]).bounds(left + col * (w + gap), this.height - 28 - (rows - 1 - row) * 24, w, 20).build());
 		}
 		bgButton = made[0];
-		showButton = made[3];
 	}
 
 	private HudConfig.Element cfg() { return HudConfig.get().element(selected); }
@@ -78,6 +78,17 @@ public class HudEditorScreen extends Screen {
 		return new int[] { p[0], p[1], s[0], s[1] };
 	}
 
+	/** The piece whose x (top right corner: hide / show it) is under the mouse, or null. */
+	private String atX(double mx, double my) {
+		String hit = null;
+		for (String id : HudConfig.IDS) {
+			int[] b = box(id);
+			if (b == null) continue;
+			if (mx >= b[0] + b[2] - HANDLE + 1 && mx <= b[0] + b[2] + 2 && my >= b[1] - 2 && my <= b[1] + HANDLE - 1) hit = id;
+		}
+		return hit;
+	}
+
 	/** The piece under the mouse (the last drawn wins), or null; handle: on its corner handle. */
 	private String at(double mx, double my, boolean handle) {
 		String hit = null;
@@ -95,12 +106,13 @@ public class HudEditorScreen extends Screen {
 	public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float delta) {
 		g.fill(0, 0, this.width, this.height, 0x60000000);
 		bgButton.setMessage(Component.literal((bgButton.getWidth() < 90 ? "Bg: " : "Background: ") + (cfg().background ? "ON" : "OFF")));
-		showButton.setMessage(Component.literal(cfg().shown ? "Hide" : "Show"));
-		String hoverHandle = at(mouseX, mouseY, true);
+		String hoverHandle = at(mouseX, mouseY, true), hoverX = atX(mouseX, mouseY);
 		for (String id : HudConfig.IDS) {
-			int[] b = HudDraw.draw(g, id, true);
+			boolean hidden = !HudConfig.get().element(id).shown;
+			// a hidden piece: just its box (so you can still find it, move it and show it again)
+			int[] b = hidden ? box(id) : HudDraw.draw(g, id, true);
 			if (b == null) continue;
-			boolean sel = id.equals(selected), hidden = !HudConfig.get().element(id).shown;
+			boolean sel = id.equals(selected);
 			int c = sel ? 0xFFFFD84A : hidden ? 0x80FF5555 : 0x80FFFFFF;
 			g.fill(b[0] - 1, b[1] - 1, b[0] + b[2] + 1, b[1], c);
 			g.fill(b[0] - 1, b[1] + b[3], b[0] + b[2] + 1, b[1] + b[3] + 1, c);
@@ -110,13 +122,31 @@ public class HudEditorScreen extends Screen {
 			int hc = id.equals(hoverHandle) || id.equals(sizing) ? 0xFFFFD84A : sel ? 0xFFFFFFFF : 0xB0FFFFFF;
 			g.fill(b[0] + b[2] - HANDLE + 1, b[1] + b[3] - HANDLE + 1, b[0] + b[2] + 2, b[1] + b[3] + 2, 0xFF000000);
 			g.fill(b[0] + b[2] - HANDLE + 2, b[1] + b[3] - HANDLE + 2, b[0] + b[2] + 1, b[1] + b[3] + 1, hc);
-			if (hidden) g.text(this.font, "hidden", b[0], b[1] + b[3] + 3, 0xFFFF7777, true);
+			// the x: click it to hide the piece (a + on a hidden one shows it again)
+			int xl = b[0] + b[2] - HANDLE + 1, xt = b[1] - 2;
+			boolean xh = id.equals(hoverX);
+			g.fill(xl, xt, xl + HANDLE + 1, xt + HANDLE + 1, 0xFF000000);
+			g.fill(xl + 1, xt + 1, xl + HANDLE, xt + HANDLE, hidden ? (xh ? 0xFF55FF55 : 0xFF2E8B2E) : (xh ? 0xFFFF5555 : 0xFFA02828));
+			if (hidden) {
+				g.fill(xl + 2, xt + 3, xl + HANDLE - 1, xt + 4, 0xFFFFFFFF);
+				g.fill(xl + 3, xt + 2, xl + 4, xt + HANDLE - 1, 0xFFFFFFFF);
+			} else for (int k = 0; k < HANDLE - 3; k++) {
+				g.fill(xl + 2 + k, xt + 2 + k, xl + 3 + k, xt + 3 + k, 0xFFFFFFFF);
+				g.fill(xl + HANDLE - 2 - k, xt + 2 + k, xl + HANDLE - 1 - k, xt + 3 + k, 0xFFFFFFFF);
+			}
+			if (hidden) {
+				// dimmed, with HIDDEN on it: it won't show in the game
+				g.fill(b[0], b[1], b[0] + b[2], b[1] + b[3], 0xC0101010);
+				String hd = this.font.width("HIDDEN") + 4 <= b[2] ? "HIDDEN" : "X";
+				g.text(this.font, hd, b[0] + b[2] / 2 - this.font.width(hd) / 2, b[1] + b[3] / 2 - 4, 0xFFFF5555, true);
+			}
+			if (xh) g.text(this.font, hidden ? "click: show" : "click: hide", xl + HANDLE + 3, xt, 0xFFFFFFFF, true);
 			if (sel || id.equals(at(mouseX, mouseY, false))) g.text(this.font, nameOf(id), b[0], b[1] - 10, sel ? 0xFFFFD84A : 0xFFDDDDDD, true);
 		}
 
 		// what's picked, and how to use it (one line just above the buttons)
 		// (shorter help when the screen is narrow)
-		String[] helps = { "   drag to move \u2022 drag the corner to resize \u2022 right-click: background", "   drag: move \u2022 corner: size \u2022 right-click: background", "   corner: size", "" };
+		String[] helps = { "   drag to move \u2022 drag the corner to resize \u2022 x: hide \u2022 right-click: background", "   drag to move \u2022 drag the corner to resize \u2022 x: hide", "   drag: move \u2022 corner: size \u2022 x: hide", "   corner: size", "" };
 		Component line = null;
 		for (String h : helps) {
 			line = Component.literal(nameOf(selected) + " " + Math.round(cfg().scale * 100) + "%").withStyle(net.minecraft.ChatFormatting.YELLOW)
@@ -133,6 +163,13 @@ public class HudEditorScreen extends Screen {
 	@Override
 	public boolean mouseClicked(MouseButtonEvent e, boolean doubleClick) {
 		if (super.mouseClicked(e, doubleClick)) return true;
+		String xId = e.button() == 0 ? atX(e.x(), e.y()) : null;
+		if (xId != null) {
+			selected = xId;
+			cfg().shown = !cfg().shown;
+			save();
+			return true;
+		}
 		String handle = e.button() == 0 ? at(e.x(), e.y(), true) : null;
 		if (handle != null) {
 			selected = sizing = handle;

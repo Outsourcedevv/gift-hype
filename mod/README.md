@@ -7,7 +7,8 @@ In the game: press **Esc**, then **Unbound** (bottom left). Every piece (gift po
 reset countdown, the level slot machine, Chunk Chat / Chat Teleport's timer and reveal, the block delete
 list, your level, wipeouts / fails, punches and shield) can be **dragged** anywhere, resized by dragging
 its **corner** (or scrolling), and **right-clicked** for a background or not (or use the buttons).
-**Hide** takes one off the screen; **Reset all** puts them back. Saved in `config/unbound-hud.json`.
+The red **x** on a piece hides it in the game (the green **+** shows it again); **Show / hide** lists every
+piece to switch on or off (Show all / Hide all). **Reset all** puts them all back. Saved in `config/unbound-hud.json`.
 
 The overlay pieces come from Unbound on this PC: the mod listens to it like the stream overlay does
 (`/api/overlay-state`, then the `/api/events` stream), on the port in `config/unbound-link.json`.
