@@ -1178,7 +1178,7 @@ export function packFiles() {
     // go to the start of your level (not while you're in jail: you go there when you're let out)
     const levels = Array.from({ length: SECRET }, (_, i) => levelInfo(i + 1));
     fn('goto', [
-        'execute if score @s dr_jail matches 1.. run return 0',
+        'execute if score @s dr_jail matches 1.. run return run function dropper:goto_jailed',
         'execute if score @s dr_level matches ..0 run scoreboard players set @s dr_level 1',
         'execute if score @s dr_level matches 102.. run return run function dropper:win_tp',
         ...levels.map(L => `execute if score @s dr_level matches ${L.n} run return run function dropper:lvl/${L.n}`),
@@ -1262,14 +1262,26 @@ export function packFiles() {
     fn('jail/enter', [
         'function dropper:jail/clear',
         'tag @s add dr_quiet', 'function dropper:goto', 'tag @s remove dr_quiet',
-        'execute at @s align xyz run summon minecraft:marker ~ ~ ~ {Tags:["dr_jailpos"]}',
-        'execute at @s align xyz run fill ~-1 ~ ~-1 ~1 ~2 ~1 minecraft:iron_bars replace minecraft:air',
-        'execute at @s align xyz run fill ~ ~ ~ ~ ~1 ~ minecraft:air replace minecraft:iron_bars',
-        'execute at @s align xyz run fill ~-1 ~3 ~-1 ~1 ~3 ~1 minecraft:iron_bars replace minecraft:air',
+        'execute at @s run function dropper:jail/cage',
         'effect give @s minecraft:jump_boost 9999 250 true',
         'playsound minecraft:block.iron_door.close master @s ~ ~ ~ 1 0.8', ...title('@s', 'JAILED', 'on the bridge', 'red'),
     ]);
     fn('jail/tick', ['scoreboard players remove @s dr_jail 1', 'execute if score @s dr_jail matches ..0 run function dropper:jail/free']);
+    fn('jail/cage', [
+        'execute align xyz run summon minecraft:marker ~ ~ ~ {Tags:["dr_jailpos"]}',
+        'execute align xyz run fill ~-1 ~ ~-1 ~1 ~2 ~1 minecraft:iron_bars replace minecraft:air',
+        'execute align xyz run fill ~ ~ ~ ~ ~1 ~ minecraft:air replace minecraft:iron_bars',
+        'execute align xyz run fill ~-1 ~3 ~-1 ~1 ~3 ~1 minecraft:iron_bars replace minecraft:air',
+    ]);
+    // gifts still work while you're in jail (levels up and down, a reset): the cage comes with you to
+    // your new level, with the same time left
+    fn('goto_jailed', [
+        'function dropper:jail/clear',
+        'scoreboard players operation #jt dr_v = @s dr_jail', 'scoreboard players set @s dr_jail 0',
+        'function dropper:goto',
+        'scoreboard players operation @s dr_jail = #jt dr_v',
+        'execute at @s run function dropper:jail/cage',
+    ]);
     fn('jail/clear', ['execute at @e[type=minecraft:marker,tag=dr_jailpos] run fill ~-1 ~ ~-1 ~1 ~3 ~1 minecraft:air replace minecraft:iron_bars', 'kill @e[type=minecraft:marker,tag=dr_jailpos]']);
     fn('jail/free', ['scoreboard players set @s dr_jail 0', 'function dropper:jail/clear', 'execute at @s run fill ~-1 ~ ~-1 ~1 ~3 ~1 minecraft:air replace minecraft:iron_bars', 'effect clear @s minecraft:jump_boost', 'playsound minecraft:block.iron_door.open master @s ~ ~ ~ 1 1', 'tag @s add dr_quiet', 'function dropper:goto', 'tag @s remove dr_quiet', ...title('@s', 'FREE', '', 'green')]);
 

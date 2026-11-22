@@ -1037,7 +1037,7 @@ export function packFiles() {
 
     // ---- levels: going to one, its obstacles each tick, each try ----
     fn('goto', [
-        'execute if score @s wo_jail matches 1.. run return 0',
+        'execute if score @s wo_jail matches 1.. run return run function wipeout:goto_jailed',
         'execute if score @s wo_level matches ..0 run scoreboard players set @s wo_level 1',
         'execute if score @s wo_level matches 101.. run return run function wipeout:win_tp',
         ...levels.map(L => `execute if score @s wo_level matches ${L.n} run return run function wipeout:lvl/${L.n}`),
@@ -1221,6 +1221,15 @@ export function packFiles() {
         'execute align xyz run fill ~-1 ~ ~-1 ~1 ~2 ~1 minecraft:iron_bars replace minecraft:air',
         'execute align xyz run fill ~ ~ ~ ~ ~1 ~ minecraft:air replace minecraft:iron_bars',
         'execute align xyz run fill ~-1 ~3 ~-1 ~1 ~3 ~1 minecraft:iron_bars replace minecraft:air',
+    ]);
+    // gifts still work while you're in jail (levels up and down, a reset): the cage comes with you to
+    // the start of your new level, with the same time left
+    fn('goto_jailed', [
+        'function wipeout:jail/clear',
+        'scoreboard players operation #jt wo_v = @s wo_jail', 'scoreboard players set @s wo_jail 0',
+        'function wipeout:goto',
+        'scoreboard players operation @s wo_jail = #jt wo_v',
+        'execute at @s run function wipeout:jail/cage',
     ]);
     fn('jail/clear', ['execute at @e[type=minecraft:marker,tag=wo_jailpos] run fill ~-1 ~ ~-1 ~1 ~3 ~1 minecraft:air replace minecraft:iron_bars', 'kill @e[type=minecraft:marker,tag=wo_jailpos]']);
     fn('jail/free', ['scoreboard players set @s wo_jail 0', 'function wipeout:jail/clear', 'execute at @s run fill ~-1 ~ ~-1 ~1 ~3 ~1 minecraft:air replace minecraft:iron_bars', 'effect clear @s minecraft:jump_boost', 'playsound minecraft:block.iron_door.open master @s ~ ~ ~ 1 1', ...title('@s', 'FREE', '', 'green')]);

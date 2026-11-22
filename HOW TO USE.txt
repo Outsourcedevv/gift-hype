@@ -223,7 +223,8 @@ THE DROPPER (Minecraft -> Dropper)
   plays on for the whole countdown until someone saves you. The save gift also floats round the
   middle of the stream (bobbing up and down and drifting round) with the time left under it, until
   someone sends it. Jail locks you in a cage on your level's
-  bridge.
+  bridge. Gifts still work while you're in jail: levels up and down and a reset move you, and the cage
+  comes with you with the same time left.
   Starting gifts: Finger Heart = punch (only while punches are on), Doughnut = punches on/off,
     Rosa = jail 5s, Paper Crane / Corgi = up 1 / 5 levels, Hat and Mustache / Boxing Gloves = down 1 / 5,
     Galaxy = 60s reset countdown (back to level 1), Glowing Jellyfish = saves you (or a shield if no
