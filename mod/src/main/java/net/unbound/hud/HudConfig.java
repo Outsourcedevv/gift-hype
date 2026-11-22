@@ -21,7 +21,7 @@ public final class HudConfig {
 
 	public Map<String, Element> elements = new LinkedHashMap<>();
 
-	public static final String[] IDS = { "level", "count", "punches", "shield" };
+	public static final String[] IDS = { "level", "count", "punches", "shield", "popups", "giftlist", "reset", "wheel", "timer", "chatdel", "reveal" };
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 	private static HudConfig instance;
 
@@ -30,8 +30,11 @@ public final class HudConfig {
 		return instance;
 	}
 
+	// the stream overlay's pieces start smaller (there's not much room on a Minecraft screen)
+	private static final java.util.Set<String> OVERLAY = java.util.Set.of("popups", "giftlist", "reset", "wheel", "timer", "chatdel", "reveal");
+
 	public Element element(String id) {
-		return elements.computeIfAbsent(id, k -> new Element());
+		return elements.computeIfAbsent(id, k -> { Element e = new Element(); if (OVERLAY.contains(k)) e.scale = 0.7; return e; });
 	}
 
 	private static File file() {

@@ -1383,9 +1383,10 @@ async function playWhenReady(g) {
     }
     let quick = true, mod = null;
     const ver = worldVersion(worldOf(g));
-    // the Dropper and Wipeout: the Unbound HUD mod comes too (Esc > Unbound to move the info around)
-    if (course) {
-        try { mod = await installHudMod(ver, log, DATA); if (mod) log('The Unbound HUD mod is set up: in Minecraft, press Esc, then Unbound, to move your level, wipeouts and punches around.'); }
+    // the Unbound HUD mod comes too (Minecraft 26.2: the Dropper, Wipeout, or your own 26.2 world): your
+    // stream overlay in the game, and the game's info, all movable (Esc > Unbound)
+    {
+        try { mod = await installHudMod(ver, log, DATA, settings.port); if (mod) log('The Unbound HUD mod is set up: in Minecraft, press Esc, then Unbound, to move and resize your gift popups, gift list, level and the rest.'); }
         catch (e) { log(`The Unbound HUD mod couldn't be set up (${e.message}). Playing without it.`); }
     }
     try { setupLauncher(ver, mod); }

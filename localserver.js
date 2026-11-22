@@ -389,7 +389,7 @@ const web = async (url, as) => {
     if (!r.ok) throw new Error(`${new URL(url).hostname} answered ${r.status}`);
     return as === 'json' ? r.json() : Buffer.from(await r.arrayBuffer());
 };
-export async function installHudMod(version, log = () => {}, cacheDir = null) {
+export async function installHudMod(version, log = () => {}, cacheDir = null, port = 4747) {
     if (version !== HUD_MC || !fs.existsSync(HUD_JAR)) return null;
     const id = `unbound-fabric-${version}`;
     // Fabric (the launcher downloads its parts from what this lists)
@@ -430,6 +430,9 @@ export async function installHudMod(version, log = () => {}, cacheDir = null) {
     }
     for (const n of fs.readdirSync(mods)) if ((/^fabric-api-.*\.jar$/.test(n) && n !== apiName) || /^unbound-hud.*\.jar$/.test(n)) fs.rmSync(path.join(mods, n), { force: true });
     fs.copyFileSync(HUD_JAR, path.join(mods, 'unbound-hud.jar'));
+    // where Unbound is (the mod listens to it like the stream overlay does)
+    fs.mkdirSync(path.join(HUD_GAME_DIR, 'config'), { recursive: true });
+    fs.writeFileSync(path.join(HUD_GAME_DIR, 'config', 'unbound-link.json'), JSON.stringify({ port }));
     // your settings (keys, video...) the first time
     const opts = path.join(HUD_GAME_DIR, 'options.txt');
     if (!fs.existsSync(opts) && fs.existsSync(path.join(MC_DIR, 'options.txt'))) fs.copyFileSync(path.join(MC_DIR, 'options.txt'), opts);

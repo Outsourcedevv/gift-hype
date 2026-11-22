@@ -176,12 +176,15 @@ WIPEOUT (Minecraft -> Wipeout)
   Knocked onto the stands is a wipeout too.
   The next level's obstacles are already moving before you get there, so nothing pops in.
   Every level has been checked tick by tick to make sure it can be done (at a little under a sprint).
-  YOUR INFO ON SCREEN: your level, wipeouts / fails and punches are at the bottom of the screen. When
-    you press Play Minecraft, Unbound also sets up the Unbound HUD mod by itself (Fabric and Fabric API
-    come with it, in a game folder of its own, .minecraft/unbound, with your settings copied in). In
-    Minecraft press Esc, then Unbound (bottom left): drag each piece wherever you want, scroll to make
-    it bigger or smaller, right-click to give it a background or not. Hide takes one off the screen,
-    Reset all puts them back. If the mod can't be set up (no internet), you play without it.
+  YOUR STREAM OVERLAY IN MINECRAFT: when you press Play Minecraft, Unbound also sets up the Unbound HUD
+    mod by itself (Minecraft 26.2: the Dropper, Wipeout, or your own 26.2 world; Fabric and Fabric API come
+    with it, in a game folder of its own, .minecraft/unbound, with your settings copied in). In the game
+    you see everything your stream overlay shows: gift popups, the gift list, the reset countdown, the
+    level slot machine, Chunk Chat / Chat Teleport's timer and reveal, the block delete list, plus your
+    level, wipeouts / fails and punches. Press Esc, then Unbound (bottom left): drag a piece to move it,
+    drag its corner right / down to make it bigger (left / up: smaller), right-click to give it a
+    background or not. Hide takes one off the screen, Reset all puts them back. (Gift pictures don't show
+    in the game, only their names.) If the mod can't be set up (no internet), you play without it.
   RESET THE MAP: if something in the Dropper's or Wipeout's map breaks, press "Reset the map" (next to
     Reopen world). The world is made again and every level built fresh (under a minute), and you start
     again on level 1 with 0 fails / wipeouts.

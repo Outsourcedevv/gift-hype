@@ -1,12 +1,16 @@
 # Unbound HUD (Minecraft mod)
 
-A small client mod for the Dropper and Wipeout. Unbound sets it up by itself when you press
+A small client mod: your Unbound stream overlay, and the Dropper's / Wipeout's info, in Minecraft. Unbound sets it up by itself when you press
 **Play Minecraft** (Fabric, Fabric API and this mod, in `.minecraft/unbound`), so you never install it by hand.
 
-In the game: press **Esc**, then **Unbound** (bottom left). Your level, wipeouts / fails, punches and shield
-are pieces you can **drag** anywhere, **scroll** to resize, and **right-click** to give a background or not
-(or use the buttons). **Hide** takes one off the screen; **Reset all** puts them back above the hotbar.
-Saved in `config/unbound-hud.json`.
+In the game: press **Esc**, then **Unbound** (bottom left). Every piece (gift popups, the gift list, the
+reset countdown, the level slot machine, Chunk Chat / Chat Teleport's timer and reveal, the block delete
+list, your level, wipeouts / fails, punches and shield) can be **dragged** anywhere, resized by dragging
+its **corner** (or scrolling), and **right-clicked** for a background or not (or use the buttons).
+**Hide** takes one off the screen; **Reset all** puts them back. Saved in `config/unbound-hud.json`.
+
+The overlay pieces come from Unbound on this PC: the mod listens to it like the stream overlay does
+(`/api/overlay-state`, then the `/api/events` stream), on the port in `config/unbound-link.json`.
 
 It reads the info line the game sends at the bottom of the screen ("Level 5  Wipeouts 3  Punches ON")
 and draws it its own way instead. Without the mod you still see that line as it is.

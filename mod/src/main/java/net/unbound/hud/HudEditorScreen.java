@@ -7,20 +7,29 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 
-/** Esc > Unbound: drag the pieces where you want them, scroll to resize, right-click for a background. */
+/**
+ * Esc > Unbound: every piece (the game's info and everything on the stream overlay) with example values.
+ * Drag a piece to move it; drag its corner handle right / down to make it bigger, left / up to make it
+ * smaller (or scroll); right-click for a background or not. Hide takes one off the screen.
+ */
 public class HudEditorScreen extends Screen {
-	private static final String[] NAMES = { "Level", "Wipeouts", "Punches", "Shield" };
+	private static final String[][] NAMES = {
+		{ "level", "Level" }, { "count", "Wipeouts / fails" }, { "punches", "Punches" }, { "shield", "Shield" },
+		{ "popups", "Gift popups" }, { "giftlist", "Gift list" }, { "reset", "Reset countdown" }, { "wheel", "Level slot machine" },
+		{ "timer", "Chunk Chat / Teleport timer" }, { "chatdel", "Block delete list" }, { "reveal", "Chunk reveal" },
+	};
+	private static final int HANDLE = 7;
 	private final Screen parent;
-	private String selected = "level", dragging = null;
-	private double grabX, grabY;
+	private String selected = "level", dragging = null, sizing = null;
+	private double grabX, grabY, startScale;
+	private int startW, startH;
 	private Button bgButton, showButton;
+	private int rows = 1;
 
 	public HudEditorScreen(Screen parent) {
 		super(Minecraft.getInstance(), Minecraft.getInstance().font, Component.literal("Unbound HUD"));
 		this.parent = parent;
 	}
-
-	private int rows = 1;
 
 	@Override
 	protected void init() {
@@ -29,7 +38,6 @@ public class HudEditorScreen extends Screen {
 		rows = w < 64 ? 2 : 1;
 		int perRow = rows == 2 ? 3 : 6;
 		if (rows == 2) w = Math.min(110, (this.width - 16 - (perRow - 1) * gap) / perRow);
-		Button[] made = new Button[n];
 		String[] labels = { "", "Smaller", "Bigger", "", "Reset all", "Done" };
 		Button.OnPress[] acts = {
 			b -> { cfg().background = !cfg().background; save(); },
@@ -39,11 +47,11 @@ public class HudEditorScreen extends Screen {
 			b -> HudConfig.get().resetAll(),
 			b -> onClose(),
 		};
+		Button[] made = new Button[n];
 		int left = this.width / 2 - (perRow * w + (perRow - 1) * gap) / 2;
 		for (int i = 0; i < n; i++) {
 			int col = i % perRow, row = i / perRow;
-			int x = left + col * (w + gap), y = this.height - 28 - (rows - 1 - row) * 24;
-			made[i] = addRenderableWidget(Button.builder(Component.literal(labels[i]), acts[i]).bounds(x, y, w, 20).build());
+			made[i] = addRenderableWidget(Button.builder(Component.literal(labels[i]), acts[i]).bounds(left + col * (w + gap), this.height - 28 - (rows - 1 - row) * 24, w, 20).build());
 		}
 		bgButton = made[0];
 		showButton = made[3];
@@ -54,23 +62,31 @@ public class HudEditorScreen extends Screen {
 
 	private void resize(double by) {
 		HudConfig.Element e = cfg();
-		e.scale = Math.max(0.5, Math.min(4.0, Math.round((e.scale + by) * 10) / 10.0));
+		e.scale = Math.max(0.3, Math.min(5.0, Math.round((e.scale + by) * 10) / 10.0));
 		save();
 	}
 
 	private static String nameOf(String id) {
-		for (int i = 0; i < HudConfig.IDS.length; i++) if (HudConfig.IDS[i].equals(id)) return NAMES[i];
+		for (String[] n : NAMES) if (n[0].equals(id)) return n[1];
 		return id;
 	}
 
-	/** The piece under the mouse (the last drawn wins), or null. */
-	private String at(double mx, double my) {
+	private int[] box(String id) {
+		int[] s = HudDraw.size(id, true);
+		if (s == null) return null;
+		int[] p = HudDraw.place(id, this.width, this.height, true);
+		return new int[] { p[0], p[1], s[0], s[1] };
+	}
+
+	/** The piece under the mouse (the last drawn wins), or null; handle: on its corner handle. */
+	private String at(double mx, double my, boolean handle) {
 		String hit = null;
 		for (String id : HudConfig.IDS) {
-			Component t = HudDraw.text(id, true);
-			if (t == null) continue;
-			int[] p = HudDraw.place(id, this.font, this.width, this.height, true), sz = HudDraw.size(this.font, t, HudConfig.get().element(id).scale);
-			if (mx >= p[0] && mx < p[0] + sz[0] && my >= p[1] && my < p[1] + sz[1]) hit = id;
+			int[] b = box(id);
+			if (b == null) continue;
+			boolean onHandle = mx >= b[0] + b[2] - HANDLE + 1 && mx <= b[0] + b[2] + 2 && my >= b[1] + b[3] - HANDLE + 1 && my <= b[1] + b[3] + 2;
+			boolean in = mx >= b[0] && mx < b[0] + b[2] && my >= b[1] && my < b[1] + b[3];
+			if (handle ? onHandle : in || onHandle) hit = id;
 		}
 		return hit;
 	}
@@ -80,31 +96,56 @@ public class HudEditorScreen extends Screen {
 		g.fill(0, 0, this.width, this.height, 0x60000000);
 		bgButton.setMessage(Component.literal((bgButton.getWidth() < 90 ? "Bg: " : "Background: ") + (cfg().background ? "ON" : "OFF")));
 		showButton.setMessage(Component.literal(cfg().shown ? "Hide" : "Show"));
+		String hoverHandle = at(mouseX, mouseY, true);
 		for (String id : HudConfig.IDS) {
-			int[] box = HudDraw.draw(g, id, true);
-			if (box == null) continue;
+			int[] b = HudDraw.draw(g, id, true);
+			if (b == null) continue;
 			boolean sel = id.equals(selected), hidden = !HudConfig.get().element(id).shown;
 			int c = sel ? 0xFFFFD84A : hidden ? 0x80FF5555 : 0x80FFFFFF;
-			g.fill(box[0] - 1, box[1] - 1, box[0] + box[2] + 1, box[1], c);
-			g.fill(box[0] - 1, box[1] + box[3], box[0] + box[2] + 1, box[1] + box[3] + 1, c);
-			g.fill(box[0] - 1, box[1], box[0], box[1] + box[3], c);
-			g.fill(box[0] + box[2], box[1], box[0] + box[2] + 1, box[1] + box[3], c);
-			if (hidden) g.text(this.font, "hidden", box[0], box[1] + box[3] + 2, 0xFFFF7777, true);
+			g.fill(b[0] - 1, b[1] - 1, b[0] + b[2] + 1, b[1], c);
+			g.fill(b[0] - 1, b[1] + b[3], b[0] + b[2] + 1, b[1] + b[3] + 1, c);
+			g.fill(b[0] - 1, b[1], b[0], b[1] + b[3], c);
+			g.fill(b[0] + b[2], b[1], b[0] + b[2] + 1, b[1] + b[3], c);
+			// the corner handle: drag it to change the size
+			int hc = id.equals(hoverHandle) || id.equals(sizing) ? 0xFFFFD84A : sel ? 0xFFFFFFFF : 0xB0FFFFFF;
+			g.fill(b[0] + b[2] - HANDLE + 1, b[1] + b[3] - HANDLE + 1, b[0] + b[2] + 2, b[1] + b[3] + 2, 0xFF000000);
+			g.fill(b[0] + b[2] - HANDLE + 2, b[1] + b[3] - HANDLE + 2, b[0] + b[2] + 1, b[1] + b[3] + 1, hc);
+			if (hidden) g.text(this.font, "hidden", b[0], b[1] + b[3] + 3, 0xFFFF7777, true);
+			if (sel || id.equals(at(mouseX, mouseY, false))) g.text(this.font, nameOf(id), b[0], b[1] - 10, sel ? 0xFFFFD84A : 0xFFDDDDDD, true);
 		}
-		g.centeredText(this.font, Component.literal("Unbound HUD"), this.width / 2, 12, 0xFFFFFFFF);
-		g.centeredText(this.font, Component.literal("Drag to move  •  Scroll to resize  •  Right-click: background on/off"), this.width / 2, 26, 0xFFBBBBBB);
-		g.centeredText(this.font, Component.literal("Selected: " + nameOf(selected) + "  (" + Math.round(cfg().scale * 100) + "%)"), this.width / 2, this.height - 42 - (rows - 1) * 24, 0xFFFFD84A);
+
+		// what's picked, and how to use it (one line just above the buttons)
+		// (shorter help when the screen is narrow)
+		String[] helps = { "   drag to move \u2022 drag the corner to resize \u2022 right-click: background", "   drag: move \u2022 corner: size \u2022 right-click: background", "   corner: size", "" };
+		Component line = null;
+		for (String h : helps) {
+			line = Component.literal(nameOf(selected) + " " + Math.round(cfg().scale * 100) + "%").withStyle(net.minecraft.ChatFormatting.YELLOW)
+				.append(Component.literal(h).withStyle(net.minecraft.ChatFormatting.GRAY));
+			if (this.font.width(line) + 16 <= this.width) break;
+		}
+		int lw = this.font.width(line) + 10, ly = this.height - 42 - (rows - 1) * 24;
+		g.fill(this.width / 2 - lw / 2, ly - 3, this.width / 2 + lw / 2, ly + 10, 0xC0000000);
+		g.centeredText(this.font, line, this.width / 2, ly, 0xFFFFFFFF);
+		if (!OverlayState.linked) g.centeredText(this.font, Component.literal("Unbound isn't connected: open the Unbound app to see your gifts here"), this.width / 2, 32, 0xFFFF9955);
 		super.extractRenderState(g, mouseX, mouseY, delta);
 	}
 
 	@Override
 	public boolean mouseClicked(MouseButtonEvent e, boolean doubleClick) {
 		if (super.mouseClicked(e, doubleClick)) return true;
-		String id = at(e.x(), e.y());
+		String handle = e.button() == 0 ? at(e.x(), e.y(), true) : null;
+		if (handle != null) {
+			selected = sizing = handle;
+			int[] b = box(handle);
+			startW = Math.max(1, b[2]); startH = Math.max(1, b[3]); startScale = cfg().scale;
+			grabX = e.x(); grabY = e.y();
+			return true;
+		}
+		String id = at(e.x(), e.y(), false);
 		if (id == null) return false;
 		selected = id;
 		if (e.button() == 1) { cfg().background = !cfg().background; save(); return true; }
-		int[] p = HudDraw.place(id, this.font, this.width, this.height, true);
+		int[] p = HudDraw.place(id, this.width, this.height, true);
 		dragging = id;
 		grabX = e.x() - p[0];
 		grabY = e.y() - p[1];
@@ -113,6 +154,13 @@ public class HudEditorScreen extends Screen {
 
 	@Override
 	public boolean mouseDragged(MouseButtonEvent e, double dx, double dy) {
+		if (sizing != null) {
+			// right / down: bigger; left / up: smaller (both ways count)
+			double fx = (startW + (e.x() - grabX)) / startW, fy = (startH + (e.y() - grabY)) / startH;
+			HudConfig.Element el = HudConfig.get().element(sizing);
+			el.scale = Math.max(0.3, Math.min(5.0, Math.round(startScale * (fx + fy) / 2 * 20) / 20.0));
+			return true;
+		}
 		if (dragging == null) return super.mouseDragged(e, dx, dy);
 		HudConfig.Element el = HudConfig.get().element(dragging);
 		el.x = Math.max(0, Math.min(1, (e.x() - grabX) / this.width));
@@ -122,13 +170,13 @@ public class HudEditorScreen extends Screen {
 
 	@Override
 	public boolean mouseReleased(MouseButtonEvent e) {
-		if (dragging != null) { dragging = null; save(); return true; }
+		if (dragging != null || sizing != null) { dragging = null; sizing = null; save(); return true; }
 		return super.mouseReleased(e);
 	}
 
 	@Override
 	public boolean mouseScrolled(double mx, double my, double h, double v) {
-		String id = at(mx, my);
+		String id = at(mx, my, false);
 		if (id != null) selected = id;
 		resize(v > 0 ? 0.1 : v < 0 ? -0.1 : 0);
 		return true;
