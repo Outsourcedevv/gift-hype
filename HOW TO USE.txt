@@ -15,6 +15,11 @@ GO LIVE
   3. Pick its type at the top, e.g. Minecraft: Parkour Paradise or Block Delete Survival.
   4. Every gift you set up for that type now plays its sound and does its actions.
 
+GETTING STARTED
+  The Games page starts with four steps (connect TikTok, pick a game, set up gifts, add the overlay),
+  ticked off as you do them. Hide takes the list away. The two pills at the top right (TikTok and your
+  game) can be clicked: they take you to where you'd fix that connection.
+
 GAMES
   The games screen shows a cover for every game with a TikTok LIVE mod. Right now that's Minecraft.
   Click a cover to open that game. "All games" takes you back. "Change cover" sets your own picture.
