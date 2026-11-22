@@ -2020,11 +2020,16 @@ async function renderMinecraftBox() {
         ${isWipeoutMode() ? `<p class="wide" style="margin:0"><b>Wipeout has its own world</b>, made by Unbound: 100 levels in one straight line just above warm sea water, between low walls with a crowd and floodlights. Each level is two obstacles (three after level 80): spinners, sliding cubes, waves of red walls (duck into the holes in the sides), bridges that keep going yellow, red and vanishing (time your run), punching gloves, crushers, the zipline (go when its light is green), the doors, laser gates, rolling bars, big bouncy balls, stepping stones, and arms to jump and duck. Reach the emerald pad and you're on the next level, right ahead. Touch anything red and you're dead; punching gloves knock you into the sea; red and white boxing gloves bounce you up. No checkpoints: die or fall and the level starts again. Level 100 is a black and yellow tower: climb the spiral steps round it, past disappearing steps, red arms and punching gloves, to the emerald on top to win.</p>`
           : `<p class="wide" style="margin:0"><b>The Dropper has its own world</b>, made by Unbound: 100 levels that get harder as you go. Fall through the gaps and land in the water to go to the next level. Hit anything else and you start that level again.</p>`}
         <div class="wide"><label class="check"><input type="checkbox" id="mcEula" ${settings.mcEula ? 'checked' : ''}> I agree to the <a href="https://aka.ms/MinecraftEULA" target="_blank" rel="noopener" style="color:var(--main-text)">Minecraft EULA</a> (needed to open the world for gifts)</label></div>
-        <div class="wide row"><button class="small" id="mcRestart">Reopen world</button><span class="pill" id="mcState"></span></div>
+        <div class="wide row"><button class="small" id="mcRestart">Reopen world</button><button class="small ghost danger" id="mcResetMap" title="If something in the map breaks: the world is made again and the levels built fresh">Reset the map</button><span class="pill" id="mcState"></span></div>
       </div>
       <p class="hint"><b>How to play:</b> press <b>Play Minecraft</b>. The first time, Unbound makes the world and builds the levels (${isWipeoutMode() ? 'under a minute' : 'about a minute'}). Your level, ${isWipeoutMode() ? 'wipeouts' : 'fails'}, punches on/off and any shield are shown at the bottom of your screen, and the reset countdown at the top.</p>`;
     $('mcEula').onchange = () => { settings.mcEula = $('mcEula').checked; api('/api/settings', { mcEula: settings.mcEula }); };
     $('mcRestart').onclick = async () => { try { await api('/api/minecraft/restart-world', {}); toast(`Reopening ${courseName()}…`); } catch (e) { toast(e.message, true); } };
+    // if something in the map breaks: back to how it was at the start (levels built fresh, level 1, 0 ${isWipeoutMode() ? 'wipeouts' : 'fails'})
+    $('mcResetMap').onclick = async () => {
+      if (!confirm(`Reset ${courseName()}'s map?\n\nThe world is made again and every level built fresh (under a minute), and you start again on level 1 with 0 ${isWipeoutMode() ? 'wipeouts' : 'fails'}.\nIf you're in it in Minecraft, you'll be sent out: join again once it's built.`)) return;
+      try { await api('/api/minecraft/reset-map', {}); toast(`Resetting ${courseName()}: building the levels again…`); } catch (e) { toast(e.message, true); }
+    };
     renderStatus();
     return;
   }

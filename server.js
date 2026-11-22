@@ -25,8 +25,8 @@ import { makeChatTeleport, normalizeChatTeleport } from './chatteleport.js';
 import { hudPack, hudProps, hudInfo, hudSpot, blockIconPng } from './hudpack.js';
 import { makeChunkChat, normalizeChunkChat } from './chunkchat.js';
 import { makeChatDelete, normalizeChatDelete } from './chatdelete.js';
-import { listWorlds, installPack, singleplayerCommands } from './singleplayer.js';
-import { makeLocalServer, setupLauncher, openLauncher, worldVersion } from './localserver.js';
+import { listWorlds, installPack, singleplayerCommands, SAVES_DIR } from './singleplayer.js';
+import { makeLocalServer, setupLauncher, openLauncher, worldVersion, installHudMod } from './localserver.js';
 import { checkForUpdate, applyUpdate, localVersion } from './updater.js';
 import { DROPPER_WORLD, DROPPER_MC, DROPPER_PROPS, DROPPER_ACTIONS, SECRET as DROPPER_LEVELS, installDropperPack, wheelAmounts, installDropperBuildPack, removeDropperBuildPack, dropperCommands, dropperAlertText, buildDropper, dropperBuilt, markDropperBuilt, dropperProgress } from './dropper.js';
 import { WIPEOUT_WORLD, WIPEOUT_MC, WIPEOUT_PROPS, WIPEOUT_ACTIONS, LEVELS as WIPEOUT_LEVELS, installWipeoutPack, installWipeoutBuildPack, removeWipeoutBuildPack, wipeoutCommands, buildWipeout, wipeoutBuilt, markWipeoutBuilt, wipeoutProgress } from './wipeout.js';
@@ -1380,8 +1380,14 @@ async function playWhenReady(g) {
         }
         if (!course.built()) throw new Error(`${course.name[0].toUpperCase() + course.name.slice(1)} is still being built. Wait a minute and press Play again`);
     }
-    let quick = true;
-    try { setupLauncher(worldVersion(worldOf(g))); }
+    let quick = true, mod = null;
+    const ver = worldVersion(worldOf(g));
+    // the Dropper and Wipeout: the Unbound HUD mod comes too (Esc > Unbound to move the info around)
+    if (course) {
+        try { mod = await installHudMod(ver, log, DATA); if (mod) log('The Unbound HUD mod is set up: in Minecraft, press Esc, then Unbound, to move your level, wipeouts and punches around.'); }
+        catch (e) { log(`The Unbound HUD mod couldn't be set up (${e.message}). Playing without it.`); }
+    }
+    try { setupLauncher(ver, mod); }
     catch (e) { quick = false; log(`Couldn't add "Unbound" to the launcher (${e.message}). In Minecraft: Multiplayer, then Unbound.`); }
     openLauncher();
     log(quick ? 'Minecraft launcher opened: press Play on "Unbound" and you go straight into your world.' : 'Minecraft launcher opened: play Minecraft, then Multiplayer, then Unbound.');
@@ -1651,6 +1657,27 @@ const routes = {
         return { ok: true, started: true };
     },
     'POST /api/minecraft/restart-world': async () => { await disconnectMinecraft(); await localServer.stop(); rconFor = null; connectMinecraft(); return { ok: true }; },
+    // a level game's map back to how it was at the start: the world is closed, deleted and made again,
+    // the levels built fresh, and everyone's back on level 1 with 0 fails / wipeouts (their scores are in
+    // the world). Only ever the Dropper's or Wipeout's own world, which Unbound made.
+    'POST /api/minecraft/reset-map': async () => {
+        const g = activeGame(), course = g && courseOf(g);
+        if (!course || !isSingle(g)) throw new Error('Pick the Dropper or Wipeout first');
+        if (courseBuilding) throw new Error(`${course.name[0].toUpperCase() + course.name.slice(1)} is being built right now: wait for it to finish, then reset`);
+        log(`Resetting ${course.name}'s map: making the world again from the start...`);
+        await disconnectMinecraft();
+        await localServer.stop();
+        rconFor = null;
+        const dir = path.join(SAVES_DIR, course.world);
+        if (path.dirname(dir) !== SAVES_DIR || !course.world) throw new Error("That world can't be reset");
+        fs.rmSync(dir, { recursive: true, force: true });
+        // a reset countdown or shields from before are gone too
+        if (dropperReset) { dropperReset = null; clearInterval(resetTicker); broadcast('stopSound', { id: 'reset' }); broadcast('reset', { active: false }); }
+        dropperShields = 0;
+        setStatus({ dropper: 'building 0/' + course.levels });
+        connectMinecraft();
+        return { ok: true };
+    },
     'GET /api/minecraft/mobs': () => Object.entries(MOBS).map(([id, m]) => ({ id, name: m.name })),
     'GET /api/minecraft/servers': () => findServers().map(({ folder, name, rcon, port, world }) => ({ folder, name, rcon, port, world })),
     'POST /api/minecraft/enable-rcon': b => { enableRcon(String(b.folder || '')); connectMinecraft(); return { ok: true }; },
