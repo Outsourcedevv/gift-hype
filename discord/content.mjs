@@ -5,7 +5,7 @@
 // Images are files in ./assets.
 
 export const DOWNLOAD_URL = 'https://github.com/Outsourcedevv/gift-hype/archive/refs/heads/main.zip';
-export const VERSION = '2.26.1';
+export const VERSION = '2.26.2';
 
 export const C = {
     purple: 0x8b6cff, blue: 0x5d8bff, cyan: 0x22d3ee, pink: 0xff3d7f, orange: 0xff7a3d,
@@ -107,7 +107,7 @@ export const GAMES = [
         key: 'teleport', name: '🧭・chat-teleport', role: 'g_teleport',
         topic: 'Chat Teleport: chat types a block, structure or biome and you get sent to the nearest one.',
         posts: [{ embeds: [game({
-            color: C.purple, title: '🧭 Chat Teleport', image: 'cover-chatteleport.png',
+            color: C.purple, title: '🧭 Chat Teleport', image: 'cover-chatteleport.jpg',
             description: 'Viewers type **anything in Minecraft**: a block (chest, diamonds, spawner), a structure (village, trial chamber, ancient city, end ship...) or a biome (cherry grove, deep dark, mushroom island). On a timer, **you\'re teleported to the nearest one**, up to 50,000 blocks away.\n\nTypos are fine ("vilage", "trail chamber", "strong hold"). Everyday chat and gift names are ignored. You never get sent to another dimension, and you always land somewhere you can breathe.',
             fields: [{ name: '📦 On screen', value: 'A box in Minecraft says **TELEPORT IN** and the seconds left, then what you went to and how far it was. Every colour, word and timing can be changed.', inline: false }],
             gifts: [['Galaxy', 'NUKE'], ['Rosa', 'jail'], ['Doughnut / Hat and Mustache / Whale Diving', 'cobweb / lava / air chunk'], ['Corgi', 'teleport to the End'], ['Finger Heart / Money Gun', 'diamond kit / god kit']],
