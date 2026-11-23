@@ -47,6 +47,17 @@ MINECRAFT'S TYPES
   Chat Teleport or Parkour Paradise, each with its own cover and its own gifts. The one marked LIVE is
   where gifts go. On a type's page, "Change cover" changes that type's picture.
 
+PARKOUR PARADISE (Minecraft -> Parkour Paradise)
+  Played on Parkour Paradise 3, Hielke's free 100-level parkour map. Unbound doesn't include the map:
+  it comes from Hielke's own page (minecraftmaps.com), which only lets people download it. So the first
+  time you press Play Minecraft, that page opens in your browser: press Download there, and Unbound picks
+  the zip up from your Downloads folder by itself, puts it into your Minecraft worlds as "Parkour Paradise
+  3" and carries on opening it ("Open the page again" and "Stop waiting" are under the Play button while
+  it waits, up to 20 minutes). Already have it (in your worlds, or its zip in Downloads)? It's found and
+  used straight away. Gifts: Finger Heart = arrow rain, Rosa = frozen for 5s, Hat and Mustache = drunk
+  for 15s, Paper Crane = speed boost, Corgi = super jump, Boxing Gloves = launched into the air, Galaxy
+  = back to the start.
+
 CHAT TELEPORT (Minecraft -> Chat Teleport)
   Viewers type anything in Minecraft in your LIVE chat, and every 30 seconds you're teleported to the
   nearest one:

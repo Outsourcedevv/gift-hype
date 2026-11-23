@@ -68,6 +68,11 @@ function writeNbt(root) {
     return Buffer.concat(parts);
 }
 
+// The name a world has in Minecraft's world list (level.dat's LevelName), for a world folder anywhere
+export function levelNameAt(dir) {
+    try { return readNbt(zlib.gunzipSync(fs.readFileSync(path.join(dir, 'level.dat')))).v.get('Data')?.v.get('LevelName')?.v || null; } catch { return null; }
+}
+
 // The Minecraft version the world was last played on, e.g. "26.2".
 export function worldVersion(world) {
     const nbt = readNbt(zlib.gunzipSync(fs.readFileSync(path.join(SAVES_DIR, world, 'level.dat'))));

@@ -401,6 +401,7 @@ svg.i { width: 14px; height: 14px; flex: none; vertical-align: -2px; }
 .gimg.change { cursor: pointer; position: relative; border: 0; padding: 0; }
 .gimg.change::after { content: 'Change'; position: absolute; inset: auto 0 0 0; font-size: 10px; font-weight: 700; text-align: center; padding: 2px 0; background: rgba(0,0,0,.65); color: #fff; border-radius: 0 0 8px 8px; opacity: 0; transition: opacity .15s; }
 .gimg.change:hover::after, .gimg.change:focus-visible::after { opacity: 1; }
+.map-wait { margin-top: 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--well); font-size: 13px; line-height: 1.45; max-width: 520px; }
 .linkbtn { background: none; border: 0; padding: 0 0 0 6px; color: var(--accent); font-size: 12px; cursor: pointer; text-decoration: underline; box-shadow: none; }
 .rule.flash { animation: ruleflash 1.4s ease; }
 input.bad { border-color: var(--red, #ff5a5a) !important; box-shadow: 0 0 0 2px color-mix(in srgb, var(--red, #ff5a5a) 30%, transparent); }
@@ -1806,7 +1807,7 @@ function renderStatus() {
     const m = status.minecraft;
     dot = m === 'connected' ? 'on' : ['connecting', 'offline', 'downloading', 'starting'].includes(m) ? 'wait' : '';
     text = {
-      connected: isDropperMode() ? (/building/.test(status.dropper || '') ? `Building ${courseName()}: ${status.dropper.replace('building ', '')} levels…` : `${courseName()[0].toUpperCase() + courseName().slice(1)} is ready`) : game?.minecraft?.single ? `Your world is ready: ${game.minecraft.world}` : 'Minecraft connected',
+      connected: isParkourMode() && game?.minecraft?.single ? 'Parkour Paradise 3 is ready' : isDropperMode() ? (/building/.test(status.dropper || '') ? `Building ${courseName()}: ${status.dropper.replace('building ', '')} levels…` : `${courseName()[0].toUpperCase() + courseName().slice(1)} is ready`) : game?.minecraft?.single ? `Your world is ready: ${game.minecraft.world}` : 'Minecraft connected',
       connecting: 'Connecting to Minecraft…',
       offline: 'Waiting for your Minecraft server to start',
       'no server picked': 'Minecraft: pick your server',
@@ -1815,6 +1816,7 @@ function renderStatus() {
       'wrong password': 'Minecraft: wrong password',
       'no password': 'Minecraft: type the RCON password',
       'no world picked': 'Minecraft: pick your world',
+      'map missing': 'Parkour Paradise 3: press Play to get it',
       'world not found': 'Minecraft: world not found',
       'eula not accepted': 'Minecraft: tick the EULA box',
       'java missing': "Minecraft: Java couldn't be downloaded",
@@ -1832,7 +1834,7 @@ function renderStatus() {
   $('gmDot').className = 'dot ' + dot;
   $('gmText').textContent = text;
   // while Play is getting everything ready, its button says what it's doing
-  if (playing_ && $('playMc')) $('playMc').textContent = /ready|connected/i.test(text) && !/building/i.test(text) ? 'Opening Minecraft…' : text;
+  if (playing_ && $('playMc') && !status.play?.step) $('playMc').textContent = /ready|connected/i.test(text) && !/building/i.test(text) ? 'Opening Minecraft…' : text;
   const mcs = $('mcState');
   if (mcs) mcs.textContent = text;
   const wsc = $('wsCount');
@@ -1934,6 +1936,7 @@ const R = () => curMode().rules;
 const isDropperMode = () => game?.connector === 'minecraft' && /dropper|wipe ?out/i.test(curMode().name || '');
 const isWipeoutMode = () => game?.connector === 'minecraft' && /wipe ?out/i.test(curMode().name || '');
 const courseName = () => isWipeoutMode() ? 'Wipeout' : 'the Dropper';
+const isParkourMode = () => game?.connector === 'minecraft' && !isDropperMode() && /parkour/i.test(curMode().name || '');
 function renderTypes() {
   const box = $('typeBox'), many = game.modes.length > 1;
   box.innerHTML = many ? `<h2 style="margin-top:18px">Type <span class="right" style="font-weight:400;text-transform:none">each type has its own gifts: the picked one is used</span></h2>
@@ -2041,8 +2044,13 @@ let playing_ = false;
 function renderPlay() {
   const box = $('playBox');
   if (!box) return;
-  if (!game || game.connector !== 'minecraft' || !(game.minecraft.single || isDropperMode())) { box.innerHTML = ''; return; }
-  box.innerHTML = `<button class="hot play-btn" id="playMc" title="Gets everything ready (the first time it downloads what's needed), then opens Minecraft straight into your world" ${playing_ ? 'disabled' : ''}>${playing_ ? 'Opening your world…' : 'Play Minecraft'}</button>`;
+  if (!game || game.connector !== 'minecraft' || !(game.minecraft.single || isDropperMode() || isParkourMode())) { box.innerHTML = ''; return; }
+  const step = playing_ && status.play?.state === 'getting ready' ? status.play.step : '';
+  box.innerHTML = `<button class="hot play-btn" id="playMc" title="Gets everything ready (the first time it downloads what's needed), then opens Minecraft straight into your world" ${playing_ ? 'disabled' : ''}>${playing_ ? (step === 'map' ? 'Waiting for the map…' : 'Opening your world…') : 'Play Minecraft'}</button>
+    ${step === 'map' ? `<div class="map-wait"><b>Download Parkour Paradise 3</b> on the page that opened in your browser (the Download button). Unbound picks it up from your Downloads folder and carries on by itself.
+      <div class="row" style="margin-top:6px"><button class="small" id="mapAgain">Open the page again</button><button class="small ghost" id="mapStop">Stop waiting</button></div></div>`
+      : step ? `<div class="hint" style="margin-top:6px">${esc(step)}</div>` : ''}`;
+  if ($('mapAgain')) { $('mapAgain').onclick = () => api('/api/minecraft/map-open', {}).catch(e => toast(e.message, true)); $('mapStop').onclick = () => api('/api/minecraft/map-cancel', {}).catch(() => {}); }
   $('playMc').onclick = async () => {
     playing_ = true; renderPlay();
     try {
@@ -2057,15 +2065,17 @@ let playSeen_ = null;
 function followPlay() {
   const p = status.play;
   if (!p) return;
-  const key = p.state + ':' + (p.at || '');
+  const key = p.state + ':' + (p.at || '') + ':' + (p.step || '');
   if (key === playSeen_) return;
+  const stepOnly = playSeen_ && playSeen_.split(':').slice(0, 2).join(':') === key.split(':').slice(0, 2).join(':');
   const first = playSeen_ === null;
   playSeen_ = key;
   const busy = p.state === 'getting ready';
-  if (busy !== playing_) { playing_ = busy; renderPlay(); if (busy) renderStatus(); }
+  if (busy !== playing_ || stepOnly) { playing_ = busy; renderPlay(); if (busy) renderStatus(); }
+  if (stepOnly) return;
   if (first) return; // don't repeat an old result when the app is reopened
   if (p.state === 'opened') toast(p.quick === false ? 'Minecraft is opening: play, then Multiplayer, then "Unbound"' : 'Minecraft is opening: press Play on "Unbound"');
-  else if (p.state === 'failed') toast(p.error || 'Minecraft could not be opened', true);
+  else if (p.state === 'failed') toast(p.error || 'Minecraft could not be opened', !/^Stopped waiting/.test(p.error || ''));
 }
 
 async function renderMinecraftBox() {
@@ -2101,6 +2111,25 @@ async function renderMinecraftBox() {
     m.single = b.dataset.where === 'single';
     queueSave(); renderMinecraftBox();
   });
+  if (m.single && isParkourMode()) {
+    let map = null;
+    box.innerHTML = where + '<p class="hint">Looking for Parkour Paradise 3…</p>';
+    try { map = await api('/api/minecraft/parkour-map'); } catch { map = {}; }
+    if (!game.minecraft.single || !isParkourMode()) return;
+    box.innerHTML = `${where}
+      <div class="conn-box">
+        <p class="wide" style="margin:0"><b>Parkour Paradise plays on <a href="${esc(map.page || '#')}" target="_blank" rel="noopener" style="color:var(--main-text)">Parkour Paradise 3</a></b>, ${esc(map.by || 'Hielke')}'s free 100-level parkour map.
+          ${map.world ? `<span class="pill">✓ On this PC: ${esc(map.world)}</span>` : `<span class="pill">Not on this PC yet: Play gets it</span>`}</p>
+        <div class="wide"><label class="check"><input type="checkbox" id="mcEula" ${settings.mcEula ? 'checked' : ''}> I agree to the <a href="https://aka.ms/MinecraftEULA" target="_blank" rel="noopener" style="color:var(--main-text)">Minecraft EULA</a> (needed to open the world for gifts)</label></div>
+        <div class="wide row"><button class="small" id="mcRestart" title="Close the world and open it again (if something seems stuck)">Reopen world</button><span class="pill" id="mcState"></span></div>
+      </div>
+      <p class="hint"><b>How to play:</b> press <b>Play Minecraft</b>. The first time, the map's page opens in your browser: press <b>Download</b> there and Unbound puts the map in your worlds by itself, then opens it. The map is ${esc(map.by || 'Hielke')}'s and comes from his page; Unbound doesn't include it.</p>`;
+    hookWhere();
+    $('mcEula').onchange = () => { settings.mcEula = $('mcEula').checked; api('/api/settings', { mcEula: settings.mcEula }); };
+    $('mcRestart').onclick = async () => { try { await api('/api/minecraft/restart-world', {}); toast('Reopening Parkour Paradise 3…'); } catch (e) { toast(e.message, true); } };
+    renderStatus();
+    return;
+  }
   if (m.single) {
     if (!mcWorlds) { box.innerHTML = where + '<p class="hint">Looking for your worlds…</p>'; try { mcWorlds = await api('/api/minecraft/worlds'); } catch { mcWorlds = []; } if (!game.minecraft.single) return; }
     const picked = mcWorlds.find(w => w.name === m.world);

@@ -28,6 +28,7 @@ import { makeChatDelete, normalizeChatDelete } from './chatdelete.js';
 import { listWorlds, installPack, singleplayerCommands, SAVES_DIR } from './singleplayer.js';
 import { makeLocalServer, setupLauncher, openLauncher, worldVersion, installHudMod } from './localserver.js';
 import { checkForUpdate, applyUpdate, localVersion } from './updater.js';
+import { PP3, findParkourMap, openMapPage, importFromDownloads, waitForParkourMap } from './parkourmap.js';
 import { DROPPER_WORLD, DROPPER_MC, DROPPER_PROPS, DROPPER_ACTIONS, SECRET as DROPPER_LEVELS, installDropperPack, wheelAmounts, installDropperBuildPack, removeDropperBuildPack, dropperCommands, dropperAlertText, buildDropper, dropperBuilt, markDropperBuilt, dropperProgress } from './dropper.js';
 import { WIPEOUT_WORLD, WIPEOUT_MC, WIPEOUT_PROPS, WIPEOUT_ACTIONS, LEVELS as WIPEOUT_LEVELS, installWipeoutPack, installWipeoutBuildPack, removeWipeoutBuildPack, wipeoutCommands, buildWipeout, wipeoutBuilt, markWipeoutBuilt, wipeoutProgress } from './wipeout.js';
 
@@ -275,7 +276,14 @@ const COURSES = {
 const courseOf = g => g?.connector !== 'minecraft' ? null : /wipe ?out/i.test(currentMode(g)?.name || '') ? COURSES.wipeout : /dropper/i.test(currentMode(g)?.name || '') ? COURSES.dropper : null;
 const isDropper = g => !!courseOf(g);           // a level game (the Dropper or Wipeout)
 // the world gifts go to: a level game has its own, the other types use the world you picked
-const worldOf = g => courseOf(g)?.world || g.minecraft.world;
+// Parkour Paradise plays on Hielke's Parkour Paradise 3 map (parkourmap.js): Play gets it if it isn't there
+const isParkour = g => g?.connector === 'minecraft' && !courseOf(g) && /parkour/i.test(currentMode(g)?.name || '');
+let pp3Seen = { at: 0, world: null };
+const parkourWorld = () => {
+    if (Date.now() - pp3Seen.at > 3000) pp3Seen = { at: Date.now(), world: findParkourMap() };
+    return pp3Seen.world;
+};
+const worldOf = g => courseOf(g)?.world || (isParkour(g) ? parkourWorld() : g.minecraft.world);
 const isSingle = g => isDropper(g) || !!g.minecraft.single;
 
 let games = loadGames();
@@ -859,9 +867,10 @@ function syncPack(g) {
         try { if (course.installPack()) { packNeedsReload = true; log(`${course.name[0].toUpperCase() + course.name.slice(1)} pack updated.`); } return 'singleplayer'; }
         catch (e) { worldError = `Couldn't put the ${course.name} pack in place: ${e.message}`; log(worldError); return 'world failed'; }
     }
-    if (!g.minecraft.world) return 'no world picked';
+    const world = worldOf(g);
+    if (!world) return isParkour(g) ? 'map missing' : 'no world picked';
     try {
-        if (installPack(g.minecraft.world, nukeSizes(g))) { packNeedsReload = true; log(`Unbound pack put into "${g.minecraft.world}".`); }
+        if (installPack(world, nukeSizes(g))) { packNeedsReload = true; log(`Unbound pack put into "${world}".`); }
         return 'singleplayer';
     } catch (e) { log(`Couldn't put the pack into the world: ${e.message}`); return 'world not found'; }
 }
@@ -1344,6 +1353,25 @@ async function disconnectTikTok() {
     setStatus({ tiktok: 'offline', tiktokError: null });
 }
 
+// ---------- Parkour Paradise 3: the map, the first time ----------
+// Already in your worlds: nothing to do. A zip of it in Downloads: put in place. Otherwise Hielke's page
+// opens in your browser, you press Download there, and it's picked up from Downloads by itself.
+let mapWaitCancelled = false;
+async function getParkourMap(g) {
+    if (!isParkour(g) || parkourWorld()) return;
+    const done = w => { pp3Seen = { at: 0, world: null }; connectMinecraft(); return w; };
+    setStatus({ play: { state: 'getting ready', step: 'Looking for Parkour Paradise 3…' } });
+    if (importFromDownloads(log)) return done();
+    log(`${PP3.name} (by ${PP3.by}) isn't on this PC yet: its page opened in your browser. Press Download there, and Unbound puts it in place by itself.`);
+    openMapPage();
+    mapWaitCancelled = false;
+    setStatus({ play: { state: 'getting ready', step: 'map', page: PP3.page } });
+    const w = await waitForParkourMap({ log, minutes: 20, isCancelled: () => mapWaitCancelled });
+    if (!w) throw new Error(mapWaitCancelled ? 'Stopped waiting for the map' : `${PP3.name} didn't arrive in your Downloads folder. Press Play to try again (or download it from ${PP3.page})`);
+    setStatus({ play: { state: 'getting ready', step: `${PP3.name} is ready. Opening it…` } });
+    done(w);
+}
+
 // ---------- Play: everything ready, then Minecraft opens ----------
 let playJob = null;
 async function playWhenReady(g) {
@@ -1352,7 +1380,7 @@ async function playWhenReady(g) {
     // waits up to 30 minutes while it's still getting there (Java, the server and the game's files can be
     // a few hundred MB), and stops at once if something's wrong
     const deadline = Date.now() + 30 * 60 * 1000;
-    const FAIL = ['world open in singleplayer', 'java missing', 'world failed', 'crashed', 'world not found', 'no world picked', 'eula not accepted'];
+    const FAIL = ['world open in singleplayer', 'java missing', 'world failed', 'crashed', 'world not found', 'no world picked', 'map missing', 'eula not accepted'];
     const is = s => localState === s || status.minecraft === s;
     while (status.minecraft !== 'connected' && Date.now() < deadline) {
         if (FAIL.some(is)) break;
@@ -1361,6 +1389,7 @@ async function playWhenReady(g) {
     if (status.minecraft !== 'connected') {
         const why = is('world open in singleplayer') ? 'That world is open in Minecraft singleplayer: close it (Save and Quit to Title), then press Play again'
             : is('java missing') ? "Java couldn't be downloaded (the Activity log in Look & settings says why). Check the PC is online and press Play again"
+            : is('map missing') ? `${PP3.name} isn't in your Minecraft worlds. Press Play to get it`
             : is('world not found') || is('no world picked') ? "Your world wasn't found. Pick your world again under Connects to, then press Play"
             : is('eula not accepted') ? 'Tick the Minecraft EULA box first'
             : is('crashed') ? `Minecraft's server stopped${localServer.problem() ? `: ${localServer.problem()}` : ''}. Press Play to try again; if it keeps happening, send the Activity log (Settings)`
@@ -1647,17 +1676,22 @@ const routes = {
     // itself. It answers straight away; how it's going is in status.play (the app's Play button shows it).
     'POST /api/minecraft/play': async () => {
         const g = activeGame();
+        // Parkour Paradise is always played on its map, in a world opened for gifts
+        if (isParkour(g) && !g.minecraft.single) { g.minecraft.single = true; saveGame(g); }
         if (!g || g.connector !== 'minecraft' || !isSingle(g)) throw new Error('Pick Singleplayer world for this game first');
-        if (!worldOf(g)) throw new Error('Pick your world first');
         if (!settings.mcEula) throw new Error('Tick the Minecraft EULA box first');
+        if (!worldOf(g) && !isParkour(g)) throw new Error('Pick your world first');
         if (!playJob) {
             setStatus({ play: { state: 'getting ready' } });
-            playJob = playWhenReady(g)
+            playJob = getParkourMap(g).then(() => playWhenReady(g))
                 .then(r => setStatus({ play: { state: 'opened', quick: r.quick, at: Date.now() } }), e => setStatus({ play: { state: 'failed', error: e.message, at: Date.now() } }))
                 .finally(() => { playJob = null; });
         }
         return { ok: true, started: true };
     },
+    'GET /api/minecraft/parkour-map': () => ({ world: findParkourMap(), name: PP3.name, by: PP3.by, page: PP3.page }),
+    'POST /api/minecraft/map-open': () => { openMapPage(); return { ok: true }; },
+    'POST /api/minecraft/map-cancel': () => { mapWaitCancelled = true; return { ok: true }; },
     'POST /api/minecraft/restart-world': async () => { await disconnectMinecraft(); await localServer.stop(); rconFor = null; connectMinecraft(); return { ok: true }; },
     // a level game's map back to how it was at the start: the world is closed, deleted and made again,
     // the levels built fresh, and everyone's back on level 1 with 0 fails / wipeouts (their scores are in
