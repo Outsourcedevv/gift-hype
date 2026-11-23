@@ -358,7 +358,7 @@ export const LAYOUT = [
     },
     {
         category: '✦ HELP', channels: [
-            { key: 'help', name: '🆘・help', type: 'forum', topic: helpGuide, tags: [['Setup', '⚙️'], ['TikTok', '🎵'], ['Minecraft', '⛏️'], ['Overlay', '📺'], ['Gifts & sounds', '🎁'], ['Solved', '✅', true]] },
+            { key: 'help', name: '🆘・help', type: 'forum', topic: helpGuide, tags: [['Setup', '⚙️'], ['TikTok', '🎵'], ['Minecraft', '⛏️'], ['Overlay', '📺'], ['Gifts & sounds', '🎁'], ['Solved', '✅']] },
             {
                 key: 'bugs', name: '🐛・bug-reports', type: 'forum',
                 topic: '**Found a bug?** One post per bug:\n• What you did\n• What you expected\n• What happened instead\n• Your Unbound version (Look & settings > Updates) and a screenshot',
