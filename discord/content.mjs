@@ -5,7 +5,7 @@
 // Images are files in ./assets.
 
 export const DOWNLOAD_URL = 'https://github.com/Outsourcedevv/gift-hype/archive/refs/heads/main.zip';
-export const VERSION = '2.26.2';
+export const VERSION = '2.26.3';
 
 export const C = {
     purple: 0x8b6cff, blue: 0x5d8bff, cyan: 0x22d3ee, pink: 0xff3d7f, orange: 0xff7a3d,
@@ -117,7 +117,7 @@ export const GAMES = [
         key: 'blockdelete', name: '💣・block-delete', role: 'g_blockdelete',
         topic: 'Block Delete Survival: chat deletes blocks, gifts drop nukes.',
         posts: [{ embeds: [game({
-            color: C.red, title: '💣 Block Delete Survival', image: 'cover-blockdelete.png',
+            color: C.red, title: '💣 Block Delete Survival', image: 'cover-blockdelete.jpg',
             description: 'Survive in your own world while chat takes it apart. Viewers **type a block** ("stone", "oak log", "logs") and after a countdown **every block of that kind around you is gone**, top of the world to the bottom.\n\nThen the gifts: a **nuke** that falls from the sky, goes up in a mushroom cloud and leaves a crater 290 blocks across. Jail. Lava chunks. Clearing your inventory. A trip to the End.',
             gifts: [['Galaxy', 'NUKE ☢️'], ['Rose', 'spawns a zombie'], ['Finger Heart', 'diamond kit'], ['Rosa', 'jail for 30s'], ['Perfume', 'clears your inventory'],
                 ['Doughnut / Hat and Mustache / Whale Diving', 'cobweb / lava / air chunk'], ['Corgi', 'teleport to the End'], ['Money Gun', 'god kit']],

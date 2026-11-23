@@ -1846,7 +1846,7 @@ const coverHtml = g => g.cover
   ? `<img src="/cover/${encodeURIComponent(g.id)}?v=${g.cover}" alt="" onerror="this.outerHTML='<div class=blank>'+this.dataset.name+'</div>'" data-name="${esc(esc(g.name))}">`
   : `<div class="blank">${esc(g.name)}</div>`;
 // A type's cover: its own picture, or the built-in one for Dropper / Block Delete / Parkour
-const TYPE_ART = [[/dropper/i, '/img/type-dropper.jpg'], [/wipe ?out/i, '/img/type-wipeout.jpg'], [/block delete/i, '/img/type-blockdelete.svg'], [/chunk chat/i, '/img/type-chunkchat.jpg'], [/chat teleport/i, '/img/type-chatteleport.jpg'], [/parkour/i, '/img/type-parkour.jpg']];
+const TYPE_ART = [[/dropper/i, '/img/type-dropper.jpg'], [/wipe ?out/i, '/img/type-wipeout.jpg'], [/block delete/i, '/img/type-blockdelete.jpg'], [/chunk chat/i, '/img/type-chunkchat.jpg'], [/chat teleport/i, '/img/type-chatteleport.jpg'], [/parkour/i, '/img/type-parkour.jpg']];
 const typeCoverHtml = m => {
   if (m.cover) return `<img src="/cover/${encodeURIComponent(game.id)}?mode=${encodeURIComponent(m.id)}&v=${encodeURIComponent(m.cover)}" alt="">`;
   const art = TYPE_ART.find(([re]) => re.test(m.name || ''));
