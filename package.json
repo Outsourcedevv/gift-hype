@@ -1,6 +1,6 @@
 {
   "name": "gift-hype",
-  "version": "2.26.1",
+  "version": "2.26.3",
   "description": "TikTok LIVE gifts trigger sounds and actions in your games",
   "type": "module",
   "main": "server.js",
