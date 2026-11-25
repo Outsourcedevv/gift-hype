@@ -1,6 +1,6 @@
 {
   "name": "gift-hype",
-  "version": "2.26.3",
+  "version": "2.27.0",
   "description": "TikTok LIVE gifts trigger sounds and actions in your games",
   "type": "module",
   "main": "server.js",
@@ -9,7 +9,9 @@
     "start": "node server.js"
   },
   "dependencies": {
+    "electron": "^45.5.0",
     "rcon-client": "^4.2.5",
+    "three": "^0.187.0",
     "tiktok-live-connector": "^2.5.0",
     "ws": "^8.18.0"
   }
