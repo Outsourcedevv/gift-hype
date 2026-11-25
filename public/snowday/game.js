@@ -3,7 +3,7 @@
 //
 // Unbound sends each gift's action over its game link (ws://127.0.0.1:<wsPort>) as
 // {"type":"gift","action":"snow","amount":100,"from":"name","image":"..."}. Actions:
-//   snow <amount>       a snowball falls from the sky and lands as that much snow
+//   snow <amount>       that much snow rises up out of the ground in front of you
 //   blizzard <seconds>  heavy snow falls all over the square
 //   santa <amount>      Santa's sleigh flies over dropping that much snow
 //   freeze <seconds>    the shovel freezes: it can't clear snow and you walk slower
@@ -706,6 +706,7 @@ function startSnow(L, li, x, z, edge) {
 function buildField(li, saved) {
     const L = LEVELS[li];
     if (F) for (const c of F.chunks) { scene.remove(c.mesh); c.mesh.geometry.dispose(); }
+    cellOps.length = 0;
     buildTown(L, li);
     const nx = Math.round(L.w / CELL), nz = Math.round(L.d / CELL), n = (nx + 1) * (nz + 1);
     const w = nx * CELL, d = nz * CELL;
@@ -922,6 +923,7 @@ function snowSpot(minD, maxD, m = 0.5) {
 
 // a melt gift: whole patches of snow vanish where you can see them (never behind you), not a thinner sheet
 function meltPatches(amount) {
+    if (!F.mark || F.mark.length !== F.v.length) F.mark = new Uint8Array(F.v.length);
     let got = 0;
     const big = amount > F.L.snow * 4000;
     for (let tries = 0; got < amount && tries < 4000; tries++) {
@@ -929,26 +931,26 @@ function meltPatches(amount) {
         if (!s) break;
         const [x, z] = s, R = big ? rand(3, 6.5) : rand(1.6, 3.6), [ix0, iz0, ix1, iz1] = range(x, z, R + 0.6);
         let here = 0;
+        const idx = [], amt = [];
         for (let iz = iz0; iz <= iz1 && got + here < amount; iz++) for (let ix = ix0; ix <= ix1; ix++) {
             const i = iz * (F.nx + 1) + ix;
-            if (F.v[i] <= 0 || Math.hypot(cellX(ix) - x, cellZ(iz) - z) > R + (F.lump[i] - 0.5) * 1.1 || !inView(cellX(ix), cellZ(iz), 75)) continue;
+            if (F.v[i] <= 0 || F.mark[i] || Math.hypot(cellX(ix) - x, cellZ(iz) - z) > R + (F.lump[i] - 0.5) * 1.1 || !inView(cellX(ix), cellZ(iz), 75)) continue;
             here += F.v[i];
-            F.v[i] = 0;
+            idx.push(i); amt.push(-F.v[i]);
+            F.mark[i] = 1;
         }
         if (!here) continue;
         got += here;
-        touched(ix0, iz0, ix1, iz1);
-        if (Math.random() < (big ? 0.25 : 1)) {
-            puff(x, z, 8, 2.5);
-            for (let k = 0; k < 3; k++) lumps.spawn(x + rand(-R, R) * 0.7, 0.2, z + rand(-R, R) * 0.7, rand(-1.5, 1.5), rand(2, 4), rand(-1.5, 1.5), rand(0.05, 0.1));
-        }
+        // it sinks away over a second or so, the patches one after another
+        cellOps.push({ idx, amt, k: -cellOps.length * 0.04, dur: 1.2, box: [ix0, iz0, ix1, iz1] });
     }
-    F.total -= got;
     return got;
 }
 // an avalanche: everything you can see within 28 m fills back up
 function avalanche(px, pz) {
-    const before = F.total, R = 28, cosV = Math.cos(halfView()), sx = -Math.sin(player.yaw), sz = -Math.cos(player.yaw);
+    const idx = [], amt = [];
+    let total = 0;
+    const R = 28, cosV = Math.cos(halfView()), sx = -Math.sin(player.yaw), sz = -Math.cos(player.yaw);
     const [ix0, iz0, ix1, iz1] = range(px, pz, R);
     for (let iz = iz0; iz <= iz1; iz++) for (let ix = ix0; ix <= ix1; ix++) {
         const i = iz * (F.nx + 1) + ix, dx = cellX(ix) - px, dz = cellZ(iz) - pz, dist = Math.hypot(dx, dz);
@@ -956,14 +958,16 @@ function avalanche(px, pz) {
         const c = (dx * sx + dz * sz) / dist;
         if (c < cosV) continue;
         const fill = F.L.snow * 1.3 * (0.8 + 0.4 * noise2(ix * CELL / 2.5, iz * CELL / 2.5, 99)) * Math.min(1, (R - dist) / 4, (dist - 2.2) / 1.5, (c - cosV) * 12);
-        F.v[i] = Math.max(F.v[i], fill);
+        if (fill > F.v[i]) { idx.push(i); amt.push(fill - F.v[i]); total += fill - F.v[i]; }
     }
-    F.total = sumSnow();
-    touched(ix0, iz0, ix1, iz1);
-    return F.total - before;
+    // it rises up over a second and a half
+    cellOps.push({ idx, amt, k: 0, dur: 1.5, box: [ix0, iz0, ix1, iz1] });
+    return total;
 }
 // a reset: all the snow comes back, fresh
 function resetSnow() {
+    cellOps.length = 0;
+    if (F.mark) F.mark.fill(0);
     F.v.set(F.base);
     F.total = sumSnow();
     for (let k = 0; k < F.chunks.length; k++) F.dirty.add(k);
@@ -1515,7 +1519,7 @@ function showBoard(seconds) {
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const balls = [];
 let sleighs = [];
-const ballMat = new THREE.MeshStandardMaterial({ color: 0xf8fbff, roughness: 0.85 });
+const cellOps = [];         // melts and avalanches in progress: { idx, amt, k, dur, box }
 
 function startLevel(i, saved = null) {
     state.level = i;
@@ -1558,7 +1562,7 @@ function levelCleared() {
 function updateGoal(t) {
     if (state.finishing) return;
     // a few specks left (and none landing) counts as clear: they melt so the counter reads 0
-    if (state.zeroSince === null && F.total <= ZERO_LEFT && !balls.length && !sleighs.length && state.blizzardUntil <= t && t - state.startedAt > 2) {
+    if (state.zeroSince === null && F.total <= ZERO_LEFT && !balls.length && !cellOps.length && !sleighs.length && state.blizzardUntil <= t && t - state.startedAt > 2) {
         if (F.total > 0) melt(F.total);
         state.zeroSince = t;
         sfx.chime(true);
@@ -1704,33 +1708,38 @@ function placeBeacons() {
 function landingSpot(sigma) {
     return snowSpot(4, 22, Math.min(sigma, 3) + 0.5);
 }
-function dropBall(amount, x, z, y = 34) {
+// gift snow rises up out of the ground over a second (no snowballs from the sky)
+const GROW = 1.1;
+const ease = k => k <= 0 ? 0 : k >= 1 ? 1 : k * k * (3 - 2 * k);
+function dropBall(amount, x, z) {
     const sigma = sigmaFor(amount);
     if (x === undefined) [x, z] = landingSpot(sigma);
-    const r = clamp(sigma * 0.75, 0.35, 4.5);
-    const m = new THREE.Mesh(new THREE.SphereGeometry(r, 18, 12), ballMat);
-    m.castShadow = true;
-    m.position.set(x, y, z);
-    scene.add(m);
-    balls.push({ m, amount, sigma, r, vy: -10 });
+    balls.push({ x, z, amount, sigma, k: 0 });
 }
 function updateBalls(dt) {
-    for (let k = balls.length - 1; k >= 0; k--) {
-        const b = balls[k];
-        b.vy -= 30 * dt;
-        b.m.position.y += b.vy * dt;
-        b.m.rotation.x += dt * 3;
-        if (b.m.position.y > b.r * 0.5) continue;
-        scene.remove(b.m);
-        b.m.geometry.dispose();
-        balls.splice(k, 1);
-        if (state.finishing) { state.pending.push({ action: 'snow', amount: b.amount, silent: true }); continue; }
-        addSnow(b.m.position.x, b.m.position.z, b.amount, b.sigma);
-        puff(b.m.position.x, b.m.position.z, Math.min(160, 20 + b.amount / 40), 2 + b.sigma * 2);
-        const near = Math.hypot(b.m.position.x - player.x, b.m.position.z - player.z);
-        const size = Math.log10(Math.max(10, b.amount)) - 1;
-        if (near < 10 + b.sigma * 3) shake(0.35, 0.03 + size * 0.04);
-        sfx.thump(size);
+    for (let i = balls.length - 1; i >= 0; i--) {
+        const b = balls[i];
+        if (state.finishing) { state.pending.push({ action: 'snow', amount: b.amount * (1 - ease(b.k)), silent: true }); balls.splice(i, 1); continue; }
+        const k = Math.min(1, b.k + dt / GROW);
+        addSnow(b.x, b.z, b.amount * (ease(k) - ease(b.k)), b.sigma);
+        b.k = k;
+        if (k >= 1) balls.splice(i, 1);
+    }
+    // melts sinking away and avalanches rising, point by point
+    for (let n = cellOps.length - 1; n >= 0; n--) {
+        const op = cellOps[n], k = Math.min(1, op.k + dt / op.dur), d = ease(k) - ease(op.k);
+        let change = 0;
+        for (let j = 0; j < op.idx.length; j++) {
+            const i = op.idx[j], before = F.v[i];
+            let v = op.amt[j] > 0 ? Math.min(MAX_V, before + op.amt[j] * d) : Math.max(0, before + op.amt[j] * d);
+            if (k >= 1 && op.amt[j] < 0) { if (v < 0.5) v = 0; F.mark[i] = 0; }
+            F.v[i] = v;
+            change += v - before;
+        }
+        F.total += change;
+        touched(...op.box);
+        op.k = k;
+        if (k >= 1) cellOps.splice(n, 1);
     }
 }
 function shake(seconds, power) {
@@ -1763,7 +1772,7 @@ function updateSleighs(dt) {
         while (k.dropped < Math.floor(done * k.drops)) {
             k.dropped++;
             const a = rand(-2.5, 2.5), x = k.s.position.x + k.f.x * a, z = k.s.position.z + k.f.z * a;
-            if (inField(x, z, 1)) dropBall(k.amount / k.drops, x, z, k.s.position.y - 1);
+            if (inField(x, z, 1)) dropBall(k.amount / k.drops, x, z);
             else dropBall(k.amount / k.drops);
         }
         if (k.u > 96) {
@@ -1812,7 +1821,6 @@ function gift(msg) {
             const got = meltPatches(amount);
             credit(state.removers, from, got);
             pop(`-${fmt(got)}`, `${from} melted snow`, image, 'good');
-            flash('#ffb347');
             sfx.chime(true);
             break;
         }
@@ -1820,10 +1828,8 @@ function gift(msg) {
             const got = avalanche(player.x, player.z);
             credit(state.adders, from, got);
             pop(`+${fmt(got)}`, `${from}: AVALANCHE!`, image, 'bad');
-            shake(2.2, 0.12);
-            flash('#ffffff');
+            shake(1.2, 0.05);
             sfx.rumble();
-            for (let k = 0; k < 40; k++) puff(player.x + rand(-25, 25), player.z + rand(-25, 25), 10, 4);
             break;
         }
         default:
