@@ -2014,6 +2014,10 @@ function renderConnector() {
   const m = game.minecraft;
   if (game.connector === 'minecraft') {
     renderMinecraftBox();
+  } else if (game.connector === 'websocket' && /snow day/i.test(game.name)) {
+    box.innerHTML = `<p class="hint">Press <b>Play Snow Day</b>: the game opens as its own app and connects by itself (the first time it downloads about 100 MB). Status: <b id="wsCount"></b></p>
+    <p class="hint">Give a gift <b>Send to my game</b> with one of these action names: <code>snow</code> (drops that much snow), <code>blizzard</code> (seconds of heavy snow),
+    <code>santa</code> (Santa drops that much snow), <code>freeze</code> (seconds the shovel is frozen), <code>melt</code> (melts that much snow, to help you) or <code>avalanche</code> (fills everything near you again).</p>`;
   } else if (game.connector === 'websocket') {
     const port = settings.wsPort;
     box.innerHTML = `<p class="hint">Your game connects to <code>ws://127.0.0.1:${port}</code> and gets a message like <code>{"type":"gift","action":"spawnEnemy","amount":3,"gift":"Rose","from":"name"}</code> for every gift action. Status: <b id="wsCount"></b></p>
@@ -2041,6 +2045,19 @@ let playing_ = false;
 function renderPlay() {
   const box = $('playBox');
   if (!box) return;
+  if (game && game.connector === 'websocket' && /snow day/i.test(game.name)) {
+    // Snow Day: the 3D Christmas game opens in its own window and connects by itself
+    box.innerHTML = `<button class="hot play-btn" id="playSnow" title="Opens Snow Day in its own window. Gifts drop snow on the village square while you shovel it">Play Snow Day</button>`;
+    $('playSnow').onclick = async () => {
+      try {
+        await flushSave();
+        const r = await api('/api/snowday/open', {});
+        toast(r.state === 'downloading' ? 'Downloading Snow Day (first time only, about 100 MB). It opens by itself when it\'s ready' : 'Snow Day is opening. Click in its window to start shovelling');
+      }
+      catch (e) { toast(e.message, true); }
+    };
+    return;
+  }
   if (!game || game.connector !== 'minecraft' || !(game.minecraft.single || isDropperMode())) { box.innerHTML = ''; return; }
   box.innerHTML = `<button class="hot play-btn" id="playMc" title="Gets everything ready (the first time it downloads what's needed), then opens Minecraft straight into your world" ${playing_ ? 'disabled' : ''}>${playing_ ? 'Opening your world…' : 'Play Minecraft'}</button>`;
   $('playMc').onclick = async () => {

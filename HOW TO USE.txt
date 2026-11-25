@@ -251,6 +251,27 @@ THE DROPPER (Minecraft -> Dropper)
     Lots of punches wait their turn (up to 2000) and keep coming until they're all done, even
     after a wipeout or a death.
 
+SNOW DAY (a Christmas game of its own, no Minecraft needed)
+  Click the Snow Day cover, then Play Snow Day. It opens as its own app (its own window, not a
+  browser; the first time it downloads about 100 MB). Click in it to start. F11 = full screen.
+  You push the snow off a Christmas town square with a big red snow pusher: the big tree in the
+  middle, paths, pines, lampposts, benches, snowmen and parked cars, houses all round the edge.
+  SNOW LEFT counts down; clear it all to beat the level. 5 levels, and the town gets bigger every
+  level (72 x 52 m on level 1, up to 164 x 116 m and nearly 4 million snow on level 5).
+  Your viewers pile snow back on, or melt it to help you: the number and their name pop up.
+  At the end of a level: the biggest snow adders and the biggest melters.
+  Keys: W A S D move, Shift run, mouse to look, R restart the level, M music on/off,
+  N sunny day / Christmas night, F11 full screen, Esc pause.
+  Each gift's action is "Send to my game" with one of these names (the amount is how much):
+    snow       a snowball drops that much snow          blizzard   that many seconds of heavy snow
+    santa      Santa flies over dropping that much     freeze     the shovel freezes for that many seconds
+    melt       melts that much snow (helps you)        avalanche  everything near you fills up again
+  It starts with: Follow / Rose +100, Finger Heart +1,000, Doughnut +5,000, Rosa frozen shovel,
+  Perfume blizzard, Hat and Mustache Santa +20,000, Corgi avalanche, GG melts 500, Money Gun melts 50,000.
+  Your level and the snow are kept when you close it. Stream the Snow Day window like any game.
+  The 3D models are made in Blender: snowday/blender/make_models.py builds them all again
+  (blender -b --python snowday/blender/make_models.py -- public/snowday/models).
+
 GIFTS
   + Add gift / Browse all gifts   - every TikTok gift with its picture and price (new ones, like a
                                     new campaign's, are added by themselves when Unbound opens)
