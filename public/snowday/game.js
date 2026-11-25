@@ -1236,6 +1236,7 @@ const keys = new Set();
 let locked = false;
 const BLADE_AHEAD = 2.0;                 // metres in front of you where the blade clears
 const BLADE_IN = 1.05;                   // hold right click: the shovel comes back to here, lifted over the snow
+const BLADE_OUT = 2.75;                  // let go: it shoves out this far (1.7 m, a bit more than the shovel), then settles back
 let pullHeld = false;
 const HOLD = new THREE.Vector3(0, -0.6, -2.55), TILT = 0.36;
 
@@ -1329,6 +1330,7 @@ function resetPlayer() {
     player.x = 0; player.z = F.d / 2 - 2; player.yaw = 0; player.pitch = -0.42; player.load = 0; player.lastYaw = 0; player.turn = 0;
     lastBlade = null;
     player.reach = BLADE_AHEAD;
+    player.jab = 0;
 }
 
 function updatePlayer(dt, t) {
@@ -1364,10 +1366,12 @@ function updatePlayer(dt, t) {
     // hold right click: the shovel comes back to you, lifted over the snow. Let go and it shoots back
     // out, scooping everything in its way
     const pulling = pullHeld && !frozen;
-    const wasIn = player.reach < BLADE_AHEAD - 0.01;
-    if (pulling) player.reach = Math.max(BLADE_IN, player.reach - 4.5 * dt);
-    else if (wasIn) { player.reach = Math.min(BLADE_AHEAD, player.reach + 13 * dt); player.jab = Math.max(player.jab, 1); }
-    const jabbing = !pulling && wasIn;
+    // player.jab: 1 while it's shoving out, -1 while it settles back to where it rests
+    if (pulling) { player.reach = Math.max(BLADE_IN, player.reach - 4.5 * dt); player.jab = player.reach < BLADE_AHEAD - 0.01 ? 1 : 0; }
+    else if (player.jab === 1) player.reach = Math.min(BLADE_OUT, player.reach + 14 * dt);
+    else if (player.jab === -1) { player.reach = Math.max(BLADE_AHEAD, player.reach - 3.5 * dt); if (player.reach <= BLADE_AHEAD) player.jab = 0; }
+    const jabbing = !pulling && player.jab === 1, landed = jabbing && player.reach >= BLADE_OUT;
+    if (landed) player.jab = -1;
     const pull = clamp((BLADE_AHEAD - player.reach) / (BLADE_AHEAD - BLADE_IN), 0, 1) * (pulling ? 1 : 0.6);
     // the blade clears everything it passes over (in small steps so running doesn't skip any)
     const b = new THREE.Vector3(player.x, 0, player.z).addScaledVector(f, player.reach);
@@ -1408,7 +1412,7 @@ function updatePlayer(dt, t) {
     lastBlade = b;
     if (jabbing) state.jabGot = (state.jabGot || 0) + got;
     // the shove lands: a kick, a thump and the scooped snow bursting off the front
-    if (!pulling && wasIn && player.reach >= BLADE_AHEAD) {
+    if (landed) {
         anim.kickV -= 1.4;
         const g = state.jabGot || 0;
         if (g > 0) {
@@ -1429,8 +1433,8 @@ function updatePlayer(dt, t) {
 
     // you stand on top of the snow
     player.y += (EYE + depthAt(player.x, player.z) * UNIT_H - player.y) * Math.min(1, dt * 8);
-    const shake = state.shakeUntil > t ? (state.shakeUntil - t) * state.shakePower : 0;
-    camera.position.set(player.x + rand(-1, 1) * shake, player.y + rand(-1, 1) * shake, player.z);
+    const wobble = state.shakeUntil > t ? (state.shakeUntil - t) * state.shakePower : 0;
+    camera.position.set(player.x + rand(-1, 1) * wobble, player.y + rand(-1, 1) * wobble, player.z);
     camera.rotation.set(player.pitch, player.yaw, 0);
     // a reset: the camera flies up to show the whole town snowed over again, then comes back down
     const air = state.aerialUntil > t ? Math.sin(clamp(1 - (state.aerialUntil - t) / 5, 0, 1) * PI) : 0;
