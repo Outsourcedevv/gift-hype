@@ -485,7 +485,7 @@ def shovel():
     red = mat('blade', '#e0161e', rough=0.38, metal=0.05)
     steel = mat('steel', '#c9d0d8', rough=0.25, metal=0.95)
     black = mat('grip', '#141414', rough=0.55)
-    W, R, T, TH = 1.05, 0.6, 0.02, 0.42   # blade width, curve radius, thickness, half the arc (radians)
+    W, R, T, TH = 1.45, 0.62, 0.022, 0.46   # blade width, curve radius, thickness, half the arc (radians)
     # the curved sheet, about half a metre tall: an arc in the YZ plane swept along X, hollow side
     # to the front (it scoops the snow), round back towards you
     n = 14

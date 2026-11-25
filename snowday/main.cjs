@@ -33,14 +33,16 @@ function open() {
     });
     Menu.setApplicationMenu(null);
     win.once('ready-to-show', () => { win.maximize(); win.show(); });
-    win.loadURL(`snowday://app/index.html?ws=${wsPort()}`);
+    win.loadURL(`snowday://app/index.html?ws=${wsPort()}${process.env.SNOWDAY_JS ? '&test' : ''}`);
     // links never open inside the game
     win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
     win.webContents.on('will-navigate', e => e.preventDefault());
-    // (for testing) SNOWDAY_SHOT=<file.png>: saves a picture of the window after a few seconds and closes
+    // (for testing) SNOWDAY_SHOT=<file.png>: saves a picture of the window after a few seconds and closes;
+    // SNOWDAY_JS=<file.js>: runs that script in the game first (it's given the test hooks) and prints its result
     if (process.env.SNOWDAY_SHOT) {
         win.webContents.once('did-finish-load', () => setTimeout(async () => {
             await win.webContents.executeJavaScript("document.getElementById('start').classList.add('hidden'); window.__err = document.querySelector('pre')?.textContent || ''; window.__err");
+            if (process.env.SNOWDAY_JS) console.log('JS', await win.webContents.executeJavaScript(`(async () => { ${fs.readFileSync(process.env.SNOWDAY_JS, 'utf8')} })()`).catch(e => 'ERROR ' + e.message));
             setTimeout(async () => {
                 const err = await win.webContents.executeJavaScript('window.__err + (document.querySelector("pre")?.textContent || "") + " | link: " + document.getElementById("linkText").textContent + " | snow: " + document.getElementById("count").textContent');
                 fs.writeFileSync(process.env.SNOWDAY_SHOT, (await win.webContents.capturePage()).toPNG());

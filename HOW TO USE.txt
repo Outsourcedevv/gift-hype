@@ -256,10 +256,11 @@ SNOW DAY (a Christmas game of its own, no Minecraft needed)
   browser; the first time it downloads about 100 MB). Click in it to start. F11 = full screen.
   You push the snow off a Christmas town square with a big red snow pusher: the big tree in the
   middle, paths, pines, lampposts, benches, snowmen and parked cars, houses all round the edge.
-  SNOW LEFT counts down; clear it all to beat the level. 5 levels, and the town gets bigger every
-  level (72 x 52 m on level 1, up to 164 x 116 m and nearly 4 million snow on level 5).
+  One big town square (150 x 106 m) with 1,000,000 snow. SNOW LEFT counts down; clear it all
+  to win, then the snow comes back for another round. You walk steadily and the shovel can only
+  push so much at a time, so deep piles from gifts take a while.
   Your viewers pile snow back on, or melt it to help you: the number and their name pop up.
-  At the end of a level: the biggest snow adders and the biggest melters.
+  When it's all cleared: the biggest snow adders and the biggest melters.
   Keys: W A S D move, Shift run, mouse to look, R restart the level, M music on/off,
   N sunny day / Christmas night, F11 full screen, Esc pause.
   Each gift's action is "Send to my game" with one of these names (the amount is how much):
