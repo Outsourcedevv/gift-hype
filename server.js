@@ -268,7 +268,7 @@ const SNOW_DAY_RULES = [
     { gift: 'Finger Heart', sound: 'builtin/vine-boom.mp3', label: '+1,000 snow', actions: [snowAction('snow', 1000)] },
     { gift: 'Rosa', sound: 'builtin/wrong-buzzer.mp3', label: 'Frozen shovel 10s', perCount: false, actions: [snowAction('freeze', 10)] },
     { gift: 'Perfume', sound: 'builtin/whoosh.mp3', label: 'Blizzard 15s', perCount: false, actions: [snowAction('blizzard', 15)] },
-    { gift: 'Doughnut', sound: 'builtin/fahh.mp3', label: 'Giant snowball +5,000', actions: [snowAction('snow', 5000)] },
+    { gift: 'Doughnut', sound: 'builtin/fahh.mp3', label: 'Big snow pile +5,000', actions: [snowAction('snow', 5000)] },
     { gift: 'Hat and Mustache', sound: 'builtin/anime-wow.mp3', label: 'Santa drops +20,000', actions: [snowAction('santa', 20000)] },
     { gift: 'Corgi', sound: 'builtin/nooo.mp3', label: 'AVALANCHE', perCount: false, actions: [snowAction('avalanche', 1)] },
     { gift: 'Money Gun', sound: 'builtin/here-comes-the-money.mp3', label: 'Melts 50,000 snow', actions: [snowAction('melt', 50000)] },

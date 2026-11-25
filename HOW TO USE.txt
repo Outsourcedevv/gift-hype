@@ -270,7 +270,7 @@ SNOW DAY (a Christmas game of its own, no Minecraft needed)
   round, hold right click to pull the shovel in (lifted over the snow) and let go to shove it out
   scooping everything in its way, R restart the level, M music on/off, N sunny day / Christmas night, F11 full screen, Esc pause.
   Each gift's action is "Send to my game" with one of these names (the amount is how much):
-    snow       a snowball drops that much snow          blizzard   that many seconds of heavy snow
+    snow       that much snow rises up in front of you  blizzard   that many seconds of heavy snow
     santa      Santa flies over dropping that much     freeze     the shovel freezes for that many seconds
     melt       melts that much snow (helps you)        avalanche  everything in front of you fills up
     reset      SAVE? countdown of that many seconds    save       stops a reset (or gives a shield)
