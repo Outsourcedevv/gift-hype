@@ -2017,7 +2017,7 @@ function renderConnector() {
   } else if (game.connector === 'websocket' && /snow day/i.test(game.name)) {
     box.innerHTML = `<p class="hint">Press <b>Play Snow Day</b>: the game opens as its own app and connects by itself (the first time it downloads about 100 MB). Status: <b id="wsCount"></b></p>
     <p class="hint">Give a gift <b>Send to my game</b> with one of these action names: <code>snow</code> (drops that much snow), <code>blizzard</code> (seconds of heavy snow),
-    <code>santa</code> (Santa drops that much snow), <code>freeze</code> (seconds the shovel is frozen), <code>melt</code> (melts that much snow, to help you) or <code>avalanche</code> (fills everything near you again).</p>`;
+    <code>santa</code> (Santa drops that much snow), <code>freeze</code> (seconds the shovel is frozen), <code>melt</code> (melts that much snow, to help you), <code>avalanche</code> (fills everything in front of you again), <code>reset</code> (a SAVE? countdown of that many seconds, then all the snow comes back) or <code>save</code> (stops a reset).</p>`;
   } else if (game.connector === 'websocket') {
     const port = settings.wsPort;
     box.innerHTML = `<p class="hint">Your game connects to <code>ws://127.0.0.1:${port}</code> and gets a message like <code>{"type":"gift","action":"spawnEnemy","amount":3,"gift":"Rose","from":"name"}</code> for every gift action. Status: <b id="wsCount"></b></p>
