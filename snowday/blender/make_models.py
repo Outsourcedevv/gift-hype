@@ -485,7 +485,7 @@ def shovel():
     red = mat('blade', '#e0161e', rough=0.38, metal=0.05)
     steel = mat('steel', '#c9d0d8', rough=0.25, metal=0.95)
     black = mat('grip', '#141414', rough=0.55)
-    W, R, T, TH = 1.45, 0.62, 0.022, 0.46   # blade width, curve radius, thickness, half the arc (radians)
+    W, R, T, TH = 2.1, 0.62, 0.022, 0.46    # blade width, curve radius, thickness, half the arc (radians)
     # the curved sheet, about half a metre tall: an arc in the YZ plane swept along X, hollow side
     # to the front (it scoops the snow), round back towards you
     n = 14
@@ -525,6 +525,8 @@ def shovel():
     box(steel, (0, 0.05, 0.015), (W, 0.03, 0.03))
     # a brace on the back where the pole meets the blade
     box(rib, (0, -0.05, H * 0.5), (0.2, 0.07, 0.3))
+    for x in (-W * 0.3, W * 0.3):          # two more braces keep the wide blade stiff
+        box(rib, (x, -0.04, H * 0.5), (0.05, 0.05, H * 0.8))
     cyl(steel, (0, -0.09, H * 0.55), 0.03, 0.1, verts=12, rot=(1.1, 0, 0), smooth=True)
     # the pole and the D-grip
     base, top = (0.0, -0.1, H * 0.58), (0.30, -1.50, 0.66)

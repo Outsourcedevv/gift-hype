@@ -8,8 +8,12 @@
 //   santa <amount>      Santa's sleigh flies over dropping that much snow
 //   freeze <seconds>    the shovel freezes: it can't clear snow and you walk slower
 //   melt <amount>       a warm spell melts that much snow (helps you)
-//   avalanche           everything around you fills up again
+//   avalanche           everything in front of you fills up again
+//   reset <seconds>     a SAVE? countdown starts: if nobody sends the save gift in time, all the snow comes back
+//   save                stops the reset countdown (with none running, it gives a shield that blocks the next one)
 // Anything else counts as snow with its amount.
+//
+// Get it to 0 and hold it there for 15 seconds to win: any snow that lands stops the clock until it's cleared.
 //
 // The models are made in Blender (snowday/blender/make_models.py) and loaded from models/.
 
@@ -19,6 +23,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 
 const $ = id => document.getElementById(id);
 const PI = Math.PI, UP = new THREE.Vector3(0, 1, 0);
@@ -39,13 +44,16 @@ function seeded(seed) {
     };
 }
 
-// ---------------------------------------------------------------- the level: one big town square, 1,000,000 snow
+// ---------------------------------------------------------------- the level: one big town, 1,500,000 snow
 const CELL = 0.3;           // the snow is a grid of points this far apart (metres)
 const CHUNK = 40;           // the snow is drawn in pieces of 40 x 40 points
-const SNOW_TOTAL = 1000000; // how much snow the square starts with
-const DEPTH = 0.22;         // how deep it lies on average (metres)
-const CLEAR_RATE = 700;     // the most snow the shovel can push away a second (deep piles take longer)
-const LEVELS = [{ w: 150, d: 106, snow: 1 }];
+const SNOW_TOTAL = 1500000; // how much snow the town starts with
+const DEPTH = 0.13;         // how deep it lies on average (metres): a thin layer
+const CLEAR_RATE = 1100;    // the most snow the shovel can push away a second (deep piles take longer)
+const BLADE_HALF = 1.1;     // half the blade's width (metres): it clears a 2.2 m strip
+const HOLD_ZERO = 15;       // seconds to hold the snow at 0 to win
+const ZERO_LEFT = 25;       // this little left (a few specks) counts as 0
+const LEVELS = [{ w: 240, d: 170, snow: 1 }];
 let UNIT_H = 0.012, MAX_V = 300;   // metres per snow and the deepest a point gets: worked out for the level
 
 // ---------------------------------------------------------------- renderer, scene, camera
@@ -89,6 +97,22 @@ composer.addPass(new RenderPass(scene, camera));
 // a soft glow on the lights only (not the snow)
 const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.32, 0.45, 0.96);
 composer.addPass(bloom);
+// colour grade: richer colours (the red shovel, green grass, blue sky), a touch more contrast, soft dark corners
+const grade = new ShaderPass({
+    uniforms: { tDiffuse: { value: null }, sat: { value: 1.32 }, contrast: { value: 1.08 }, vignette: { value: 0.28 } },
+    vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader: `uniform sampler2D tDiffuse; uniform float sat; uniform float contrast; uniform float vignette; varying vec2 vUv;
+      void main(){
+        vec4 c = texture2D(tDiffuse, vUv);
+        float l = dot(c.rgb, vec3(0.2126, 0.7152, 0.0722));
+        vec3 col = max(mix(vec3(l), c.rgb, sat), 0.0);
+        col = pow(col, vec3(contrast)) * pow(0.6, contrast - 1.0);
+        vec2 d = vUv - 0.5;
+        col *= 1.0 - vignette * smoothstep(0.35, 0.85, length(d * vec2(1.1, 1.0)));
+        gl_FragColor = vec4(col, c.a);
+      }`,
+});
+composer.addPass(grade);
 composer.addPass(new OutputPass());
 
 addEventListener('resize', () => {
@@ -202,8 +226,8 @@ const auroraU = { time: { value: 0 } };
 // sunny winter afternoon (like the streams) or a Christmas night: N switches
 const TIMES = {
     day: {
-        hor: [0.62, 0.82, 0.93], mid: [0.25, 0.55, 0.86], top: [0.06, 0.28, 0.72], fog: [0.72, 0.82, 0.92], fogDensity: 0.0026,
-        hemiSky: 0x9cc8f0, hemiGround: 0xf4efe6, hemi: 1.05, sun: 0xfff3e0, sunI: 2.6, exposure: 1.0, bloom: 0.22, lamps: 0, disc: [5, 4.8, 4.4], discR: 1.2,
+        hor: [0.55, 0.78, 0.96], mid: [0.16, 0.46, 0.92], top: [0.03, 0.2, 0.78], fog: [0.66, 0.8, 0.96], fogDensity: 0.0022,
+        hemiSky: 0x8cc4ff, hemiGround: 0xf6eee0, hemi: 1.0, sun: 0xffefd6, sunI: 2.8, exposure: 1.02, bloom: 0.24, lamps: 0, disc: [5, 4.8, 4.4], discR: 1.2,
         haloColour: 'rgba(255,250,235,0.55)', night: false,
     },
     night: {
@@ -432,7 +456,7 @@ function addSparkle(material, density) {
 }
 
 // ---------------------------------------------------------------- the land around the town: hills, then mountains
-const FLAT_X = 165, FLAT_Z = 135;            // the town sits on flat ground this big (half sizes)
+const FLAT_X = 190, FLAT_Z = 155;            // the town sits on flat ground this big (half sizes)
 function fbm(x, z, oct = 4) { let v = 0, a = 0.5, f = 1; for (let i = 0; i < oct; i++) { v += a * noise2(x * f, z * f, 3 + i); f *= 2.03; a *= 0.5; } return v; }
 const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 function terrainH(x, z) {
@@ -474,7 +498,7 @@ const loader = new GLTFLoader();
 const MODEL_NAMES = ['house_red', 'house_cream', 'house_blue', 'house_green', 'tree_big', 'pine', 'pine_tall', 'snowman', 'lamppost', 'presents',
     'candy_cane', 'fence', 'shovel', 'sleigh', 'car_red', 'car_green', 'car_silver', 'bench', 'tree_bare', 'tree_bare2', 'church'];
 const models = {};
-const MODELS_VERSION = 5;          // bump when the Blender models change
+const MODELS_VERSION = 6;          // bump when the Blender models change
 const T = (x, y, z, ry = 0, s = 1) => new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromAxisAngle(UP, ry), new THREE.Vector3(s, s, s));
 // facing: a model's front is +Z; this turns it to face (dx, dz)
 const face = (dx, dz) => Math.atan2(dx, dz);
@@ -497,14 +521,10 @@ function instanced(model, transforms, { cast = true, receive = true } = {}) {
 }
 
 // ---------------------------------------------------------------- the town (rebuilt for each level's size)
-// Inside the fence: a street all round the edge, a cross of paths and a plaza with the big tree in the
-// middle; grass between them with pines, lampposts, benches, snowmen, presents and parked cars.
-// Outside: houses along every side, then forest and mountains.
-const STREET = 4, PATH = 1.9, PLAZA = 9, RING = 12.5;
-function isPath(L, x, z) {
-    const ex = L.w / 2 - Math.abs(x), ez = L.d / 2 - Math.abs(z), r = Math.hypot(x, z);
-    return ex < STREET || ez < STREET || Math.abs(x) < PATH || Math.abs(z) < PATH || r < RING;
-}
+// Inside the fence, under the snow: a street all round the edge, a cross of paths and a round plaza,
+// grass between them, and nothing standing on it. Outside: lampposts, the big tree, houses with cars
+// and snowmen out front, then forest and mountains.
+const STREET = 4, PATH = 1.9, RING = 12.5;
 
 let town = null;            // { group, colliders: [{x, z, r}], lamps: [[x, z]] }
 const lights = [];
@@ -558,88 +578,48 @@ function buildTown(L, li) {
         scene.remove(town.group);
         town.group.traverse(o => { if (o.isInstancedMesh) o.dispose(); if (o.userData.own) o.geometry.dispose(); });
     }
+    // Nothing stands on the snow: it's one open field to clear. Everything else is outside the fence.
     const group = new THREE.Group(), colliders = [], lamps = [], r = seeded(1000 + li * 77);
     const put = {};          // model name -> transforms
     const add = (name, x, z, ry = 0, s = 1) => (put[name] ||= []).push(T(x, 0, z, ry, s));
     const hw = L.w / 2, hd = L.d / 2;
-    const free = (x, z, rad) => !colliders.some(c => Math.hypot(c.x - x, c.z - z) < c.r + rad) && Math.hypot(x, z - hd + 2) > 6;
 
     // the ground you uncover
     groundMeshes(L, group);
-
-    // the big tree in the middle, candy canes round it, presents underneath
-    add('tree_big', 0, 0, 0, 1.3);
-    colliders.push({ x: 0, z: 0, r: 4.6 });
-    for (let k = 0; k < 10; k++) {
-        const a = k / 10 * 2 * PI, x = Math.cos(a) * 6.6, z = Math.sin(a) * 6.6;
-        add('candy_cane', x, z, -a, 1.2);
-        colliders.push({ x, z, r: 0.35 });
-    }
-    for (let k = 0; k < 5; k++) { const a = k / 5 * 2 * PI + 0.3; add('presents', Math.cos(a) * 4.9, Math.sin(a) * 4.9, a * 2, 0.9); }
-    // benches round the plaza, facing the tree
-    for (let k = 0; k < 8; k++) {
-        const a = (k + 0.5) / 8 * 2 * PI, x = Math.cos(a) * 10.6, z = Math.sin(a) * 10.6;
-        add('bench', x, z, face(-x, -z) + PI);
-        colliders.push({ x, z, r: 0.95 });
-    }
-    // lampposts along both sides of the paths, and round the plaza
-    for (let d = RING + 5; d < Math.max(hw, hd) - STREET; d += 11) for (const s of [-1, 1]) {
-        if (d < hw - STREET) { lamps.push([s * d, PATH + 0.7], [s * d, -PATH - 0.7]); }
-        if (d < hd - STREET) { lamps.push([PATH + 0.7, s * d], [-PATH - 0.7, s * d]); }
-    }
-    for (let k = 0; k < 8; k++) { const a = k / 8 * 2 * PI + PI / 8; lamps.push([Math.cos(a) * (RING + 0.6), Math.sin(a) * (RING + 0.6)]); }
-    for (let x = -hw + 8; x <= hw - 8; x += 14) lamps.push([x, -hd + 0.6], [x, hd - 0.6]);
-    for (let z = -hd + 10; z <= hd - 10; z += 14) lamps.push([-hw + 0.6, z], [hw - 0.6, z]);
-    for (const [x, z] of lamps) { add('lamppost', x, z, face(-x, -z)); colliders.push({ x, z, r: 0.3 }); }
-
-    // parked cars along the street
-    const cars = ['car_red', 'car_green', 'car_silver'];
-    for (let x = -hw + 7; x < hw - 7; x += r(9, 16)) for (const s of [-1, 1]) {
-        if (Math.abs(x) < 6 || r() < 0.45) continue;
-        const z = s * (hd - 1.4), ry = r() < 0.5 ? PI / 2 : -PI / 2;
-        if (!free(x, z, 2.4)) continue;
-        add(cars[Math.floor(r(0, 3))], x, z, ry);
-        for (const o of [-1.4, 0, 1.4]) colliders.push({ x: x + o, z, r: 1.0 });
-    }
-    for (let z = -hd + 9; z < hd - 9; z += r(10, 16)) for (const s of [-1, 1]) {
-        if (r() < 0.5) continue;
-        const x = s * (hw - 1.4);
-        if (!free(x, z, 2.4)) continue;
-        add(cars[Math.floor(r(0, 3))], x, z, r() < 0.5 ? 0 : PI);
-        for (const o of [-1.4, 0, 1.4]) colliders.push({ x, z: z + o, r: 1.0 });
-    }
-
-    // pines, snowmen and presents on the grass
-    const area = L.w * L.d;
-    const scatter = (n, rad, fn) => {
-        for (let k = 0, tries = 0; k < n && tries < n * 40; tries++) {
-            const x = r(-hw + STREET + rad, hw - STREET - rad), z = r(-hd + STREET + rad, hd - STREET - rad);
-            if (isPath(L, x, z) || isPath(L, x + rad, z) || isPath(L, x - rad, z) || isPath(L, x, z + rad) || isPath(L, x, z - rad) || !free(x, z, rad + 1.2)) continue;
-            // fn may return a wider blocking radius (a tree's branches) and the snow-free patch under it
-            const c = fn(x, z) || {};
-            colliders.push({ x, z, r: c.r || rad, snow: c.snow });
-            k++;
-        }
-    };
-    scatter(Math.round(area / 240), 2.4, (x, z) => { const sc = r(0.85, 1.35); add('pine', x, z, r(0, 6), sc); return { r: 1.75 * sc, snow: 0.9 * sc }; });
-    scatter(Math.round(area / 1100) + 2, 0.75, (x, z) => add('snowman', x, z, face(-x, -z) + r(-0.6, 0.6)));
-    scatter(Math.round(area / 1500) + 1, 0.9, (x, z) => add('presents', x, z, r(0, 6), 0.9));
 
     // the fence round the edge
     const fx = hw + 0.3, fz = hd + 0.3;
     for (let x = -hw + 1; x < hw; x += 2) { add('fence', x, -fz, 0); add('fence', x, fz, PI); }
     for (let z = -hd + 1; z < hd; z += 2) { add('fence', -fx, z, PI / 2); add('fence', fx, z, -PI / 2); }
 
-    // houses along every side, facing in, then the forest
-    const houses = ['house_red', 'house_cream', 'house_blue', 'house_green'];
+    // lampposts just outside the fence, shining in
+    for (let x = -hw + 8; x <= hw - 8; x += 14) lamps.push([x, -fz - 1.2], [x, fz + 1.2]);
+    for (let z = -hd + 10; z <= hd - 10; z += 14) lamps.push([-fx - 1.2, z], [fx + 1.2, z]);
+    for (const [x, z] of lamps) add('lamppost', x, z, face(-x, -z));
+
+    // the big Christmas tree outside the north fence, straight ahead when you start, with candy canes and presents
+    const tree = [0, -fz - 9];
+    add('tree_big', tree[0], tree[1], 0, 1.4);
+    for (let k = 0; k < 10; k++) { const a = k / 10 * 2 * PI; add('candy_cane', tree[0] + Math.cos(a) * 6.8, tree[1] + Math.sin(a) * 6.8, -a, 1.2); }
+    for (let k = 0; k < 6; k++) { const a = k / 6 * 2 * PI + 0.3; add('presents', tree[0] + Math.cos(a) * 5, tree[1] + Math.sin(a) * 5, a * 2, 0.9); }
+
+    // houses along every side, facing in, with a car parked out front, then the forest
+    const houses = ['house_red', 'house_cream', 'house_blue', 'house_green'], cars = ['car_red', 'car_green', 'car_silver'];
     let h = 0;
     for (let x = -hw + 6; x <= hw - 6; x += r(17, 24)) {
-        if (r() > 0.25) add(houses[h++ % 4], x + r(-2, 2), -fz - 13, 0);
-        if (r() > 0.25) add(houses[h++ % 4], x + r(-2, 2), fz + 13, PI);
+        for (const s of [-1, 1]) {
+            if (r() < 0.25 || (s < 0 && Math.abs(x) < 14)) continue;
+            const hx = x + r(-2, 2);
+            add(houses[h++ % 4], hx, s * (fz + 13), s < 0 ? 0 : PI);
+            if (r() < 0.55) add(cars[Math.floor(r(0, 3))], hx + r(-4, 4), s * (fz + 4.5), r() < 0.5 ? PI / 2 : -PI / 2);
+            else if (r() < 0.4) add('snowman', hx + r(-4, 4), s * (fz + 5), s < 0 ? 0 : PI);
+        }
     }
-    for (let z = -hd + 10; z <= hd - 10; z += r(28, 40)) {
-        if (r() > 0.5) add(houses[h++ % 4], -fx - 14, z + r(-2, 2), PI / 2);
-        if (r() > 0.5) add(houses[h++ % 4], fx + 14, z + r(-2, 2), -PI / 2);
+    for (let z = -hd + 10; z <= hd - 10; z += r(28, 40)) for (const s of [-1, 1]) {
+        if (r() < 0.5) continue;
+        const hz = z + r(-2, 2);
+        add(houses[h++ % 4], s * (fx + 14), hz, -s * PI / 2);
+        if (r() < 0.5) add(cars[Math.floor(r(0, 3))], s * (fx + 4.5), hz + r(-4, 4), r() < 0.5 ? 0 : PI);
     }
     for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { add('snowman', sx * (fx + 4), sz * (fz + 4), face(-sx, -sz)); add('candy_cane', sx * (fx + 0.6), sz * (fz + 0.6), face(-sx, -sz) + PI / 2, 1.3); }
     const trees = ['pine', 'pine_tall', 'pine', 'tree_bare', 'tree_bare2'];
@@ -650,7 +630,7 @@ function buildTown(L, li) {
     }
     for (const name in put) group.add(instanced(models[name], put[name], { receive: !/^pine|^tree_bare/.test(name) }));
     scene.add(group);
-    town = { group, colliders, lamps };
+    town = { group, colliders, lamps, tree };
     lastLights = -1;
 }
 
@@ -696,7 +676,7 @@ let lastLights = -1;
 function placeLights(t) {
     if (t - lastLights < 0.4 && lastLights >= 0) return;
     lastLights = t;
-    lights[0].position.set(0, 5, 0);
+    lights[0].position.set(town.tree[0], 5, town.tree[1]);
     lights[0].intensity = 26; lights[0].distance = 24; lights[0].color.set(0xffc27a);
     const near = town.lamps.map(([x, z]) => [x, z, (x - player.x) ** 2 + (z - player.z) ** 2]).sort((a, b) => a[2] - b[2]);
     for (let i = 1; i < lights.length; i++) {
@@ -729,7 +709,7 @@ function buildField(li, saved) {
     buildTown(L, li);
     const nx = Math.round(L.w / CELL), nz = Math.round(L.d / CELL), n = (nx + 1) * (nz + 1);
     const w = nx * CELL, d = nz * CELL;
-    const v = new Float32Array(n), bump = new Float32Array(n), tone = new Float32Array(n), mask = new Uint8Array(n);
+    const v = new Float32Array(n), bump = new Float32Array(n), tone = new Float32Array(n), lump = new Float32Array(n), mask = new Uint8Array(n);
     // no snow under the tree, posts, cars...
     for (const c of town.colliders) {
         const rr = c.snow ?? c.r * 0.85;
@@ -742,6 +722,8 @@ function buildField(li, saved) {
         const i = iz * (nx + 1) + ix, x = ix * CELL, z = iz * CELL;
         bump[i] = Math.random();
         tone[i] = noise2(x / 7, z / 7, 31);
+        // where the cut edges break: lumps about a hand wide, so the snow comes away in chunks
+        lump[i] = noise2(x / 0.42, z / 0.42, 51) * 0.7 + noise2(x / 0.17, z / 0.17, 52) * 0.3;
         if (mask[i]) continue;
         v[i] = startSnow({ snow: 16 }, li, x, z, Math.min(x, w - x, z, d - z));
         start += v[i];
@@ -754,8 +736,9 @@ function buildField(li, saved) {
     L.snow = perPoint;
     UNIT_H = DEPTH / perPoint;
     MAX_V = 3.5 / UNIT_H;
+    const base = v.slice();                  // the fresh snow (a reset brings it all back)
     if (saved && saved.length === n) for (let i = 0; i < n; i++) v[i] = mask[i] ? 0 : saved[i];
-    F = { L, nx, nz, w, d, v, bump, tone, mask, chunks: [], dirty: new Set(), total: 0, start };
+    F = { L, nx, nz, w, d, v, base, bump, tone, lump, mask, chunks: [], dirty: new Set(), total: 0, start };
     // the snow drawn in chunks, so a change only redraws the pieces it touched
     for (let cz = 0; cz * CHUNK < nz; cz++) for (let cx = 0; cx * CHUNK < nx; cx++) {
         const x0 = cx * CHUNK, x1 = Math.min(nx, x0 + CHUNK), z0 = cz * CHUNK, z1 = Math.min(nz, z0 + CHUNK);
@@ -806,9 +789,11 @@ function refreshChunk(c) {
         if (v[i] > 0.5) {
             // white on top, icy blue on the cut walls and slopes
             // a cut edge next to cleared ground is shaded blue, so the paths you dig stand out
-            const edge = hl < 0 || hr < 0 || hu < 0 || hd < 0 ? 0.35 : 0;
-            const b = 0.89 + F.tone[i] * 0.09 + F.bump[i] * 0.03, wall = Math.min(1, Math.min(1, (1 - nyv / len) * 4) * 0.55 + edge);
-            col[k * 4] = b * (1 - wall) + 0.70 * wall; col[k * 4 + 1] = b * (1 - wall) + 0.82 * wall; col[k * 4 + 2] = b * (1 - wall) + 0.97 * wall; col[k * 4 + 3] = 1;
+            const edge = hl < 0 || hr < 0 || hu < 0 || hd < 0 ? 0.45 : 0;
+            const b = 0.9 + F.tone[i] * 0.08 + F.bump[i] * 0.03, wall = Math.min(1, Math.min(1, (1 - nyv / len) * 4) * 0.6 + edge);
+            // a faint cool tint in the hollows, bright clean white on top
+            const cool = (1 - F.tone[i]) * 0.04;
+            col[k * 4] = (b - cool) * (1 - wall) + 0.52 * wall; col[k * 4 + 1] = (b - cool * 0.4) * (1 - wall) + 0.74 * wall; col[k * 4 + 2] = b * (1 - wall) + 1.0 * wall; col[k * 4 + 3] = 1;
         } else col[k * 4 + 3] = 0;
     }
     g.attributes.position.needsUpdate = true;
@@ -863,15 +848,27 @@ function addSnow(x, z, amount, sigma) {
 }
 const sigmaFor = amount => Math.max(0.5, CELL * Math.sqrt(amount / (2 * PI * F.L.snow * 2)));
 
-// clears a strip as wide as the blade; returns how much snow it took
+// clears a strip as wide as the blade; returns how much snow it took. The snow comes away in whole
+// lumps, never shaved thinner: each point under the blade goes all at once, and along the blade's ends
+// the edge breaks where the snow's lumps are, so the cut walls are ragged and chunky. Where it broke
+// off, broke[] gets x, z, amount (the lumps that fly off the ends).
+const broke = [];
 function clearRect(cx, cz, rx, rz, fx, fz, halfW, halfL, budget = Infinity) {
-    const [ix0, iz0, ix1, iz1] = range(cx, cz, Math.max(halfW, halfL) + CELL);
+    const rag = CELL * 1.6;
+    const [ix0, iz0, ix1, iz1] = range(cx, cz, Math.max(halfW + rag, halfL) + CELL);
     let got = 0;
     for (let iz = iz0; iz <= iz1 && got < budget; iz++) for (let ix = ix0; ix <= ix1 && got < budget; ix++) {
         const dx = cellX(ix) - cx, dz = cellZ(iz) - cz;
-        if (Math.abs(dx * rx + dz * rz) > halfW || Math.abs(dx * fx + dz * fz) > halfL) continue;
+        const lat = Math.abs(dx * rx + dz * rz), lon = Math.abs(dx * fx + dz * fz);
+        if (lon > halfL || lat > halfW + rag) continue;
         const i = iz * (F.nx + 1) + ix;
-        if (F.v[i] > 0) { const take = Math.min(F.v[i], budget - got); got += take; F.v[i] -= take; if (F.v[i] < 0.05) F.v[i] = 0; }
+        if (F.v[i] <= 0) continue;
+        // the ends of the blade: a point breaks off only where its lump is (so whole chunks go together)
+        if (lat > halfW - rag * 0.6 && lat - (halfW - rag * 0.6) > F.lump[i] * rag * 1.6) continue;
+        const take = F.v[i];
+        got += take;
+        F.v[i] = 0;
+        if (lat > halfW - rag) broke.push(cellX(ix), cellZ(iz), take);
     }
     if (got) { F.total -= got; touched(ix0, iz0, ix1, iz1); }
     return got;
@@ -888,19 +885,88 @@ function melt(amount) {
     for (let k = 0; k < F.chunks.length; k++) F.dirty.add(k);
     return melted;
 }
-// an avalanche: everything within 28 m of you fills back up
+// ---- where gifts may land or melt: only where you can see, or ground you've already cleared
+// half the camera's width as an angle (a little inside the edges)
+const halfView = () => Math.atan(Math.tan(camera.fov * PI / 360) * camera.aspect) * 0.85;
+function inView(x, z, maxD = 70) {
+    const dx = x - player.x, dz = z - player.z, d = Math.hypot(dx, dz);
+    if (d < 2.5 || d > maxD) return false;
+    return (-dx * Math.sin(player.yaw) - dz * Math.cos(player.yaw)) / d > Math.cos(halfView());
+}
+const inField = (x, z, m = 0.5) => Math.abs(x) < F.w / 2 - m && Math.abs(z) < F.d / 2 - m;
+// a spot on the snow in front of you, in sight (null if you're facing out over the fence)
+function viewSpot(minD, maxD, m = 0.5) {
+    for (let k = 0; k < 30; k++) {
+        const a = player.yaw + rand(-1, 1) * halfView() * 0.75, d = rand(minD, maxD);
+        const x = player.x - Math.sin(a) * d, z = player.z - Math.cos(a) * d;
+        if (inField(x, z, m)) return [x, z];
+    }
+    return null;
+}
+// a spot you've already shovelled (snow was there and now it's gone)
+function clearedSpot(m = 0.5) {
+    for (let k = 0; k < 120; k++) {
+        const ix = Math.floor(rand(0, F.nx + 1)), iz = Math.floor(rand(0, F.nz + 1)), i = iz * (F.nx + 1) + ix;
+        if (F.v[i] === 0 && F.base[i] > 0 && inField(cellX(ix), cellZ(iz), m)) return [cellX(ix), cellZ(iz)];
+    }
+    return null;
+}
+// where new snow goes: mostly in sight, sometimes back on ground you've cleared
+function snowSpot(minD, maxD, m = 0.5) {
+    const s = (Math.random() < 0.75 ? viewSpot(minD, maxD, m) || clearedSpot(m) : clearedSpot(m) || viewSpot(minD, maxD, m));
+    if (s) return s;
+    // facing the fence with nothing cleared: just inside the fence in front of you
+    const f = fwd();
+    return [clamp(player.x + f.x * 8, -F.w / 2 + m, F.w / 2 - m), clamp(player.z + f.z * 8, -F.d / 2 + m, F.d / 2 - m)];
+}
+
+// a melt gift: whole patches of snow vanish where you can see them (never behind you), not a thinner sheet
+function meltPatches(amount) {
+    let got = 0;
+    const big = amount > F.L.snow * 4000;
+    for (let tries = 0; got < amount && tries < 4000; tries++) {
+        const s = viewSpot(3, big ? 60 : 40);
+        if (!s) break;
+        const [x, z] = s, R = big ? rand(3, 6.5) : rand(1.6, 3.6), [ix0, iz0, ix1, iz1] = range(x, z, R + 0.6);
+        let here = 0;
+        for (let iz = iz0; iz <= iz1 && got + here < amount; iz++) for (let ix = ix0; ix <= ix1; ix++) {
+            const i = iz * (F.nx + 1) + ix;
+            if (F.v[i] <= 0 || Math.hypot(cellX(ix) - x, cellZ(iz) - z) > R + (F.lump[i] - 0.5) * 1.1 || !inView(cellX(ix), cellZ(iz), 75)) continue;
+            here += F.v[i];
+            F.v[i] = 0;
+        }
+        if (!here) continue;
+        got += here;
+        touched(ix0, iz0, ix1, iz1);
+        if (Math.random() < (big ? 0.25 : 1)) {
+            puff(x, z, 8, 2.5);
+            for (let k = 0; k < 3; k++) lumps.spawn(x + rand(-R, R) * 0.7, 0.2, z + rand(-R, R) * 0.7, rand(-1.5, 1.5), rand(2, 4), rand(-1.5, 1.5), rand(0.05, 0.1));
+        }
+    }
+    F.total -= got;
+    return got;
+}
+// an avalanche: everything you can see within 28 m fills back up
 function avalanche(px, pz) {
-    const before = F.total, R = 28;
+    const before = F.total, R = 28, cosV = Math.cos(halfView()), sx = -Math.sin(player.yaw), sz = -Math.cos(player.yaw);
     const [ix0, iz0, ix1, iz1] = range(px, pz, R);
     for (let iz = iz0; iz <= iz1; iz++) for (let ix = ix0; ix <= ix1; ix++) {
-        const i = iz * (F.nx + 1) + ix, dist = Math.hypot(cellX(ix) - px, cellZ(iz) - pz);
-        if (F.mask[i] || dist > R) continue;
-        const fill = F.L.snow * 1.3 * (0.8 + 0.4 * noise2(ix * CELL / 2.5, iz * CELL / 2.5, 99)) * Math.min(1, (R - dist) / 4);
+        const i = iz * (F.nx + 1) + ix, dx = cellX(ix) - px, dz = cellZ(iz) - pz, dist = Math.hypot(dx, dz);
+        if (F.mask[i] || dist > R || dist < 2.2) continue;
+        const c = (dx * sx + dz * sz) / dist;
+        if (c < cosV) continue;
+        const fill = F.L.snow * 1.3 * (0.8 + 0.4 * noise2(ix * CELL / 2.5, iz * CELL / 2.5, 99)) * Math.min(1, (R - dist) / 4, (dist - 2.2) / 1.5, (c - cosV) * 12);
         F.v[i] = Math.max(F.v[i], fill);
     }
     F.total = sumSnow();
     touched(ix0, iz0, ix1, iz1);
     return F.total - before;
+}
+// a reset: all the snow comes back, fresh
+function resetSnow() {
+    F.v.set(F.base);
+    F.total = sumSnow();
+    for (let k = 0; k < F.chunks.length; k++) F.dirty.add(k);
 }
 
 // ---------------------------------------------------------------- particles (snow spray, puffs, fireworks)
@@ -946,7 +1012,65 @@ class Particles {
         this.points.geometry.attributes.color.needsUpdate = true;
     }
 }
-const spray = new Particles(2500, { size: 0.09 });
+const spray = new Particles(2500, { size: 0.06 });
+
+// lumps of snow: chunky, faceted bits that break off the blade, tumble, bounce and crumble away
+// (just for show: the snow they came from is already counted as cleared)
+const lumpGeo = (() => {
+    const g = new THREE.IcosahedronGeometry(1, 2), p = g.attributes.position;
+    for (let i = 0; i < p.count; i++) {
+        // the same bump for the same corner, so the faces stay joined
+        const x = p.getX(i), y = p.getY(i), z = p.getZ(i), k = 1 + 0.22 * Math.sin(x * 5.1 + y * 3.3) * Math.cos(z * 4.2 - y * 2.7) + 0.08 * Math.sin(x * 13 - z * 11 + y * 7);
+        p.setXYZ(i, x * k, y * k * 0.72, z * k);
+    }
+    g.computeVertexNormals();
+    return g;
+})();
+const lumpMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, emissive: 0x6a7694, normalMap: SNOW_NORMAL, normalScale: new THREE.Vector2(1.6, 1.6) });
+const lumps = (() => {
+    const N = 600, mesh = new THREE.InstancedMesh(lumpGeo, lumpMat, N);
+    mesh.castShadow = true;
+    mesh.frustumCulled = false;
+    mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    const zero = new THREE.Matrix4().makeScale(0, 0, 0);
+    for (let i = 0; i < N; i++) mesh.setMatrixAt(i, zero);
+    scene.add(mesh);
+    const p = new Float32Array(N * 3), v = new Float32Array(N * 3), rot = new Float32Array(N * 3), spin = new Float32Array(N * 3), size = new Float32Array(N), life = new Float32Array(N);
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), pos = new THREE.Vector3(), sc = new THREE.Vector3();
+    let next = 0;
+    return {
+        spawn(x, y, z, vx, vy, vz, s) {
+            const i = next = (next + 1) % N;
+            p.set([x, y, z], i * 3); v.set([vx, vy, vz], i * 3);
+            rot.set([rand(0, 6), rand(0, 6), rand(0, 6)], i * 3); spin.set([rand(-9, 9), rand(-9, 9), rand(-9, 9)], i * 3);
+            size[i] = s; life[i] = rand(1.1, 1.8);
+        },
+        update(dt) {
+            for (let i = 0; i < N; i++) {
+                if (life[i] <= 0) continue;
+                life[i] -= dt;
+                if (life[i] <= 0) { mesh.setMatrixAt(i, zero); continue; }
+                const k = i * 3, s = size[i];
+                v[k + 1] -= 15 * dt;
+                p[k] += v[k] * dt; p[k + 1] += v[k + 1] * dt; p[k + 2] += v[k + 2] * dt;
+                const d = F ? depthAt(p[k], p[k + 2]) : 0, ground = (d > 0.5 ? 0.03 + d * UNIT_H : 0.01) + s * 0.6;
+                if (p[k + 1] < ground) {
+                    p[k + 1] = ground;
+                    if (v[k + 1] < -2.5) { v[k + 1] *= -0.28; if (s > 0.1 && Math.random() < 0.3) puff(p[k], p[k + 2], 3, 0.8); }
+                    else v[k + 1] = 0;
+                    const f = Math.max(0, 1 - dt * 7);
+                    v[k] *= f; v[k + 2] *= f;
+                    spin[k] *= f; spin[k + 1] *= f; spin[k + 2] *= f;
+                }
+                rot[k] += spin[k] * dt; rot[k + 1] += spin[k + 1] * dt; rot[k + 2] += spin[k + 2] * dt;
+                // crumbles away at the end
+                const g = s * Math.min(1, life[i] / 0.45);
+                mesh.setMatrixAt(i, m.compose(pos.set(p[k], p[k + 1], p[k + 2]), q.setFromEuler(e.set(rot[k], rot[k + 1], rot[k + 2])), sc.set(g, g, g)));
+            }
+            mesh.instanceMatrix.needsUpdate = true;
+        },
+    };
+})();
 const fireworks = new Particles(3000, { size: 0.9, additive: true, gravity: -4 });
 
 function puff(x, z, n, spread) {
@@ -995,7 +1119,7 @@ function updateFlakes(dt, t, heavy) {
 
 // ---------------------------------------------------------------- sound (made in the browser, nothing to download)
 const sfx = (() => {
-    let ac = null, master, musicGain, scrapeGain, noise, musicOn = localStorage.getItem('snowday.music') !== 'off', nextNote = 0, step = 0;
+    let crunchAt = 0, ac = null, master, musicGain, scrapeGain, noise, musicOn = localStorage.getItem('snowday.music') !== 'off', nextNote = 0, step = 0;
     function init() {
         if (ac) return;
         ac = new AudioContext();
@@ -1074,6 +1198,22 @@ const sfx = (() => {
             notes.forEach((f, i) => tone(f, t + i * 0.09, 0.4, { vol: 0.25 }));
         },
         whoosh() { if (ac) hiss(ac.currentTime, 1.2, { freq: 500, vol: 0.5, type: 'bandpass' }); },
+        // the crunch of snow breaking up as you push it: short gritty bursts, faster the more you take
+        crunch(rate) {
+            if (!ac || ac.currentTime < crunchAt) return;
+            const t = ac.currentTime, r = clamp(rate, 0, 1.5);
+            crunchAt = t + rand(0.05, 0.11) / (0.5 + r);
+            hiss(t, rand(0.04, 0.09), { freq: rand(900, 2600), vol: 0.1 + r * 0.16, type: 'bandpass' });
+            if (Math.random() < 0.35) hiss(t + 0.02, 0.07, { freq: rand(250, 450), vol: 0.12 + r * 0.1 });
+        },
+        tick(n) { if (ac) tone(n <= 3 ? 1320 : 990, ac.currentTime, 0.12, { type: 'square', vol: 0.12 }); },
+        alarm() { if (!ac) return; const t = ac.currentTime; for (let k = 0; k < 6; k++) tone(k % 2 ? 620 : 880, t + k * 0.16, 0.15, { type: 'sawtooth', vol: 0.12 }); },
+        fanfare() {
+            if (!ac) return;
+            const t = ac.currentTime;
+            [[784, 0], [988, 0.1], [1175, 0.2], [1568, 0.32]].forEach(([f, d]) => { tone(f, t + d, 0.45, { vol: 0.22 }); tone(f * 2, t + d, 0.25, { type: 'sine', vol: 0.05 }); });
+            for (let k = 0; k < 10; k++) tone(rand(2600, 4200), t + 0.3 + k * 0.04, 0.2, { type: 'sine', vol: 0.05 });
+        },
         rumble() { if (!ac) return; const t = ac.currentTime; hiss(t, 2.5, { freq: 220, vol: 0.9 }); tone(55, t, 2.2, { type: 'sawtooth', vol: 0.2, slide: 30 }); },
         boom() { if (!ac) return; const t = ac.currentTime; hiss(t, 0.7, { freq: 1500, vol: 0.35 }); tone(80, t, 0.5, { type: 'sine', vol: 0.3, slide: 35 }); },
         freeze() { if (!ac) return; const t = ac.currentTime; for (let k = 0; k < 8; k++) tone(rand(1800, 3000), t + k * 0.05, 0.4, { type: 'sine', vol: 0.08 }); },
@@ -1091,10 +1231,12 @@ const sfx = (() => {
 // ground, the pole running down to your hands at the bottom right. It only leans a little when you
 // turn, shivers when it's frozen, and the snow you push piles up in front of the blade.
 const EYE = 1.95;
-const player = { x: 0, z: 0, yaw: 0, pitch: -0.42, y: EYE, load: 0, turn: 0, lastYaw: 0, vib: 0 };
+const player = { x: 0, z: 0, yaw: 0, pitch: -0.42, y: EYE, load: 0, turn: 0, lastYaw: 0, vib: 0, spin: 0, reach: 2.0, jab: 0 };
 const keys = new Set();
 let locked = false;
 const BLADE_AHEAD = 2.0;                 // metres in front of you where the blade clears
+const BLADE_IN = 1.05;                   // hold right click: the shovel comes back to here, lifted over the snow
+let pullHeld = false;
 const HOLD = new THREE.Vector3(0, -0.6, -2.55), TILT = 0.36;
 
 const shovelPivot = new THREE.Group();
@@ -1124,21 +1266,59 @@ function setupShovel() {
     });
     shovelPivot.add(shovel);
     pile = new THREE.Mesh(pileGeometry(), new THREE.MeshStandardMaterial({ color: 0xf6f9ff, emissive: 0x2a3040, roughness: 0.9, normalMap: SNOW_NORMAL }));
-    pile.position.set(0, 0.24, -0.62);
+    pile.position.set(0, 0.2, -0.6);
     shovel.add(pile);
+    // chunky lumps riding on top of the heap: more of them show the more you're pushing
+    const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, emissive: 0x2a3040, normalMap: SNOW_NORMAL });
+    for (let k = 0; k < 26; k++) {
+        const x = rand(-1, 1) * 0.95 * Math.sqrt(k / 26 + 0.05), z = -0.42 - rand(0, 0.5), m = new THREE.Mesh(lumpGeo, mat);
+        m.userData = { x, y: 0.12 + (1 - Math.abs(x)) * 0.16 + rand(0, 0.08), z, s: rand(0.07, 0.14), ph: rand(0, 6) };
+        m.rotation.set(rand(0, 6), rand(0, 6), rand(0, 6));
+        pileLumps.push(m);
+        shovel.add(m);
+    }
 }
-function placeShovel(dt, t, pushing, frozen) {
-    // turning makes it lag behind and lean a little; pushing snow makes it judder
+const pileLumps = [];
+// how the shovel moves: springs, so it bites into the snow, bounces with your steps and lags on turns
+const anim = { step: 0, walk: 0, push: 0, pushV: 0, back: 0, kick: 0, kickV: 0, rate: 0 };
+function placeShovel(dt, t, { speed = 0, back = false, rate = 0, frozen = false, pull = 0 } = {}) {
     const yawVel = (player.yaw - player.lastYaw) / Math.max(dt, 1e-3);
     player.lastYaw = player.yaw;
     player.turn += (clamp(yawVel, -4, 4) - player.turn) * Math.min(1, dt * 8);
-    player.vib = pushing ? Math.sin(t * 55) * 0.004 * clamp(player.load / 30, 0.3, 1) : 0;
-    const shiver = frozen ? Math.sin(t * 70) * 0.006 : 0;
-    shovelPivot.position.set(HOLD.x - player.turn * 0.035 + shiver, HOLD.y + player.vib, HOLD.z);
-    shovelPivot.rotation.set(TILT, -player.turn * 0.025, -player.turn * 0.03);
+    const k = Math.min(1, dt * 7);
+    anim.walk += ((speed > 0.3 ? 1 : 0) - anim.walk) * k;
+    anim.back += ((back ? 1 : 0) - anim.back) * k;
+    anim.step += dt * speed * 4.4;
+    // biting into deep snow gives it a kick, then it shoves forward under the load
+    if (rate > anim.rate + 0.35) anim.kickV -= 1.6 * (rate - anim.rate);
+    anim.rate += (rate - anim.rate) * Math.min(1, dt * 10);
+    anim.pushV += ((anim.rate * 0.9 - anim.push) * 140 - anim.pushV * 15) * dt;
+    anim.push += anim.pushV * dt;
+    anim.kickV += (-anim.kick * 220 - anim.kickV * 14) * dt;
+    anim.kick += anim.kickV * dt;
+    const stepY = Math.abs(Math.cos(anim.step)) * 0.022 * anim.walk, stepX = Math.sin(anim.step) * 0.014 * anim.walk;
+    player.vib = anim.rate > 0.05 ? (Math.sin(t * 57) * 0.003 + Math.sin(t * 31) * 0.002) * (0.4 + anim.rate) : 0;
+    const shiver = frozen ? Math.sin(t * 70) * 0.006 : 0, sway = Math.sin(t * 1.3) * 0.004;
+    // pulled in: the blade comes back along the ground towards you and lifts up (worked out level with
+    // the ground, then turned into the shovel's tilted frame)
+    const d = (BLADE_AHEAD - player.reach), lift = pull * 0.32, p = viewRig.rotation.x;
+    const py = lift * Math.cos(p) + d * Math.sin(p), pz = -lift * Math.sin(p) + d * Math.cos(p);
+    shovelPivot.position.set(
+        HOLD.x - player.turn * 0.04 + shiver + stepX,
+        HOLD.y + player.vib + stepY - anim.push * 0.02 + anim.back * 0.03 + anim.kick * 0.04 + py,
+        HOLD.z - anim.push * 0.1 + anim.back * 0.1 + anim.kick * 0.3 + pz);
+    shovelPivot.rotation.set(TILT + anim.push * 0.05 - anim.back * 0.06 + anim.kick * 0.5 - pull * 0.22, -player.turn * 0.03, -player.turn * 0.035 + stepX * 1.2 + sway);
     const s = clamp(player.load / 45, 0, 1);
     pile.visible = s > 0.03 && !frozen;
-    pile.scale.set(0.7 + s * 0.75, 0.15 + s * 0.7, 0.3 + s * 0.45);
+    pile.scale.set(0.9 + s * 1.3, 0.12 + s * 0.55, 0.3 + s * 0.45);
+    const shown = frozen ? 0 : Math.round(s * pileLumps.length);
+    pileLumps.forEach((m, i) => {
+        const u = m.userData;
+        m.visible = i < shown;
+        if (!m.visible) return;
+        m.position.set(u.x * (0.6 + s * 0.4), u.y * (0.5 + s * 0.6) + Math.sin(t * 18 + u.ph) * 0.006 * anim.rate, u.z);
+        m.scale.setScalar(u.s * (0.7 + s * 0.4));
+    });
 }
 
 const fwd = () => new THREE.Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
@@ -1148,6 +1328,7 @@ let lastBlade = null;
 function resetPlayer() {
     player.x = 0; player.z = F.d / 2 - 2; player.yaw = 0; player.pitch = -0.42; player.load = 0; player.lastYaw = 0; player.turn = 0;
     lastBlade = null;
+    player.reach = BLADE_AHEAD;
 }
 
 function updatePlayer(dt, t) {
@@ -1157,13 +1338,15 @@ function updatePlayer(dt, t) {
     if (keys.has('KeyS') || keys.has('ArrowDown')) mz -= 1;
     if (keys.has('KeyA')) mx -= 1;
     if (keys.has('KeyD')) mx += 1;
-    if (keys.has('ArrowLeft')) player.yaw += 2.2 * dt;
-    if (keys.has('ArrowRight')) player.yaw -= 2.2 * dt;
+    if (keys.has('ArrowLeft') || keys.has('KeyQ')) player.yaw += 2.4 * dt;
+    if (keys.has('ArrowRight') || keys.has('KeyE')) player.yaw -= 2.4 * dt;
+    // Space: a quick about-turn, to go back for a bit you missed
+    if (player.spin) { const a = Math.min(player.spin, 9 * dt); player.yaw += a; player.spin -= a; }
     const f = fwd(), r = right(), moving = !!(mx || mz);
     const b0 = new THREE.Vector3(player.x, 0, player.z).addScaledVector(f, BLADE_AHEAD);
-    // deep snow in front of the blade slows you down
+    // deep snow in front of the blade slows you down, only when you push into it (backing off is free)
     let speed = (keys.has("ShiftLeft") || keys.has("ShiftRight")) ? 6.5 : 4.2;
-    speed *= clamp(1 - depthAt(b0.x, b0.z) * UNIT_H / 2.4, 0.4, 1);
+    if (mz > 0) speed *= clamp(1 - depthAt(b0.x, b0.z) * UNIT_H / 2.4, 0.4, 1);
     if (frozen) speed *= 0.55;
     if (moving) {
         const len = Math.hypot(mx, mz);
@@ -1178,37 +1361,90 @@ function updatePlayer(dt, t) {
     player.x = clamp(player.x, -F.w / 2 + 0.4, F.w / 2 - 0.4);
     player.z = clamp(player.z, -F.d / 2 + 0.4, F.d / 2 - 0.4);
 
+    // hold right click: the shovel comes back to you, lifted over the snow. Let go and it shoots back
+    // out, scooping everything in its way
+    const pulling = pullHeld && !frozen;
+    const wasIn = player.reach < BLADE_AHEAD - 0.01;
+    if (pulling) player.reach = Math.max(BLADE_IN, player.reach - 4.5 * dt);
+    else if (wasIn) { player.reach = Math.min(BLADE_AHEAD, player.reach + 13 * dt); player.jab = Math.max(player.jab, 1); }
+    const jabbing = !pulling && wasIn;
+    const pull = clamp((BLADE_AHEAD - player.reach) / (BLADE_AHEAD - BLADE_IN), 0, 1) * (pulling ? 1 : 0.6);
     // the blade clears everything it passes over (in small steps so running doesn't skip any)
-    const b = new THREE.Vector3(player.x, 0, player.z).addScaledVector(f, BLADE_AHEAD);
+    const b = new THREE.Vector3(player.x, 0, player.z).addScaledVector(f, player.reach);
     let got = 0;
-    if (!frozen && !state.finishing) {
+    if (!frozen && !state.finishing && !pulling) {
         const from = lastBlade || b, dist = from.distanceTo(b), steps = Math.max(1, Math.ceil(dist / (CELL * 0.7)));
         for (let k = 1; k <= steps; k++) {
             const p = from.clone().lerp(b, k / steps);
-            got += clearRect(p.x, p.z, r.x, r.z, f.x, f.z, 0.76, CELL * 0.8, CLEAR_RATE * dt - got);
+            got += clearRect(p.x, p.z, r.x, r.z, f.x, f.z, BLADE_HALF, CELL * 0.8, CLEAR_RATE * dt * (jabbing ? 6 : 1) - got);
         }
         if (got > 0) {
-            const n = Math.min(16, 2 + got / (F.L.snow * 0.6));
+            // a fine spray off the top of the heap
+            const n = Math.min(6, 1 + got / (F.L.snow * 2));
             for (let k = 0; k < n; k++) {
-                const side = rand(-0.8, 0.8), up = rand(1.2, 3.4);
+                const side = rand(-1.1, 1.1), up = rand(1.2, 3.4);
                 spray.spawn(b.x + r.x * side + f.x * 0.3, rand(0.15, 0.5), b.z + r.z * side + f.z * 0.3,
                     f.x * rand(1.5, 3.5) + r.x * side * 2.5, up, f.z * rand(1.5, 3.5) + r.z * side * 2.5, rand(0.5, 1.1), null, 1.6);
             }
+            // lumps tumbling off the front of the heap
+            state.lumpDebt += got / (F.L.snow * 9);
+            for (; state.lumpDebt >= 1; state.lumpDebt--) {
+                const side = rand(-BLADE_HALF, BLADE_HALF);
+                lumps.spawn(b.x + r.x * side + f.x * 0.45, rand(0.25, 0.55), b.z + r.z * side + f.z * 0.45,
+                    f.x * rand(1.8, 4) + r.x * side * rand(0.3, 1.2), rand(1.5, 3.5), f.z * rand(1.8, 4) + r.z * side * rand(0.3, 1.2), rand(0.04, 0.1));
+            }
+            state.streak += got;
+            state.streakAt = t;
+            sfx.crunch(got / Math.max(dt, 1e-3) / CLEAR_RATE);
         }
     }
+    // chunks breaking off the ends of the blade fall away to the sides
+    for (let k = 0; k < broke.length && k < 3 * 8; k += 3) {
+        if (Math.random() > 0.25) continue;
+        const x = broke[k], z = broke[k + 1], side = Math.sign((x - b.x) * r.x + (z - b.z) * r.z) || 1;
+        lumps.spawn(x, rand(0.1, 0.3), z, r.x * side * rand(1, 2.6) + f.x * rand(0.5, 2), rand(1.5, 3), r.z * side * rand(1, 2.6) + f.z * rand(0.5, 2), rand(0.05, 0.12));
+    }
+    broke.length = 0;
     lastBlade = b;
-    player.load = player.load * Math.exp(-dt * (moving ? 1.2 : 3)) + got * 0.35 * (16 / F.L.snow);
-    sfx.scrape(moving && !frozen ? 0.04 + clamp(got / (F.L.snow * 1.5), 0, 0.3) : 0);
+    if (jabbing) state.jabGot = (state.jabGot || 0) + got;
+    // the shove lands: a kick, a thump and the scooped snow bursting off the front
+    if (!pulling && wasIn && player.reach >= BLADE_AHEAD) {
+        anim.kickV -= 1.4;
+        const g = state.jabGot || 0;
+        if (g > 0) {
+            sfx.thump(Math.min(1.5, g / (F.L.snow * 60)));
+            shake(0.18, 0.02);
+            for (let k = 0; k < Math.min(18, 4 + g / (F.L.snow * 6)); k++) {
+                const side = rand(-BLADE_HALF, BLADE_HALF);
+                lumps.spawn(b.x + r.x * side + f.x * 0.4, rand(0.2, 0.5), b.z + r.z * side + f.z * 0.4,
+                    f.x * rand(3, 6.5) + r.x * side * rand(0.3, 1), rand(2, 4.5), f.z * rand(3, 6.5) + r.z * side * rand(0.3, 1), rand(0.05, 0.12));
+            }
+            puff(b.x + f.x * 0.8, b.z + f.z * 0.8, 14, 2.2);
+        }
+        state.jabGot = 0;
+    }
+    const back = mz < 0;
+    player.load = player.load * Math.exp(-dt * (back ? 5 : moving ? 1.2 : 3)) + got * 0.35 * (16 / F.L.snow);
+    sfx.scrape(moving && !frozen ? 0.04 + clamp(got / Math.max(dt, 1e-3) / CLEAR_RATE, 0, 1) * 0.3 : 0);
 
     // you stand on top of the snow
     player.y += (EYE + depthAt(player.x, player.z) * UNIT_H - player.y) * Math.min(1, dt * 8);
     const shake = state.shakeUntil > t ? (state.shakeUntil - t) * state.shakePower : 0;
     camera.position.set(player.x + rand(-1, 1) * shake, player.y + rand(-1, 1) * shake, player.z);
     camera.rotation.set(player.pitch, player.yaw, 0);
+    // a reset: the camera flies up to show the whole town snowed over again, then comes back down
+    const air = state.aerialUntil > t ? Math.sin(clamp(1 - (state.aerialUntil - t) / 5, 0, 1) * PI) : 0;
+    if (air > 0) {
+        const e = air * air * (3 - 2 * air);
+        camera.position.y += e * 75;
+        camera.position.addScaledVector(f, -e * 40);
+        camera.rotation.x = player.pitch + (-1.05 - player.pitch) * e;
+    }
+    viewRig.visible = air < 0.08;
     // the shovel stays down on the ground: looking up or down only moves it a little on screen
     viewRig.position.copy(camera.position);
     viewRig.rotation.set(-0.42 + (player.pitch + 0.42) * 0.3, player.yaw, 0, 'YXZ');
-    placeShovel(dt, t, moving && got > 0, frozen);
+    placeShovel(dt, t, { pull, speed: moving ? speed : 0, back, rate: frozen ? 0 : clamp(got / Math.max(dt, 1e-3) / CLEAR_RATE * 2.5, 0, 1), frozen });
     moonFollow(player.x, player.z);
     placeLights(t);
 }
@@ -1218,9 +1454,10 @@ addEventListener('keydown', e => {
     if (e.code === 'KeyM') toast(sfx.toggleMusic() ? 'Music on' : 'Music off');
     if (e.code === 'KeyN') { setTimeOfDay(timeOfDay === 'day' ? 'night' : 'day'); toast(timeOfDay === 'day' ? 'Sunny day' : 'Christmas night'); }
     if (e.code === 'KeyR' && $('start').classList.contains('hidden')) restartLevel();
+    if (e.code === 'Space' && !e.repeat && !player.spin) { e.preventDefault(); player.spin = PI; }
     if (e.code === 'F11' && window.snowdayApp) { e.preventDefault(); window.snowdayApp.fullscreen(); }
     if (TEST) {
-        const tests = { Digit1: ['snow', 100], Digit2: ['snow', 1000], Digit3: ['santa', 20000], Digit4: ['blizzard', 12], Digit5: ['freeze', 8], Digit6: ['melt', 50000], Digit7: ['avalanche', 1], Digit8: ['snow', 25000] };
+        const tests = { Digit1: ['snow', 100], Digit2: ['snow', 1000], Digit3: ['santa', 20000], Digit4: ['blizzard', 12], Digit5: ['freeze', 8], Digit6: ['melt', 50000], Digit7: ['avalanche', 1], Digit8: ['snow', 25000], Digit9: ['reset', 20], Digit0: ['save', 1] };
         if (tests[e.code]) gift({ action: tests[e.code][0], amount: tests[e.code][1], from: 'Tester' });
         if (e.code === 'BracketRight') startLevel(Math.min(LEVELS.length - 1, state.level + 1));
         if (e.code === 'BracketLeft') startLevel(Math.max(0, state.level - 1));
@@ -1228,7 +1465,11 @@ addEventListener('keydown', e => {
     }
 });
 addEventListener('keyup', e => keys.delete(e.code));
-addEventListener('blur', () => keys.clear());
+addEventListener('blur', () => { keys.clear(); pullHeld = false; });
+// right click held: pull the shovel back
+addEventListener('mousedown', e => { if (e.button === 2) pullHeld = true; });
+addEventListener('mouseup', e => { if (e.button === 2) pullHeld = false; });
+addEventListener('contextmenu', e => e.preventDefault());
 // look with the mouse: captured (pointer lock), or by dragging where it can't be captured
 addEventListener('mousemove', e => {
     if (!locked && !(e.buttons & 1 && $('start').classList.contains('hidden'))) return;
@@ -1248,15 +1489,22 @@ document.addEventListener('pointerlockchange', () => {
 
 // ---------------------------------------------------------------- the game: levels and gifts
 const state = { level: 0, finishing: false, startedAt: 0, frozenUntil: 0, blizzardUntil: 0, shakeUntil: 0, shakePower: 0, pending: [],
-    adders: new Map(), removers: new Map() };   // this level's biggest snow adders and melters, for the end screen
+    adders: new Map(), removers: new Map(), resetters: new Map(),   // this round's biggest adders, resetters and melters, for the end screen
+    zeroSince: null,        // when the snow hit 0 (hold it there HOLD_ZERO seconds to win)
+    reset: null,            // a reset countdown running: { endsAt, total, from, save: { name, image } }
+    shields: 0,             // saves sent with no reset running: each blocks one reset
+    milestone: 0,           // how many 100,000s cleared so far this round (each one shows once)
+    aerialUntil: 0, lumpDebt: 0, streak: 0, streakAt: 0 };
 function credit(board, who, n) { if (n > 0 && who) board.set(who, (board.get(who) || 0) + n); }
 function showBoard(seconds) {
     const list = (board, cls, title, none) => {
         const top = [...board].sort((a, b) => b[1] - a[1]).slice(0, 5);
-        const rows = top.map(([who, n], i) => `<li><span><b>${i + 1}</b>${esc(who)}</span><span>${fmt(n)}</span></li>`).join('');
+        const rows = top.map(([who, n], i) => `<li><span><b>${String(i + 1).padStart(2, '0')}</b>${esc(who)}</span><span>${fmt(n)}</span></li>`).join('');
         return `<div class="col ${cls}"><h3 class="chunky" style="-webkit-text-stroke-width:4px">${title}</h3>${rows ? `<ol>${rows}</ol>` : `<div class="none">${none}</div>`}</div>`;
     };
-    $('board').innerHTML = list(state.adders, 'add', 'BIGGEST SNOW ADDERS', 'Nobody added snow this level') + list(state.removers, 'melt', 'BIGGEST MELTERS', 'Nobody melted snow this level');
+    $('board').innerHTML = list(state.adders, 'add', 'BIGGEST ADDERS', 'Nobody added snow this round')
+        + list(state.resetters, 'reset', 'BIGGEST RESETTERS', 'No resets this round')
+        + list(state.removers, 'melt', 'BIGGEST REMOVERS', 'Nobody melted snow this round');
     $('board').classList.add('show');
     setTimeout(() => $('board').classList.remove('show'), seconds * 1000);
 }
@@ -1274,6 +1522,10 @@ function startLevel(i, saved = null) {
     $('level').textContent = state.rounds ? `ROUND ${state.rounds + 1}` : 'CHRISTMAS TOWN';
     state.adders.clear();
     state.removers.clear();
+    state.resetters.clear();
+    state.zeroSince = null;
+    state.milestone = Math.floor((F.start - F.total) / 100000);
+    stopReset();
     shownCount = F.total;
     save();
     const queued = state.pending.splice(0);
@@ -1281,28 +1533,172 @@ function startLevel(i, saved = null) {
 }
 function restartLevel() { startLevel(state.level); toast('Level restarted'); }
 
+// you win: held at 0 for 15 seconds. Fireworks, the leaderboards, then a fresh 1,500,000 for the next round
 function levelCleared() {
     state.finishing = true;
-    melt(F.total);
+    state.zeroSince = null;
+    stopReset();
     sfx.win();
-    const last = true;
     state.rounds = (state.rounds || 0) + 1;
-    banner('ALL 1,000,000 SNOW CLEARED!', 'Merry Christmas! The snow comes back in 12 seconds', 11);
-    showBoard(last ? 11 : 5.5);
-    const until = performance.now() / 1000 + (last ? 11 : 5);
-    const fw = setInterval(() => { if (performance.now() / 1000 > until) return clearInterval(fw); firework(); }, last ? 280 : 450);
-    setTimeout(() => startLevel(0), 12000);
+    banner('YOU WIN!', `All ${fmt(F.start)} snow cleared · next round in 20s`, 19);
+    confetti(260);
+    showBoard(19);
+    const until = performance.now() / 1000 + 19;
+    const fw = setInterval(() => { if (performance.now() / 1000 > until) return clearInterval(fw); firework(); }, 260);
+    let left = 20;
+    const tick = setInterval(() => { left--; $('bannerSmall').textContent = `All ${fmt(F.start)} snow cleared · next round in ${left}s`; if (left <= 1) clearInterval(tick); }, 1000);
+    setTimeout(() => startLevel(0), 20000);
 }
 
-// where a gift's snow lands: mostly in front of you, so you see it coming and have to deal with it
+// ---------------------------------------------------------------- hold zero, the SAVE? countdown and milestones
+function updateGoal(t) {
+    if (state.finishing) return;
+    // a few specks left (and none landing) counts as clear: they melt so the counter reads 0
+    if (state.zeroSince === null && F.total <= ZERO_LEFT && !balls.length && !sleighs.length && state.blizzardUntil <= t && t - state.startedAt > 2) {
+        if (F.total > 0) melt(F.total);
+        state.zeroSince = t;
+        sfx.chime(true);
+        flash('#bfffd0');
+    }
+    if (state.zeroSince !== null) {
+        if (F.total > 0.5) {
+            // snow landed: the clock stops until it's all cleared again
+            state.zeroSince = null;
+            $('hold').classList.add('broken');
+            setTimeout(() => $('hold').classList.remove('broken'), 900);
+        } else if (t - state.zeroSince >= HOLD_ZERO) levelCleared();
+    }
+    const holding = state.zeroSince !== null;
+    $('hold').classList.toggle('show', holding);
+    if (holding) {
+        const left = Math.max(0, Math.ceil(HOLD_ZERO - (t - state.zeroSince)));
+        if ($('holdN').textContent !== `${left}s`) { $('holdN').textContent = `${left}s`; if (left <= 5) sfx.tick(left); }
+    }
+
+    // a reset counting down: if it runs out, all the snow comes back
+    if (state.reset) {
+        const left = Math.max(0, state.reset.endsAt - t), s = Math.ceil(left);
+        const txt = `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+        if ($('saveTime').textContent !== txt) { $('saveTime').textContent = txt; if (s <= 10 && s > 0) sfx.tick(s); }
+        $('saveFill').style.width = `${100 * left / state.reset.total}%`;
+        if (left <= 0) doReset();
+    }
+
+    // milestones: every 100,000 cleared, and the big ones by percent
+    const cleared = F.start - F.total, m = Math.floor(cleared / 100000);
+    if (m > state.milestone) {
+        state.milestone = m;
+        const pct = Math.floor(100 * cleared / F.start);
+        milestone(`${fmt(m * 100000)} CLEARED!`, `${pct}% of the snow is gone`);
+    }
+    // where the last bits are: a beacon over each patch once there's little left
+    if (t - (state.beaconAt || 0) > 1) { state.beaconAt = t; placeBeacons(); }
+}
+function startReset(seconds, from, saveGift, image) {
+    if (state.reset) { pop('RESET', `${from} · one's already counting down`, image, 'event'); return; }
+    if (state.shields > 0) {
+        state.shields--;
+        pop('BLOCKED', `${from}'s reset hit a shield`, image, 'good');
+        sfx.chime(true);
+        return;
+    }
+    const total = clamp(seconds, 10, 300), now = performance.now() / 1000;
+    state.reset = { endsAt: now + total, total, from, save: saveGift || null };
+    $('saveBy').textContent = `RESET BY ${String(from).toUpperCase()}`;
+    const s = saveGift;
+    $('saveGift').innerHTML = s ? `Send ${s.image ? '<img alt="">' : ''}<b></b> to save it!` : 'Send the save gift to stop it!';
+    if (s) { $('saveGift').querySelector('b').textContent = s.name; if (s.image) { const img = $('saveGift').querySelector('img'); img.onerror = () => img.remove(); img.src = s.image; } }
+    $('save').classList.add('show');
+    pop('RESET?', `${from} wants all the snow back`, image, 'bad');
+    sfx.alarm();
+    shake(0.6, 0.05);
+}
+function stopReset() { state.reset = null; $('save').classList.remove('show'); }
+function saveReset(from, image) {
+    if (!state.reset) {
+        state.shields++;
+        pop('SHIELD', `${from} · blocks the next reset`, image, 'good');
+        sfx.chime(true);
+        return;
+    }
+    stopReset();
+    pop('SAVED!', `${from} saved the snow`, image, 'good');
+    milestone('SAVED!', `${from} stopped the reset`);
+    flash('#7dffa8');
+    confetti(120);
+    sfx.chime(true);
+}
+function doReset() {
+    const from = state.reset.from, before = F.total;
+    stopReset();
+    resetSnow();
+    credit(state.resetters, from, Math.max(1, F.total - before));
+    state.zeroSince = null;
+    state.milestone = 0;
+    state.aerialUntil = performance.now() / 1000 + 5;
+    banner('RESET!', `${from} brought back all ${fmt(F.total)} snow`, 5);
+    flash('#ffffff');
+    shake(1.5, 0.1);
+    sfx.rumble();
+    for (let k = 0; k < 50; k++) puff(player.x + rand(-30, 30), player.z + rand(-30, 30), 10, 4);
+}
+
+// a big gold milestone banner that pops in and out (the main banner is kept for the win and reset)
+let mileTimer = null;
+function milestone(big, small) {
+    const el = $('mile');
+    $('mileBig').textContent = big;
+    $('mileSmall').textContent = small;
+    el.classList.remove('show');
+    void el.offsetWidth;
+    el.classList.add('show');
+    clearTimeout(mileTimer);
+    mileTimer = setTimeout(() => el.classList.remove('show'), 2600);
+    confetti(70);
+    sfx.fanfare();
+}
+// paper confetti over the screen
+function confetti(n) {
+    const box = $('confetti'), colours = ['#ff3b47', '#4dff6a', '#ffd75e', '#5ab0ff', '#ff7bff', '#ffffff'];
+    for (let i = 0; i < n; i++) {
+        const c = document.createElement('i');
+        c.style.left = `${rand(0, 100)}vw`;
+        c.style.background = colours[i % colours.length];
+        c.style.setProperty('--dx', `${rand(-25, 25)}vw`);
+        c.style.setProperty('--r', `${rand(-900, 900)}deg`);
+        c.style.animationDuration = `${rand(1.8, 3.4)}s`;
+        c.style.animationDelay = `${rand(0, 0.4)}s`;
+        c.style.width = `${rand(7, 13)}px`; c.style.height = `${rand(10, 18)}px`;
+        box.appendChild(c);
+        setTimeout(() => c.remove(), 4000);
+    }
+}
+// light pillars over the last patches of snow, so you can find them
+const beaconMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.4, 1.6, 0.8), transparent: true, opacity: 0.45, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
+const beacons = Array.from({ length: 8 }, () => {
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.6, 40, 12, 1, true), beaconMat);
+    m.visible = false;
+    scene.add(m);
+    return m;
+});
+function placeBeacons() {
+    beacons.forEach(b => b.visible = false);
+    if (state.finishing || F.total > Math.min(30000, F.start * 0.02) || F.total <= 0.5) return;
+    const B = 20, patches = [];
+    for (let bz = 0; bz <= F.nz; bz += B) for (let bx = 0; bx <= F.nx; bx += B) {
+        let s = 0, sx = 0, sz = 0;
+        for (let iz = bz; iz < Math.min(F.nz + 1, bz + B); iz++) for (let ix = bx; ix < Math.min(F.nx + 1, bx + B); ix++) {
+            const v = F.v[iz * (F.nx + 1) + ix];
+            if (v > 0) { s += v; sx += ix * v; sz += iz * v; }
+        }
+        if (s > 0) patches.push([s, cellX(sx / s), cellZ(sz / s)]);
+    }
+    patches.sort((a, b) => b[0] - a[0]).slice(0, beacons.length).forEach(([, x, z], i) => { beacons[i].position.set(x, 20, z); beacons[i].visible = true; });
+}
+
+// where a gift's snow lands: in front of you where you can see it coming, or back on ground you've cleared
 function landingSpot(sigma) {
-    const m = Math.min(sigma, 3) + 0.5;
-    let x, z;
-    if (Math.random() < 0.7) {
-        const f = fwd(), r = right(), ahead = rand(4, 14), side = rand(-6, 6);
-        x = player.x + f.x * ahead + r.x * side; z = player.z + f.z * ahead + r.z * side;
-    } else { x = player.x + rand(-30, 30); z = player.z + rand(-30, 30); }
-    return [clamp(x, -F.w / 2 + m, F.w / 2 - m), clamp(z, -F.d / 2 + m, F.d / 2 - m)];
+    return snowSpot(4, 22, Math.min(sigma, 3) + 0.5);
 }
 function dropBall(amount, x, z, y = 34) {
     const sigma = sigmaFor(amount);
@@ -1339,31 +1735,34 @@ function shake(seconds, power) {
     state.shakePower = Math.max(power / seconds, state.shakeUntil > t ? state.shakePower : 0);
 }
 
-// Santa flies across just in front of you, dropping the snow in a line
+// Santa flies across in front of you (side to side, where you can see him), dropping the snow in a line
 function santa(amount) {
     const s = models.sleigh.clone();
     s.scale.setScalar(1.3);
-    const dir = Math.random() < 0.5 ? 1 : -1, f = fwd();
-    const z = clamp(player.z + f.z * 8, -F.d / 2 + 2, F.d / 2 - 2), x0 = clamp(player.x - 22, -F.w / 2 + 1, F.w / 2 - 1), x1 = clamp(player.x + 22, -F.w / 2 + 1, F.w / 2 - 1);
-    s.position.set(dir > 0 ? x0 - 80 : x1 + 80, 12, z);
-    s.rotation.y = face(dir, 0) + PI;
+    const dir = Math.random() < 0.5 ? 1 : -1, f = fwd(), r = right();
+    const cx = player.x + f.x * 18, cz = player.z + f.z * 18;
+    s.position.set(cx - r.x * dir * 96, 12, cz - r.z * dir * 96);
+    s.rotation.y = face(r.x * dir, r.z * dir) + PI;
     scene.add(s);
-    sleighs.push({ s, dir, z, x0, x1, amount, drops: 12, dropped: 0 });
+    sleighs.push({ s, dir, cx, cz, r, f, u: -96, amount, drops: 12, dropped: 0 });
     sfx.bells(4);
     sfx.whoosh();
 }
 function updateSleighs(dt) {
     for (const k of [...sleighs]) {
-        k.s.position.x += k.dir * 26 * dt;
-        k.s.position.y = 12 + Math.sin(k.s.position.x * 0.15) * 0.8;
-        k.s.rotation.z = Math.sin(k.s.position.x * 0.15) * 0.05;
-        const x = k.s.position.x, span = k.x1 - k.x0;
-        const done = clamp(((k.dir > 0 ? x - k.x0 : k.x1 - x)) / span, 0, 1);
+        k.u += 26 * dt;
+        const u = k.u * k.dir;
+        k.s.position.set(k.cx + k.r.x * u, 12 + Math.sin(k.u * 0.15) * 0.8, k.cz + k.r.z * u);
+        k.s.rotation.z = Math.sin(k.u * 0.15) * 0.05;
+        // it drops along the middle 28 m, the part you can see
+        const done = clamp((k.u + 14) / 28, 0, 1);
         while (k.dropped < Math.floor(done * k.drops)) {
             k.dropped++;
-            dropBall(k.amount / k.drops, clamp(x, -F.w / 2 + 1, F.w / 2 - 1), clamp(k.z + rand(-2.5, 2.5), -F.d / 2 + 1, F.d / 2 - 1), k.s.position.y - 1);
+            const a = rand(-2.5, 2.5), x = k.s.position.x + k.f.x * a, z = k.s.position.z + k.f.z * a;
+            if (inField(x, z, 1)) dropBall(k.amount / k.drops, x, z, k.s.position.y - 1);
+            else dropBall(k.amount / k.drops);
         }
-        if (done >= 1 && Math.abs(x - (k.dir > 0 ? k.x1 : k.x0)) > 90) {
+        if (k.u > 96) {
             while (k.dropped < k.drops) { k.dropped++; dropBall(k.amount / k.drops); }
             scene.remove(k.s);
             sleighs = sleighs.filter(o => o !== k);
@@ -1379,10 +1778,16 @@ function gift(msg) {
     if (state.finishing && action !== 'freeze') {
         // the next level gets it
         state.pending.push(msg);
-        if (!msg.silent) pop(action === 'melt' ? `-${fmt(amount)}` : action === 'blizzard' ? 'BLIZZARD' : action === 'avalanche' ? 'AVALANCHE' : `+${fmt(amount)}`, `${from} (next level)`, image, 'event');
+        if (!msg.silent) pop(action === 'melt' ? `-${fmt(amount)}` : action === 'blizzard' ? 'BLIZZARD' : action === 'avalanche' ? 'AVALANCHE' : action === 'reset' ? 'RESET' : action === 'save' ? 'SHIELD' : `+${fmt(amount)}`, `${from} (next round)`, image, 'event');
         return;
     }
     switch (action) {
+        case 'reset':
+            startReset(+msg.amount || 60, from, msg.save, image);
+            break;
+        case 'save':
+            saveReset(from, image);
+            break;
         case 'blizzard':
             state.blizzardUntil = Math.max(state.blizzardUntil, now) + Math.min(120, amount);
             credit(state.adders, from, Math.min(F.start * 0.003, 4000) * Math.min(120, amount));
@@ -1400,7 +1805,7 @@ function gift(msg) {
             sfx.freeze();
             break;
         case 'melt': {
-            const got = melt(amount);
+            const got = meltPatches(amount);
             credit(state.removers, from, got);
             pop(`-${fmt(got)}`, `${from} melted snow`, image, 'good');
             flash('#ffb347');
@@ -1424,7 +1829,7 @@ function gift(msg) {
 }
 
 // ---------------------------------------------------------------- the HUD
-let shownCount = 0, lastShown = -1;
+let shownCount = 0, lastShown = -1, countMood = ['', 0], lastMood = null;
 function pop(amount, who, image, kind) {
     const el = document.createElement('div');
     el.className = `pop chunky ${kind}`;
@@ -1458,13 +1863,27 @@ function updateHud(dt, t) {
     shownCount += (F.total - shownCount) * Math.min(1, dt * 10);
     if (Math.abs(F.total - shownCount) < 1) shownCount = F.total;
     const n = Math.max(0, Math.ceil(shownCount));
-    if (n !== lastShown) {
+    // the number: green while it's going down, red when snow's added, cream when nothing's happening
+    if (shownCount > before + 0.5) countMood = ['up', t];
+    else if (shownCount < before - 0.5 && (countMood[0] !== 'up' || t - countMood[1] > 1)) countMood = ['down', t];
+    else if (t - countMood[1] > 1.2) countMood = ['', t - 1.2];
+    const mood = countMood[0];
+    if (n !== lastShown || mood !== lastMood) {
         $('count').textContent = fmt(n);
-        $('count').classList.toggle('up', shownCount > before + 0.5);
-        lastShown = n;
+        $('count').className = `chunky ${mood}`;
+        lastShown = n; lastMood = mood;
     }
-    $('barFill').style.width = `${clamp(100 * (1 - F.total / F.start), 0, 100)}%`;
+    const pct = clamp(100 * (1 - F.total / F.start), 0, 100);
+    $('barFill').style.width = `${pct}%`;
+    const pctText = `${Math.floor(pct)}% CLEARED`;
+    if ($('pct').textContent !== pctText) $('pct').textContent = pctText;
+    // the streak: how much you've pushed in one go
+    const streaking = t - state.streakAt < 1.2 && state.streak > F.L.snow * 30;
+    $('streak').classList.toggle('show', streaking);
+    if (streaking) $('streakN').textContent = `+${fmt(state.streak)}`;
+    else if (t - state.streakAt > 1.2) state.streak = 0;
     const fx = [];
+    if (state.shields) fx.push(`<div class="fx good">🛡️ ${state.shields} reset shield${state.shields > 1 ? 's' : ''}</div>`);
     if (state.blizzardUntil > t) fx.push(`<div class="fx">🌨️ Blizzard ${Math.ceil(state.blizzardUntil - t)}s</div>`);
     if (state.frozenUntil > t) fx.push(`<div class="fx">🧊 Shovel frozen ${Math.ceil(state.frozenUntil - t)}s</div>`);
     if (sleighs.length) fx.push('<div class="fx hot">🎅 Santa is flying over!</div>');
@@ -1492,7 +1911,7 @@ async function connect() {
 }
 
 // ---------------------------------------------------------------- keeping your progress
-const SAVE_KEY = 'snowday.save.v3';
+const SAVE_KEY = 'snowday.save.v4';
 function save() {
     if (!F) return;
     const q = new Uint16Array(F.v.length);
@@ -1526,19 +1945,22 @@ function frame() {
     updateSleighs(dt);
     const heavy = state.blizzardUntil > t;
     if (heavy && !state.finishing) {
-        // the blizzard buries the area around you
+        // the blizzard buries what you can see (and where you've cleared)
         const rate = Math.min(F.start * 0.003, 4000);
-        for (let k = 0; k < 6; k++) addSnow(clamp(player.x + rand(-30, 30), -F.w / 2, F.w / 2), clamp(player.z + rand(-30, 30), -F.d / 2, F.d / 2), rate * dt / 6, 0.7);
+        for (let k = 0; k < 6; k++) { const [x, z] = snowSpot(3, 35); addSnow(x, z, rate * dt / 6, 0.7); }
     }
     scene.fog.density += ((heavy ? 0.03 : baseFog) - scene.fog.density) * Math.min(1, dt * 2);
     auroraU.time.value = t;
     updateFlakes(dt, t, heavy);
     spray.update(dt);
     fireworks.update(dt);
+    lumps.update(dt);
     refreshSnow();
     if (t - lastFix > 1) { F.total = sumSnow(); lastFix = t; }
-    if (!state.finishing && F.total <= Math.max(60, F.start * 0.002) && t - state.startedAt > 2) levelCleared();
+    updateGoal(t);
     updateHud(dt, t);
+    for (const b of beacons) if (b.visible) b.rotation.y = t;
+    beaconMat.opacity = 0.32 + Math.sin(t * 4) * 0.12;
     composer.render();
     requestAnimationFrame(frame);
 }
@@ -1552,7 +1974,7 @@ async function cover(gameId) {
     camera.aspect = W / H;
     camera.updateProjectionMatrix();
     player.load = 40;
-    placeShovel(0.016, 0, false, false);
+    placeShovel(0.016, 0, {});
     composer.render();
     const c = document.createElement('canvas');
     c.width = W; c.height = H;
@@ -1585,7 +2007,7 @@ async function main() {
     setupShovel();
     const saved = load();
     startLevel(saved ? saved.level : 0, saved ? saved.v : null);
-    if (TEST) window.snowday = { player, state, gift, camera, get field() { return F; }, cover, startLevel };
+    if (TEST) window.snowday = { player, state, gift, camera, get field() { return F; }, cover, startLevel, viewRig, shovelPivot, anim, pull: v => { pullHeld = v; } };
     connect();
     frame();
 }

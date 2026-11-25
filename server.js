@@ -256,6 +256,11 @@ const DROPPER_RULES = [
 // Snow Day (public/snowday): a 3D Christmas game of its own. You shovel the snow off the village
 // square; gifts pile it back on. Each gift's action is sent to the game over the game link.
 const snowAction = (name, amount) => ({ type: 'message', name, amount });
+// a reset gift starts a 60 second SAVE? countdown: the save gift stops it, or all the snow comes back
+const SNOW_DAY_RESET_RULES = [
+    { gift: 'Galaxy', sound: 'builtin/i-need-a-hero.mp3', label: 'Reset in 60s (SAVE?)', perCount: false, actions: [snowAction('reset', 60)] },
+    { gift: 'Glowing Jellyfish', sound: 'builtin/cha-ching.mp3', label: 'Saves the reset', perCount: false, actions: [snowAction('save', 1)] },
+];
 const SNOW_DAY_RULES = [
     { gift: 'Follow', sound: 'builtin/bonk.mp3', label: '+100 snow', actions: [snowAction('snow', 100)] },
     { gift: 'Rose', sound: 'builtin/bonk.mp3', label: '+100 snow', actions: [snowAction('snow', 100)] },
@@ -267,6 +272,7 @@ const SNOW_DAY_RULES = [
     { gift: 'Hat and Mustache', sound: 'builtin/anime-wow.mp3', label: 'Santa drops +20,000', actions: [snowAction('santa', 20000)] },
     { gift: 'Corgi', sound: 'builtin/nooo.mp3', label: 'AVALANCHE', perCount: false, actions: [snowAction('avalanche', 1)] },
     { gift: 'Money Gun', sound: 'builtin/here-comes-the-money.mp3', label: 'Melts 50,000 snow', actions: [snowAction('melt', 50000)] },
+    ...SNOW_DAY_RESET_RULES,
 ];
 const SNOW_DAY_COVER = path.join(ROOT, 'public', 'img', 'cover-snowday.jpg');
 const isSnowDay = g => g?.connector === 'websocket' && /snow day/i.test(g.name);
@@ -426,6 +432,18 @@ if (!settings.snowDay) {
         saveGame(g);
     }
     settings.snowDay = true; saveSettings();
+}
+if (!settings.snowDayReset) {
+    // 2.28: Snow Day's reset and save gifts are added to the Snow Day game you already have
+    for (const g of Object.values(games)) {
+        if (!isSnowDay(g)) continue;
+        const rules = rulesOf(g);
+        if (rules.some(r => r.actions.some(a => a.type === 'message' && (a.name === 'reset' || a.name === 'save')))) continue;
+        const used = new Set(rules.map(r => r.gift.toLowerCase()));
+        rules.push(...normalizeRules(SNOW_DAY_RESET_RULES.filter(r => !used.has(r.gift.toLowerCase()))));
+        saveGame(g);
+    }
+    settings.snowDayReset = true; saveSettings();
 }
 if (!settings.covers) {
     for (const g of Object.values(games)) if (g.connector === 'minecraft' && /minecraft/i.test(g.name) && !g.cover) { g.cover = MINECRAFT_COVER; saveGame(g); }
@@ -1189,7 +1207,10 @@ async function runAction(game, a, ctx) {
         if (game.connector !== 'minecraft') return;
         for (let i = 0; i < times; i++) await mc(fill(a.command || '', ctx)).catch(e => log(`Command failed: ${e.message}`));
     } else if (a.type === 'message') {
-        const sent = sendToGames({ type: 'gift', action: a.name || 'gift', amount: (+a.amount || 1) * (ctx.perCount ? ctx.count : 1), gift: ctx.gift, from: ctx.from, count: ctx.count, game: game.name, image: ctx.image || null });
+        // a reset tells the game which gift saves it (shown on its SAVE? banner)
+        const saver = a.name === 'reset' ? rulesOf(game).find(r => r.actions.some(x => x.type === 'message' && x.name === 'save')) : null;
+        const save = saver ? { name: saver.gift, image: findGift(saver.gift)?.image || saver.image || null } : undefined;
+        const sent = sendToGames({ type: 'gift', action: a.name || 'gift', amount: (+a.amount || 1) * (ctx.perCount ? ctx.count : 1), gift: ctx.gift, from: ctx.from, count: ctx.count, game: game.name, image: ctx.image || null, save });
         if (!sent) log(`No game is connected to receive "${a.name}".`);
     } else if (a.type === 'keys') {
         for (let i = 0; i < times; i++) { pressKeys(a.keys || ''); if (times > 1) await sleep(Math.max(30, +a.gap || 120)); }
