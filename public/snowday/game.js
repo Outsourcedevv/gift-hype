@@ -39,18 +39,14 @@ function seeded(seed) {
     };
 }
 
-// ---------------------------------------------------------------- levels: a bigger town square each time
+// ---------------------------------------------------------------- the level: one big town square, 1,000,000 snow
 const CELL = 0.3;           // the snow is a grid of points this far apart (metres)
-const UNIT_H = 0.012;       // 1 snow = 12 mm deep
-const MAX_V = 300;          // deepest a point can get (3.6 m)
 const CHUNK = 40;           // the snow is drawn in pieces of 40 x 40 points
-const LEVELS = [
-    { w: 72, d: 52, snow: 14 },
-    { w: 92, d: 66, snow: 15 },
-    { w: 114, d: 82, snow: 16 },
-    { w: 138, d: 98, snow: 17 },
-    { w: 164, d: 116, snow: 18 },
-];
+const SNOW_TOTAL = 1000000; // how much snow the square starts with
+const DEPTH = 0.22;         // how deep it lies on average (metres)
+const CLEAR_RATE = 700;     // the most snow the shovel can push away a second (deep piles take longer)
+const LEVELS = [{ w: 150, d: 106, snow: 1 }];
+let UNIT_H = 0.012, MAX_V = 300;   // metres per snow and the deepest a point gets: worked out for the level
 
 // ---------------------------------------------------------------- renderer, scene, camera
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
@@ -416,8 +412,27 @@ function detailModels() {
     });
 }
 
+// snow glitter: tiny points that catch the light and twinkle as you move
+function addSparkle(material, density) {
+    material.onBeforeCompile = sh => {
+        sh.vertexShader = 'varying vec3 vSpW;\n' + sh.vertexShader.replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\n vSpW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+        sh.fragmentShader = 'varying vec3 vSpW;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+            {
+              vec3 cell = floor(vSpW * ${density.toFixed(1)});
+              float h = fract(sin(dot(cell, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+              vec3 vd = normalize(cameraPosition - vSpW);
+              float tw = fract(h * 91.7 + dot(floor(vd * 6.0), vec3(0.31, 0.17, 0.23)) * 7.0);
+              float dist = length(cameraPosition - vSpW);
+              vec3 fp = fract(vSpW * ${density.toFixed(1)}) - 0.5;
+              float round_ = 1.0 - smoothstep(0.12, 0.3, length(fp));
+              totalEmissiveRadiance += vec3(0.9, 0.95, 1.0) * step(0.9965, h) * step(0.55, tw) * round_ * 1.8 * (1.0 - smoothstep(6.0, 30.0, dist));
+            }`);
+    };
+    material.customProgramCacheKey = () => 'sparkle' + density;
+}
+
 // ---------------------------------------------------------------- the land around the town: hills, then mountains
-const FLAT_X = 140, FLAT_Z = 112;            // the town sits on flat ground this big (half sizes)
+const FLAT_X = 165, FLAT_Z = 135;            // the town sits on flat ground this big (half sizes)
 function fbm(x, z, oct = 4) { let v = 0, a = 0.5, f = 1; for (let i = 0; i < oct; i++) { v += a * noise2(x * f, z * f, 3 + i); f *= 2.03; a *= 0.5; } return v; }
 const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 function terrainH(x, z) {
@@ -447,7 +462,9 @@ function terrainH(x, z) {
         if (y > 260) col.set([shade, shade, shade + 0.02], i * 3);
     }
     geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
-    const ground = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, normalMap: SNOW_NORMAL, normalScale: new THREE.Vector2(0.7, 0.7) }));
+    const groundMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, normalMap: SNOW_NORMAL, normalScale: new THREE.Vector2(1.1, 1.1) });
+    addSparkle(groundMat, 18);
+    const ground = new THREE.Mesh(geo, groundMat);
     ground.receiveShadow = true;
     scene.add(ground);
 }
@@ -457,7 +474,7 @@ const loader = new GLTFLoader();
 const MODEL_NAMES = ['house_red', 'house_cream', 'house_blue', 'house_green', 'tree_big', 'pine', 'pine_tall', 'snowman', 'lamppost', 'presents',
     'candy_cane', 'fence', 'shovel', 'sleigh', 'car_red', 'car_green', 'car_silver', 'bench', 'tree_bare', 'tree_bare2', 'church'];
 const models = {};
-const MODELS_VERSION = 4;          // bump when the Blender models change
+const MODELS_VERSION = 5;          // bump when the Blender models change
 const T = (x, y, z, ry = 0, s = 1) => new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromAxisAngle(UP, ry), new THREE.Vector3(s, s, s));
 // facing: a model's front is +Z; this turns it to face (dx, dz)
 const face = (dx, dz) => Math.atan2(dx, dz);
@@ -598,12 +615,13 @@ function buildTown(L, li) {
         for (let k = 0, tries = 0; k < n && tries < n * 40; tries++) {
             const x = r(-hw + STREET + rad, hw - STREET - rad), z = r(-hd + STREET + rad, hd - STREET - rad);
             if (isPath(L, x, z) || isPath(L, x + rad, z) || isPath(L, x - rad, z) || isPath(L, x, z + rad) || isPath(L, x, z - rad) || !free(x, z, rad + 1.2)) continue;
-            fn(x, z);
-            colliders.push({ x, z, r: rad });
+            // fn may return a wider blocking radius (a tree's branches) and the snow-free patch under it
+            const c = fn(x, z) || {};
+            colliders.push({ x, z, r: c.r || rad, snow: c.snow });
             k++;
         }
     };
-    scatter(Math.round(area / 240), 1.4, (x, z) => add('pine', x, z, r(0, 6), r(0.85, 1.35)));
+    scatter(Math.round(area / 240), 2.4, (x, z) => { const sc = r(0.85, 1.35); add('pine', x, z, r(0, 6), sc); return { r: 1.75 * sc, snow: 0.9 * sc }; });
     scatter(Math.round(area / 1100) + 2, 0.75, (x, z) => add('snowman', x, z, face(-x, -z) + r(-0.6, 0.6)));
     scatter(Math.round(area / 1500) + 1, 0.9, (x, z) => add('presents', x, z, r(0, 6), 0.9));
 
@@ -696,11 +714,13 @@ function noise2(x, z, seed) {
     return (h(xi, zi) * (1 - u) + h(xi + 1, zi) * u) * (1 - v) + (h(xi, zi + 1) * (1 - u) + h(xi + 1, zi + 1) * u) * v;
 }
 
-const snowMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.78, metalness: 0, alphaTest: 0.5, normalMap: SNOW_NORMAL, normalScale: new THREE.Vector2(0.9, 0.9) });
+const snowMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.78, metalness: 0, alphaTest: 0.5, normalMap: SNOW_NORMAL, normalScale: new THREE.Vector2(1.5, 1.5) });
+addSparkle(snowMat, 26);
 let F = null;   // the field: { L, nx, nz, w, d, v, bump, mask, chunks, dirty, total, start }
 
 function startSnow(L, li, x, z, edge) {
-    return L.snow * (1 + 0.5 * Math.max(0, 1 - edge / 1.8)) * (0.72 + 0.42 * noise2(x / 3.4, z / 3.4, li * 13.7 + 1) + 0.14 * noise2(x / 0.9, z / 0.9, li * 13.7 + 6));
+    const ripple = Math.sin((x * 0.8 + z * 0.35) * 1.7 + noise2(x / 4, z / 4, li + 21) * 6) * 0.11;
+    return L.snow * (1 + 0.5 * Math.max(0, 1 - edge / 1.8)) * (0.6 + 0.55 * noise2(x / 6, z / 6, li * 13.7 + 1) + 0.16 * noise2(x / 1.2, z / 1.2, li * 13.7 + 6) + ripple);
 }
 
 function buildField(li, saved) {
@@ -709,10 +729,10 @@ function buildField(li, saved) {
     buildTown(L, li);
     const nx = Math.round(L.w / CELL), nz = Math.round(L.d / CELL), n = (nx + 1) * (nz + 1);
     const w = nx * CELL, d = nz * CELL;
-    const v = new Float32Array(n), bump = new Float32Array(n), mask = new Uint8Array(n);
+    const v = new Float32Array(n), bump = new Float32Array(n), tone = new Float32Array(n), mask = new Uint8Array(n);
     // no snow under the tree, posts, cars...
     for (const c of town.colliders) {
-        const rr = c.r * 0.85;
+        const rr = c.snow ?? c.r * 0.85;
         for (let iz = Math.max(0, Math.floor((c.z - rr + d / 2) / CELL)); iz <= Math.min(nz, Math.ceil((c.z + rr + d / 2) / CELL)); iz++)
             for (let ix = Math.max(0, Math.floor((c.x - rr + w / 2) / CELL)); ix <= Math.min(nx, Math.ceil((c.x + rr + w / 2) / CELL)); ix++)
                 if (Math.hypot(-w / 2 + ix * CELL - c.x, -d / 2 + iz * CELL - c.z) <= rr) mask[iz * (nx + 1) + ix] = 1;
@@ -721,12 +741,21 @@ function buildField(li, saved) {
     for (let iz = 0; iz <= nz; iz++) for (let ix = 0; ix <= nx; ix++) {
         const i = iz * (nx + 1) + ix, x = ix * CELL, z = iz * CELL;
         bump[i] = Math.random();
+        tone[i] = noise2(x / 7, z / 7, 31);
         if (mask[i]) continue;
-        v[i] = startSnow(L, li, x, z, Math.min(x, w - x, z, d - z));
+        v[i] = startSnow({ snow: 16 }, li, x, z, Math.min(x, w - x, z, d - z));
         start += v[i];
     }
+    // exactly SNOW_TOTAL to start with, about DEPTH deep
+    const k = SNOW_TOTAL / start;
+    for (let i = 0; i < n; i++) v[i] *= k;
+    start = SNOW_TOTAL;
+    const perPoint = SNOW_TOTAL / (n - mask.reduce((a, b) => a + b, 0));
+    L.snow = perPoint;
+    UNIT_H = DEPTH / perPoint;
+    MAX_V = 3.5 / UNIT_H;
     if (saved && saved.length === n) for (let i = 0; i < n; i++) v[i] = mask[i] ? 0 : saved[i];
-    F = { L, nx, nz, w, d, v, bump, mask, chunks: [], dirty: new Set(), total: 0, start };
+    F = { L, nx, nz, w, d, v, bump, tone, mask, chunks: [], dirty: new Set(), total: 0, start };
     // the snow drawn in chunks, so a change only redraws the pieces it touched
     for (let cz = 0; cz * CHUNK < nz; cz++) for (let cx = 0; cx * CHUNK < nx; cx++) {
         const x0 = cx * CHUNK, x1 = Math.min(nx, x0 + CHUNK), z0 = cz * CHUNK, z1 = Math.min(nz, z0 + CHUNK);
@@ -761,7 +790,7 @@ function buildField(li, saved) {
 }
 function sumSnow() { let t = 0; for (let i = 0; i < F.v.length; i++) t += F.v[i]; return t; }
 
-const heightAt = i => { const s = F.v[i]; return s > 0.5 ? 0.03 + s * UNIT_H + F.bump[i] * 0.035 * Math.min(1, s / 12) : -0.12; };
+const heightAt = i => { const s = F.v[i]; return s > 0.5 ? 0.03 + s * UNIT_H + F.bump[i] * 0.035 * Math.min(1, s / (F.L.snow * 0.8)) : -0.12; };
 function refreshChunk(c) {
     const g = c.mesh.geometry, pos = g.attributes.position.array, nor = g.attributes.normal.array, col = g.attributes.color.array;
     const nx1 = F.nx + 1, v = F.v;
@@ -776,7 +805,9 @@ function refreshChunk(c) {
         nor[k * 3] = nxv / len; nor[k * 3 + 1] = nyv / len; nor[k * 3 + 2] = nzv / len;
         if (v[i] > 0.5) {
             // white on top, icy blue on the cut walls and slopes
-            const b = 0.93 + F.bump[i] * 0.07, wall = Math.min(1, (1 - nyv / len) * 4) * 0.55;
+            // a cut edge next to cleared ground is shaded blue, so the paths you dig stand out
+            const edge = hl < 0 || hr < 0 || hu < 0 || hd < 0 ? 0.35 : 0;
+            const b = 0.89 + F.tone[i] * 0.09 + F.bump[i] * 0.03, wall = Math.min(1, Math.min(1, (1 - nyv / len) * 4) * 0.55 + edge);
             col[k * 4] = b * (1 - wall) + 0.70 * wall; col[k * 4 + 1] = b * (1 - wall) + 0.82 * wall; col[k * 4 + 2] = b * (1 - wall) + 0.97 * wall; col[k * 4 + 3] = 1;
         } else col[k * 4 + 3] = 0;
     }
@@ -830,17 +861,17 @@ function addSnow(x, z, amount, sigma) {
     touched(ix0, iz0, ix1, iz1);
     return added;
 }
-const sigmaFor = amount => Math.max(0.5, CELL * Math.sqrt(amount / (2 * PI * 34)));
+const sigmaFor = amount => Math.max(0.5, CELL * Math.sqrt(amount / (2 * PI * F.L.snow * 2)));
 
 // clears a strip as wide as the blade; returns how much snow it took
-function clearRect(cx, cz, rx, rz, fx, fz, halfW, halfL) {
+function clearRect(cx, cz, rx, rz, fx, fz, halfW, halfL, budget = Infinity) {
     const [ix0, iz0, ix1, iz1] = range(cx, cz, Math.max(halfW, halfL) + CELL);
     let got = 0;
-    for (let iz = iz0; iz <= iz1; iz++) for (let ix = ix0; ix <= ix1; ix++) {
+    for (let iz = iz0; iz <= iz1 && got < budget; iz++) for (let ix = ix0; ix <= ix1 && got < budget; ix++) {
         const dx = cellX(ix) - cx, dz = cellZ(iz) - cz;
         if (Math.abs(dx * rx + dz * rz) > halfW || Math.abs(dx * fx + dz * fz) > halfL) continue;
         const i = iz * (F.nx + 1) + ix;
-        if (F.v[i] > 0) { got += F.v[i]; F.v[i] = 0; }
+        if (F.v[i] > 0) { const take = Math.min(F.v[i], budget - got); got += take; F.v[i] -= take; if (F.v[i] < 0.05) F.v[i] = 0; }
     }
     if (got) { F.total -= got; touched(ix0, iz0, ix1, iz1); }
     return got;
@@ -1107,7 +1138,7 @@ function placeShovel(dt, t, pushing, frozen) {
     shovelPivot.rotation.set(TILT, -player.turn * 0.025, -player.turn * 0.03);
     const s = clamp(player.load / 45, 0, 1);
     pile.visible = s > 0.03 && !frozen;
-    pile.scale.set(0.5 + s * 0.55, 0.15 + s * 0.65, 0.3 + s * 0.4);
+    pile.scale.set(0.7 + s * 0.75, 0.15 + s * 0.7, 0.3 + s * 0.45);
 }
 
 const fwd = () => new THREE.Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
@@ -1131,8 +1162,8 @@ function updatePlayer(dt, t) {
     const f = fwd(), r = right(), moving = !!(mx || mz);
     const b0 = new THREE.Vector3(player.x, 0, player.z).addScaledVector(f, BLADE_AHEAD);
     // deep snow in front of the blade slows you down
-    let speed = (keys.has("ShiftLeft") || keys.has("ShiftRight")) ? 9.5 : 5.8;
-    speed *= clamp(1 - depthAt(b0.x, b0.z) / 200, 0.45, 1);
+    let speed = (keys.has("ShiftLeft") || keys.has("ShiftRight")) ? 6.5 : 4.2;
+    speed *= clamp(1 - depthAt(b0.x, b0.z) * UNIT_H / 2.4, 0.4, 1);
     if (frozen) speed *= 0.55;
     if (moving) {
         const len = Math.hypot(mx, mz);
@@ -1154,20 +1185,20 @@ function updatePlayer(dt, t) {
         const from = lastBlade || b, dist = from.distanceTo(b), steps = Math.max(1, Math.ceil(dist / (CELL * 0.7)));
         for (let k = 1; k <= steps; k++) {
             const p = from.clone().lerp(b, k / steps);
-            got += clearRect(p.x, p.z, r.x, r.z, f.x, f.z, 0.56, CELL * 0.8);
+            got += clearRect(p.x, p.z, r.x, r.z, f.x, f.z, 0.76, CELL * 0.8, CLEAR_RATE * dt - got);
         }
         if (got > 0) {
-            const n = Math.min(16, 2 + got / 10);
+            const n = Math.min(16, 2 + got / (F.L.snow * 0.6));
             for (let k = 0; k < n; k++) {
-                const side = rand(-0.6, 0.6), up = rand(1.2, 3.4);
+                const side = rand(-0.8, 0.8), up = rand(1.2, 3.4);
                 spray.spawn(b.x + r.x * side + f.x * 0.3, rand(0.15, 0.5), b.z + r.z * side + f.z * 0.3,
                     f.x * rand(1.5, 3.5) + r.x * side * 2.5, up, f.z * rand(1.5, 3.5) + r.z * side * 2.5, rand(0.5, 1.1), null, 1.6);
             }
         }
     }
     lastBlade = b;
-    player.load = player.load * Math.exp(-dt * (moving ? 1.2 : 3)) + got * 0.35;
-    sfx.scrape(moving && !frozen ? 0.04 + clamp(got / 25, 0, 0.3) : 0);
+    player.load = player.load * Math.exp(-dt * (moving ? 1.2 : 3)) + got * 0.35 * (16 / F.L.snow);
+    sfx.scrape(moving && !frozen ? 0.04 + clamp(got / (F.L.snow * 1.5), 0, 0.3) : 0);
 
     // you stand on top of the snow
     player.y += (EYE + depthAt(player.x, player.z) * UNIT_H - player.y) * Math.min(1, dt * 8);
@@ -1240,7 +1271,7 @@ function startLevel(i, saved = null) {
     state.startedAt = performance.now() / 1000;
     buildField(i, saved);
     resetPlayer();
-    $('level').textContent = `LEVEL ${i + 1} / ${LEVELS.length}`;
+    $('level').textContent = state.rounds ? `ROUND ${state.rounds + 1}` : 'CHRISTMAS TOWN';
     state.adders.clear();
     state.removers.clear();
     shownCount = F.total;
@@ -1254,12 +1285,13 @@ function levelCleared() {
     state.finishing = true;
     melt(F.total);
     sfx.win();
-    const last = state.level === LEVELS.length - 1;
-    banner(last ? 'YOU BEAT SNOW DAY!' : `LEVEL ${state.level + 1} CLEARED!`, last ? 'Merry Christmas! Back to level 1 in 12 seconds' : `Get ready for level ${state.level + 2}: an even bigger town`, last ? 11 : 5);
+    const last = true;
+    state.rounds = (state.rounds || 0) + 1;
+    banner('ALL 1,000,000 SNOW CLEARED!', 'Merry Christmas! The snow comes back in 12 seconds', 11);
     showBoard(last ? 11 : 5.5);
     const until = performance.now() / 1000 + (last ? 11 : 5);
     const fw = setInterval(() => { if (performance.now() / 1000 > until) return clearInterval(fw); firework(); }, last ? 280 : 450);
-    setTimeout(() => startLevel(last ? 0 : state.level + 1), last ? 12000 : 6000);
+    setTimeout(() => startLevel(0), 12000);
 }
 
 // where a gift's snow lands: mostly in front of you, so you see it coming and have to deal with it
@@ -1353,7 +1385,7 @@ function gift(msg) {
     switch (action) {
         case 'blizzard':
             state.blizzardUntil = Math.max(state.blizzardUntil, now) + Math.min(120, amount);
-            credit(state.adders, from, Math.min(F.start * 0.006, 9000) * Math.min(120, amount));
+            credit(state.adders, from, Math.min(F.start * 0.003, 4000) * Math.min(120, amount));
             pop('BLIZZARD', `${from} · ${amount}s`, image, 'bad');
             sfx.whoosh();
             break;
@@ -1460,7 +1492,7 @@ async function connect() {
 }
 
 // ---------------------------------------------------------------- keeping your progress
-const SAVE_KEY = 'snowday.save.v2';
+const SAVE_KEY = 'snowday.save.v3';
 function save() {
     if (!F) return;
     const q = new Uint16Array(F.v.length);
@@ -1495,7 +1527,7 @@ function frame() {
     const heavy = state.blizzardUntil > t;
     if (heavy && !state.finishing) {
         // the blizzard buries the area around you
-        const rate = Math.min(F.start * 0.006, 9000);
+        const rate = Math.min(F.start * 0.003, 4000);
         for (let k = 0; k < 6; k++) addSnow(clamp(player.x + rand(-30, 30), -F.w / 2, F.w / 2), clamp(player.z + rand(-30, 30), -F.d / 2, F.d / 2), rate * dt / 6, 0.7);
     }
     scene.fog.density += ((heavy ? 0.03 : baseFog) - scene.fog.density) * Math.min(1, dt * 2);
