@@ -839,8 +839,8 @@ ubIntro.start();
             <div id="typeBox"></div>
           </div>
         </div>
-        <h2 style="margin-top:22px">What gifts control <span class="right" style="font-weight:400;text-transform:none">pick where the gifts' actions happen</span></h2>
-        <div class="seg" role="radiogroup" aria-label="How gifts reach the game">
+        <h2 style="margin-top:22px" id="connHead">What gifts control <span class="right" style="font-weight:400;text-transform:none">pick where the gifts' actions happen</span></h2>
+        <div class="seg" role="radiogroup" aria-label="How gifts reach the game" id="connSeg">
           <button data-conn="minecraft" role="radio">Minecraft</button>
           <button data-conn="keys" role="radio">Key presses</button>
           <button data-conn="none" role="radio">Sounds only</button>
@@ -1078,6 +1078,7 @@ ubIntro.start();
       <button class="type" data-ntype="minecraft" role="radio"><b>Minecraft</b><span>Runs Minecraft commands on your server (RCON).</span></button>
       <button class="type" data-ntype="keys" role="radio"><b>Key presses</b><span>Presses keys in whatever game is open. Works with lots of PC games.</span></button>
       <button class="type" data-ntype="none" role="radio"><b>Sounds only</b><span>Just sounds and stream popups for gifts.</span></button>
+      <button class="type" data-ntype="bubblewrap" role="radio"><b>Bubble Wrap</b><span>Unbound's own game: pop 1,000,000 bubbles while gifts help and troll you.</span></button>
     </div>
     <p class="hint">You can give it a cover picture after it's made.</p>
     <div class="toolbar"><button class="primary" id="nCreate" style="margin-left:auto">Create game</button></div>
@@ -1831,7 +1832,17 @@ function renderStatus() {
     dot = status.gameClients ? 'on' : 'wait';
     text = status.gameClients ? `Game connected${status.gameClients > 1 ? ` (${status.gameClients})` : ''}` : 'Waiting for your game';
   } else if (c === 'keys') { dot = 'on'; text = 'Key presses ready'; }
+  else if (c === 'bubblewrap') {
+    const b = status.bubble;
+    dot = b?.open ? 'on' : '';
+    text = b?.open ? `Bubble Wrap is open: ${(b.popped || 0).toLocaleString('en-US')} popped` : 'Bubble Wrap: press Play Bubble Wrap';
+  }
   $('gmDot').className = 'dot ' + dot;
+  if (c === 'bubblewrap') {
+    const b = status.bubble || {};
+    if ($('bwState')) $('bwState').textContent = b.open ? `Open: ${(b.popped || 0).toLocaleString('en-US')} popped` : 'Not open';
+    if ($('playBw')) $('playBw').textContent = b.open ? 'Bubble Wrap is open' : 'Play Bubble Wrap';
+  }
   $('gmText').textContent = text;
   // while Play is getting everything ready, its button says what it's doing
   if (playing_ && $('playMc') && !status.play?.step) $('playMc').textContent = /ready|connected/i.test(text) && !/building/i.test(text) ? 'Opening Minecraft…' : text;
@@ -1842,7 +1853,7 @@ function renderStatus() {
 }
 
 // ----- Games screen (covers) and the game page -----
-const CONN_NAMES = { minecraft: 'Minecraft', websocket: 'Game link', keys: 'Key presses', none: 'Sounds only' };
+const CONN_NAMES = { minecraft: 'Minecraft', websocket: 'Game link', keys: 'Key presses', none: 'Sounds only', bubblewrap: 'Bubble Wrap' };
 let view = 'home';
 const coverHtml = g => g.cover
   ? `<img src="/cover/${encodeURIComponent(g.id)}?v=${g.cover}" alt="" onerror="this.outerHTML='<div class=blank>'+this.dataset.name+'</div>'" data-name="${esc(esc(g.name))}">`
@@ -2012,6 +2023,8 @@ connectGiftHype();`;
 
 function renderConnector() {
   renderPlay();
+  // Bubble Wrap is its own game: nothing to pick
+  $('connHead').hidden = $('connSeg').hidden = game.connector === 'bubblewrap';
   document.querySelectorAll('[data-conn]').forEach(b => b.setAttribute('aria-checked', String(b.dataset.conn === game.connector)));
   const box = $('connBox');
   const m = game.minecraft;
@@ -2025,6 +2038,18 @@ function renderConnector() {
       <p class="hint">Unity, Godot, Python and most engines have a WebSocket client too: connect to the same address and read the same JSON.</p>
     </details>`;
     $('wsCopy').onclick = () => { navigator.clipboard.writeText(WS_SNIPPET(port)); toast('Code copied'); };
+  } else if (game.connector === 'bubblewrap') {
+    const b = status.bubble || {};
+    box.innerHTML = `<div class="conn-box">
+        <p class="wide" style="margin:0"><b>Pop 1,000,000 bubbles</b>, in 3D, first person. A huge sheet of bubble wrap, 1,000 by 1,000 bubbles. Walk on it with <b>W A S D</b>, look round with the mouse (click the game first), and pop it all while gifts help you and troll you. You start with your <b>hand</b> (1 bubble at a time: click the one you look at, or <b>Space</b>); gifts give you better tools for a while: <b>boots</b> (pop where you step), a <b>rolling pin</b> (3 wide), a <b>lawn roller</b> (5 wide) and the <b>steamroller</b> (11 wide, you drive it from the cab: <b>W S</b> to drive, <b>A D</b> to steer), or a random one. Other gifts add bubble wrap, pop bubbles for you, or jail you.</p>
+        <p class="wide" style="margin:0"><span class="pill" id="bwState">${b.open ? `Open: ${(b.popped || 0).toLocaleString('en-US')} popped` : 'Not open'}</span></p>
+        <div class="wide row"><button class="small ghost danger" id="bwNew" title="Every bubble back: start again from 0">New sheet</button></div>
+      </div>
+      <p class="hint"><b>How to stream it:</b> press <b>Play Bubble Wrap</b> and it opens in a window of its own. In TikTok LIVE Studio or OBS add that window (<b>Window capture</b>, "Bubble Wrap · Unbound"). The counter is saved as you go, so next stream you carry on where you stopped. <b>M</b> turns the game's pop sounds off and on.</p>`;
+    $('bwNew').onclick = async () => {
+      if (!confirm('Start a new sheet?\n\nEvery bubble comes back and the counter goes back to 0.')) return;
+      try { await api('/api/bubble/new-sheet', {}); toast('New sheet: 1,000,000 bubbles to go'); } catch (e) { toast(e.message, true); }
+    };
   } else if (game.connector === 'keys') {
     box.innerHTML = `<p class="hint">Unbound presses keys in <b>whatever window is in front</b>, so click into your game before going live. Type keys like <code>w</code>, <code>{SPACE}</code>, <code>{ENTER}</code>, <code>{UP}</code>, <code>{F1}</code>. <code>^</code> = Ctrl, <code>+</code> = Shift, <code>%</code> = Alt (e.g. <code>^s</code>). It works in lots of PC games; a few (mostly anti-cheat ones) ignore pretend key presses.</p>`;
   } else {
@@ -2044,6 +2069,11 @@ let playing_ = false;
 function renderPlay() {
   const box = $('playBox');
   if (!box) return;
+  if (game?.connector === 'bubblewrap') {
+    box.innerHTML = `<button class="hot play-btn" id="playBw" title="Opens Bubble Wrap in a window of its own">${status.bubble?.open ? 'Bubble Wrap is open' : 'Play Bubble Wrap'}</button>`;
+    $('playBw').onclick = async () => { try { await api('/api/bubble/open', {}); toast('Bubble Wrap is opening in its own window'); } catch (e) { toast(e.message, true); } };
+    return;
+  }
   if (!game || game.connector !== 'minecraft' || !(game.minecraft.single || isDropperMode() || isParkourMode())) { box.innerHTML = ''; return; }
   const step = playing_ && status.play?.state === 'getting ready' ? status.play.step : '';
   box.innerHTML = `<button class="hot play-btn" id="playMc" title="Gets everything ready (the first time it downloads what's needed), then opens Minecraft straight into your world" ${playing_ ? 'disabled' : ''}>${playing_ ? (step === 'map' ? 'Waiting for the map…' : 'Opening your world…') : 'Play Minecraft'}</button>
@@ -2224,6 +2254,11 @@ const ACTION_TYPES = {
   command: { label: 'Custom command', conn: 'minecraft', fields: { command: { text: 'e.g. give {player} diamond 5', def: '' } } },
   message: { label: 'Send to my game', conn: 'websocket', fields: { name: { text: 'action name, e.g. spawnEnemy', def: '' }, amount: { label: 'amount', def: 1, min: 1 } } },
   keys: { label: 'Press keys', conn: 'keys', fields: { keys: { text: 'e.g. {SPACE} or w', def: '' }, times: { label: 'times', def: 1, min: 1 } } },
+  bubbleAdd: { label: 'Add bubble wrap', conn: 'bubblewrap', desc: 'Fresh bubble wrap lands round you: that many popped bubbles come back (the counter goes down)', fields: { amount: { label: 'bubbles', def: 1000, min: 1, max: 1000000 } } },
+  bubbleRemove: { label: 'Pop bubbles for you', conn: 'bubblewrap', desc: 'A wave goes out from you and pops that many bubbles (the counter goes up)', fields: { amount: { label: 'bubbles', def: 1000, min: 1, max: 1000000 } } },
+  bubbleTool: { label: 'Give a tool', conn: 'bubblewrap', desc: 'You get that tool for a while, then go back to your hand. Hand: 1 at a time (worst) · Boots: where you step · Rolling pin: 3 wide · Lawn roller: 5 wide · Steamroller: 11 wide, you drive it (best)', fields: { tool: { label: 'tool', def: 'steam', choices: [['hand', 'Hand (1 at a time)'], ['boots', 'Boots'], ['pin', 'Rolling pin (3 wide)'], ['roller', 'Lawn roller (5 wide)'], ['steam', 'Steamroller (11 wide)']] }, seconds: { label: 'seconds', def: 30, min: 1, max: 3600 } } },
+  bubbleRandom: { label: 'Random tool', conn: 'bubblewrap', desc: 'A wheel spins through the five tools on the game screen and lands on one. The numbers are the chances (they don\'t have to add up to 100: a tool with 20 is twice as likely as one with 10, 0 = never)', fields: { seconds: { label: 'seconds', def: 30, min: 1, max: 3600 }, hand: { label: 'Hand', def: 10, min: 0 }, boots: { label: 'Boots', def: 30, min: 0 }, pin: { label: 'Rolling pin', def: 30, min: 0 }, roller: { label: 'Lawn roller', def: 20, min: 0 }, steam: { label: 'Steamroller', def: 10, min: 0 } } },
+  bubbleJail: { label: 'Jail', conn: 'bubblewrap', desc: 'A cage drops round you: you can\'t move or pop until it opens. More jail adds more time', fields: { seconds: { label: 'seconds', def: 10, min: 1, max: 3600 } } },
   wait: { label: 'Wait', conn: '*', fields: { seconds: { label: 'seconds', def: 1, min: 0, step: 0.5 } } },
 };
 const newAction = type => ({ type, ...Object.fromEntries(Object.entries(ACTION_TYPES[type].fields || {}).map(([k, f]) => [k, f.def])) });

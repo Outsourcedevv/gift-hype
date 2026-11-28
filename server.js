@@ -4,6 +4,7 @@
 // do things in the game, through one of these:
 //   minecraft - commands sent to a Minecraft server over RCON
 //   websocket - JSON messages to your own game, which connects to ws://127.0.0.1:<wsPort>
+//   bubblewrap - Bubble Wrap, Unbound's own game (public/bubblewrap.html, in a window of its own)
 //   keys      - key presses sent to whatever window is in front (works in many PC games)
 //   none      - sounds and overlay only
 //
@@ -146,7 +147,7 @@ function normalizeGame(g) {
         // Cover picture on the games screen: '' (none), 'file:<name>' (uploaded, in data/covers)
         // or a link to an official store picture (downloaded once, then kept in data/covers).
         cover: typeof g.cover === 'string' && (/^file:[\w.-]+$/.test(g.cover) || isCoverUrl(g.cover)) ? g.cover : '',
-        connector: ['minecraft', 'websocket', 'keys', 'none'].includes(g.connector) ? g.connector : 'none',
+        connector: ['minecraft', 'websocket', 'keys', 'none', 'bubblewrap'].includes(g.connector) ? g.connector : 'none',
         // serverFolder: a server found on this PC; its RCON port and password are read from its
         // server.properties. Without one, host/port/password are used as typed.
         // single: a singleplayer world (world = its folder name in .minecraft/saves) instead of a server
@@ -286,6 +287,35 @@ const parkourWorld = () => {
 const worldOf = g => courseOf(g)?.world || (isParkour(g) ? parkourWorld() : g.minecraft.world);
 const isSingle = g => isDropper(g) || !!g.minecraft.single;
 
+// ---------- Bubble Wrap: pop 1,000,000 bubbles (Unbound's own game, public/bubblewrap.html) ----------
+// Its gifts add or pop bubble wrap, give a tool (or a random one), or jail you. The sheet is kept in
+// data/bubblewrap.json, so it carries on next stream.
+const BUBBLE_TOOLS = ['hand', 'boots', 'pin', 'roller', 'steam'];
+const BUBBLE_RULES = [
+    { gift: 'Rose', sound: 'builtin/bonk.mp3', label: 'Pops 50 for you', actions: [{ type: 'bubbleRemove', amount: 50 }] },
+    { gift: 'Finger Heart', sound: 'builtin/oh-no.mp3', label: '+500 bubble wrap', actions: [{ type: 'bubbleAdd', amount: 500 }] },
+    { gift: 'Rosa', sound: 'builtin/wrong-buzzer.mp3', label: 'Jail for 10s', actions: [{ type: 'bubbleJail', seconds: 10 }] },
+    { gift: 'Doughnut', sound: 'builtin/boing.mp3', label: 'Boots for 30s', actions: [{ type: 'bubbleTool', tool: 'boots', seconds: 30 }] },
+    { gift: 'Paper Crane', sound: 'builtin/whoosh.mp3', label: 'Rolling pin for 30s', actions: [{ type: 'bubbleTool', tool: 'pin', seconds: 30 }] },
+    { gift: 'Hand Hearts', sound: 'builtin/anime-wow.mp3', label: 'Random tool', perCount: false, actions: [{ type: 'bubbleRandom', seconds: 30, hand: 10, boots: 30, pin: 30, roller: 20, steam: 10 }] },
+    { gift: 'Corgi', sound: 'builtin/level-up.mp3', label: 'Lawn roller for 30s', actions: [{ type: 'bubbleTool', tool: 'roller', seconds: 30 }] },
+    { gift: 'Boxing Gloves', sound: 'builtin/fahh.mp3', label: '+10,000 bubble wrap', actions: [{ type: 'bubbleAdd', amount: 10000 }] },
+    { gift: 'Money Gun', sound: 'builtin/here-comes-the-money.mp3', label: 'Steamroller for 30s', actions: [{ type: 'bubbleTool', tool: 'steam', seconds: 30 }] },
+    { gift: 'Galaxy', sound: 'builtin/nooo.mp3', label: '+50,000 bubble wrap', perCount: false, actions: [{ type: 'bubbleAdd', amount: 50000 }] },
+    { gift: 'Glowing Jellyfish', sound: 'builtin/cha-ching.mp3', label: 'Pops 25,000 for you', perCount: false, actions: [{ type: 'bubbleRemove', amount: 25000 }] },
+];
+const BUBBLE_FILE = path.join(DATA, 'bubblewrap.json');
+// its cover, kept with the other covers
+function bubbleCover() {
+    try {
+        fs.mkdirSync(COVERS_DIR, { recursive: true });
+        const to = path.join(COVERS_DIR, 'bubblewrap.jpg');
+        if (!fs.existsSync(to)) fs.copyFileSync(path.join(ROOT, 'public', 'img', 'game-bubblewrap.jpg'), to);
+        return 'file:bubblewrap.jpg';
+    } catch { return ''; }
+}
+const makeBubbleGame = (name = 'Bubble Wrap') => normalizeGame({ id: newId(), name, connector: 'bubblewrap', cover: bubbleCover(), modes: [{ id: newId(), name: '', rules: normalizeRules(BUBBLE_RULES) }] });
+
 let games = loadGames();
 const saveGame = g => writeJson(gamePath(g.id), g);
 
@@ -407,6 +437,11 @@ if (!settings.chatTeleport) {
 if (!settings.covers) {
     for (const g of Object.values(games)) if (g.connector === 'minecraft' && /minecraft/i.test(g.name) && !g.cover) { g.cover = MINECRAFT_COVER; saveGame(g); }
     settings.covers = true; saveSettings();
+}
+// Bubble Wrap is added once (next to Minecraft), for everyone
+if (!settings.bubbleGame) {
+    if (!Object.values(games).some(g => g.connector === 'bubblewrap')) { const b = makeBubbleGame(); games[b.id] = b; saveGame(b); }
+    settings.bubbleGame = true; saveSettings();
 }
 if (!games[settings.activeGame]) settings.activeGame = Object.keys(games)[0] || null;
 for (const g of Object.values(games)) {
@@ -1162,6 +1197,7 @@ async function runAction(game, a, ctx) {
         }
         return;
     }
+    if (game.connector === 'bubblewrap' && /^bubble/.test(a.type)) return bubbleAction(a, ctx);
     if (a.type === 'command') {
         if (game.connector !== 'minecraft') return;
         for (let i = 0; i < times; i++) await mc(fill(a.command || '', ctx)).catch(e => log(`Command failed: ${e.message}`));
@@ -1176,6 +1212,42 @@ async function runAction(game, a, ctx) {
     } else if (a.type === 'wait') {
         await sleep(Math.max(0, Math.min(60000, (+a.seconds || 1) * 1000)));
     }
+}
+
+// A Bubble Wrap gift action, sent to the game's window (it listens on /api/events)
+function bubbleAction(a, ctx) {
+    const n = ctx.perCount ? Math.max(1, ctx.count || 1) : 1;
+    const base = { from: ctx.from, gift: ctx.gift, image: ctx.image || null };
+    const secs = v => Math.max(1, Math.min(3600, Math.round(+v || 30)));
+    if (!status.bubble?.open) log('Bubble Wrap is not open: press Play Bubble Wrap in Unbound to get gifts in the game.');
+    if (a.type === 'bubbleAdd' || a.type === 'bubbleRemove') {
+        const amount = Math.max(1, Math.min(1000000, Math.round(+a.amount || 1) * n));
+        broadcast('bubble', { ...base, kind: a.type === 'bubbleAdd' ? 'add' : 'remove', amount });
+    } else if (a.type === 'bubbleTool') {
+        broadcast('bubble', { ...base, kind: 'tool', tool: BUBBLE_TOOLS.includes(a.tool) ? a.tool : 'steam', seconds: Math.min(3600, secs(a.seconds) * n) });
+    } else if (a.type === 'bubbleRandom') {
+        // picked here, with the chances set on the action; the game spins and lands on it
+        const chances = Object.fromEntries(BUBBLE_TOOLS.map(t => [t, Math.max(0, +a[t] || 0)]));
+        const total = Object.values(chances).reduce((x, y) => x + y, 0);
+        for (let k = 0; k < Math.min(n, 5); k++) {
+            let roll = Math.random() * (total || 1), tool = 'hand';
+            if (total) for (const t of BUBBLE_TOOLS) { if ((roll -= chances[t]) < 0) { tool = t; break; } }
+            log(`Random tool for ${ctx.from}: ${tool}`);
+            broadcast('bubble', { ...base, kind: 'tool', tool, seconds: secs(a.seconds), spin: true, chances });
+        }
+    } else if (a.type === 'bubbleJail') {
+        broadcast('bubble', { ...base, kind: 'jail', seconds: Math.min(3600, secs(a.seconds) * n) });
+    }
+}
+// Is the game's window open? It says hello every few seconds.
+let bubbleSeen = 0;
+setInterval(() => { if (status.bubble?.open && Date.now() - bubbleSeen > 9000) setStatus({ bubble: { ...status.bubble, open: false } }); }, 3000);
+function openBubbleWindow() {
+    const url = `http://localhost:${settings.port}/bubblewrap`;
+    if (NO_OPEN) return;
+    if (!EDGE) { spawn('cmd', ['/c', 'start', '', url], { detached: true, stdio: 'ignore', windowsHide: true }).on('error', () => {}).unref(); return; }
+    spawn(EDGE, [`--app=${url}`, `--user-data-dir=${path.join(ROOT, 'data', 'window')}`, '--autoplay-policy=no-user-gesture-required', '--window-size=1280,760', '--no-first-run', '--no-default-browser-check'],
+        { stdio: 'ignore', detached: true }).on('error', e => log(`Bubble Wrap's window couldn't open: ${e.message}`)).unref();
 }
 
 function findRule(game, giftName) {
@@ -1565,7 +1637,30 @@ const routes = {
         broadcast('settings', publicState().settings);
         return { ok: true };
     },
+    // Bubble Wrap: its sheet (gzipped bits, from the game), and its window
+    'GET /api/bubble/state': () => { try { return JSON.parse(fs.readFileSync(BUBBLE_FILE, 'utf8')); } catch { return { data: null }; } },
+    'POST /api/bubble/save': b => {
+        if (typeof b.data !== 'string' || b.data.length > 900000 || !/^[A-Za-z0-9+/=]*$/.test(b.data)) throw new Error('Bad sheet');
+        writeJson(BUBBLE_FILE, { data: b.data, x: +b.x || 0, y: +b.y || 0, popped: Math.max(0, Math.min(1000000, +b.popped || 0)), at: Date.now() });
+        return { ok: true };
+    },
+    'POST /api/bubble/hello': b => {
+        bubbleSeen = Date.now();
+        const next = { open: true, popped: Math.max(0, Math.min(1000000, Math.round(+b.popped || 0))), tool: BUBBLE_TOOLS.includes(b.tool) ? b.tool : 'hand' };
+        if (!status.bubble?.open || status.bubble.popped !== next.popped || status.bubble.tool !== next.tool) setStatus({ bubble: next });
+        return { ok: true };
+    },
+    'POST /api/bubble/open': () => { openBubbleWindow(); return { ok: true }; },
+    // a new sheet: every bubble back, 0 popped
+    'POST /api/bubble/new-sheet': () => {
+        fs.rmSync(BUBBLE_FILE, { force: true });
+        broadcast('bubble', { kind: 'newsheet' });
+        setStatus({ bubble: { ...(status.bubble || {}), popped: 0 } });
+        log('Bubble Wrap: a new sheet, 1,000,000 bubbles to go.');
+        return { ok: true };
+    },
     'POST /api/games/new': b => {
+        if (b.connector === 'bubblewrap') { const bg = makeBubbleGame(String(b.name || 'Bubble Wrap').slice(0, 60)); games[bg.id] = bg; saveGame(bg); setActive(bg.id); return { ok: true, id: bg.id }; }
         const g = normalizeGame({ id: newId(), name: b.name || 'New game', connector: b.connector || 'none', cover: /minecraft/i.test(b.name || '') && b.connector === 'minecraft' ? MINECRAFT_COVER : '', rules: [] });
         if (g.connector === 'minecraft') g.minecraft.serverFolder = findServers().find(f => f.rcon)?.folder || '';
         games[g.id] = g;
@@ -1744,7 +1839,7 @@ function allowed(req) {
     return true;
 }
 
-const STATIC = { '/': 'app.html', '/overlay': 'overlay.html' };
+const STATIC = { '/': 'app.html', '/overlay': 'overlay.html', '/bubblewrap': 'bubblewrap.html' };
 
 // ---------- Covers ----------
 const coverVersion = g => g.cover ? crypto.createHash('md5').update(g.cover).digest('hex').slice(0, 8) : '';
@@ -1800,6 +1895,11 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && /^\/fonts\/[\w-]+\.ttf$/.test(url.pathname)) {
         const f = path.join(ROOT, 'public', url.pathname);
         if (fs.existsSync(f)) { res.writeHead(200, { 'Content-Type': 'font/ttf', 'Cache-Control': 'max-age=86400', 'Access-Control-Allow-Origin': '*' }); return res.end(fs.readFileSync(f)); }
+    }
+    // three.js, for Bubble Wrap (kept here so the game works without the internet)
+    if (req.method === 'GET' && /^\/vendor\/[\w.-]+\.js$/.test(url.pathname)) {
+        const f = path.join(ROOT, 'public', url.pathname);
+        if (fs.existsSync(f)) { res.writeHead(200, { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'max-age=86400' }); return res.end(fs.readFileSync(f)); }
     }
     if (req.method === 'GET' && /^\/img\/[\w-]+\.(svg|jpg|png|webp)$/.test(url.pathname)) {
         const f = path.join(ROOT, 'public', url.pathname), ext = path.extname(url.pathname).slice(1);
