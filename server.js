@@ -301,8 +301,10 @@ const BUBBLE_RULES = [
     { gift: 'Corgi', sound: 'builtin/level-up.mp3', label: 'Lawn roller for 30s', actions: [{ type: 'bubbleTool', tool: 'roller', seconds: 30 }] },
     { gift: 'Boxing Gloves', sound: 'builtin/fahh.mp3', label: '+10,000 bubble wrap', actions: [{ type: 'bubbleAdd', amount: 10000 }] },
     { gift: 'Money Gun', sound: 'builtin/here-comes-the-money.mp3', label: 'Steamroller for 30s', actions: [{ type: 'bubbleTool', tool: 'steam', seconds: 30 }] },
-    { gift: 'Galaxy', sound: 'builtin/nooo.mp3', label: '+50,000 bubble wrap', perCount: false, actions: [{ type: 'bubbleAdd', amount: 50000 }] },
-    { gift: 'Glowing Jellyfish', sound: 'builtin/cha-ching.mp3', label: 'Pops 25,000 for you', perCount: false, actions: [{ type: 'bubbleRemove', amount: 25000 }] },
+    { gift: 'Galaxy', sound: 'builtin/i-need-a-hero.mp3', label: 'Reset in 60s', perCount: false, actions: [{ type: 'bubbleReset', seconds: 60 }] },
+    { gift: 'Glowing Jellyfish', sound: 'builtin/cha-ching.mp3', label: 'Saves the sheet', perCount: false, actions: [{ type: 'bubbleSave' }] },
+    { gift: 'Whale Diving', sound: 'builtin/nooo.mp3', label: '+50,000 bubble wrap', perCount: false, actions: [{ type: 'bubbleAdd', amount: 50000 }] },
+    { gift: 'Interstellar', sound: 'builtin/here-comes-the-money.mp3', label: 'Pops 100,000 for you', perCount: false, actions: [{ type: 'bubbleRemove', amount: 100000 }] },
 ];
 const BUBBLE_FILE = path.join(DATA, 'bubblewrap.json');
 // its cover, kept with the other covers
@@ -1220,6 +1222,7 @@ function bubbleAction(a, ctx) {
     const base = { from: ctx.from, gift: ctx.gift, image: ctx.image || null };
     const secs = v => Math.max(1, Math.min(3600, Math.round(+v || 30)));
     if (!status.bubble?.open) log('Bubble Wrap is not open: press Play Bubble Wrap in Unbound to get gifts in the game.');
+    if (a.type === 'bubbleReset' || a.type === 'bubbleSave') return;   // the reset countdown (handleGift) does these
     if (a.type === 'bubbleAdd' || a.type === 'bubbleRemove') {
         const amount = Math.max(1, Math.min(1000000, Math.round(+a.amount || 1) * n));
         broadcast('bubble', { ...base, kind: a.type === 'bubbleAdd' ? 'add' : 'remove', amount });
@@ -1238,6 +1241,13 @@ function bubbleAction(a, ctx) {
     } else if (a.type === 'bubbleJail') {
         broadcast('bubble', { ...base, kind: 'jail', seconds: Math.min(3600, secs(a.seconds) * n) });
     }
+}
+// a new sheet: every bubble back, 0 popped (the button, or a reset nobody saved)
+function bubbleNewSheet(why) {
+    fs.rmSync(BUBBLE_FILE, { force: true });
+    broadcast('bubble', { kind: 'newsheet', why: why || null });
+    setStatus({ bubble: { ...(status.bubble || {}), popped: 0 } });
+    log(`Bubble Wrap: a new sheet${why ? ` (${why})` : ''}, 1,000,000 bubbles to go.`);
 }
 // Is the game's window open? It says hello every few seconds.
 let bubbleSeen = 0;
@@ -1263,24 +1273,28 @@ function resetPublic() {
     if (!dropperReset) return { active: false };
     return { active: true, secondsLeft: Math.max(0, Math.ceil((dropperReset.endsAt - Date.now()) / 1000)), total: dropperReset.total, saveGift: dropperReset.save };
 }
+// the reset and the save: the Dropper's / Wipeout's, and Bubble Wrap's (there a reset brings the whole sheet back)
+const RESET_TYPES = new Set(['resetTimer', 'bubbleReset']), SAVE_TYPES = new Set(['saveReset', 'bubbleSave']);
 function saveGiftOf(game) {
-    const r = rulesOf(game).find(x => x.actions.some(a => a.type === 'saveReset'));
+    const r = rulesOf(game).find(x => x.actions.some(a => SAVE_TYPES.has(a.type)));
     return r ? { name: r.gift, image: findGift(r.gift)?.image || r.image || null } : null;
 }
 function dropperResetGift(game, rule, from) {
-    const reset = rule.actions.find(a => a.type === 'resetTimer'), save = rule.actions.some(a => a.type === 'saveReset');
+    const reset = rule.actions.find(a => RESET_TYPES.has(a.type)), save = rule.actions.some(a => SAVE_TYPES.has(a.type));
     if (reset) {
         if (dropperShields > 0) { dropperShields--; broadcast('reset', { active: false, event: 'blocked', by: from }); return 'blocked'; }
         if (dropperReset) return 'running';
         const secs = Math.max(5, Math.min(600, Math.round(+reset.seconds || 60)));
-        dropperReset = { endsAt: Date.now() + secs * 1000, total: secs, save: saveGiftOf(game), by: from };
+        dropperReset = { endsAt: Date.now() + secs * 1000, total: secs, save: saveGiftOf(game), by: from, bubble: game.connector === 'bubblewrap' };
         clearInterval(resetTicker);
         resetTicker = setInterval(() => {
             if (!dropperReset) return clearInterval(resetTicker);
             if (Date.now() >= dropperReset.endsAt) {
-                const by = dropperReset.by; dropperReset = null; clearInterval(resetTicker);
+                const by = dropperReset.by, bubble = dropperReset.bubble; dropperReset = null; clearInterval(resetTicker);
                 broadcast('stopSound', { id: 'reset' });
-                return broadcast('reset', { active: false, event: 'done', by });
+                broadcast('reset', { active: false, event: 'done', by });
+                if (bubble) bubbleNewSheet(`${by}'s reset ran out`);
+                return;
             }
             broadcast('reset', resetPublic());
         }, 1000);
@@ -1318,7 +1332,7 @@ async function handleGift(giftName, count, from, image, coins) {
     log(`${from} ${entry.event === 'follow' ? 'followed you' : `sent ${count > 1 ? count + ' x ' : ''}${giftName}`}${rule ? ` -> ${entry.did}` : ' (nothing set up for it)'}`);
     if (!rule) return;
 
-    const dropper = isDropper(game), resetEvent = dropper ? dropperResetGift(game, rule, from) : null;
+    const dropper = isDropper(game), resetEvent = dropper || game.connector === 'bubblewrap' ? dropperResetGift(game, rule, from) : null;
     // a reset's sound plays on (looping) for the whole countdown, until it's saved or runs out
     const soundFile = pickSound(rule.sound);
     // the part that plays: the gift's own cut (not for random sounds: each is a different file), and the
@@ -1652,13 +1666,7 @@ const routes = {
     },
     'POST /api/bubble/open': () => { openBubbleWindow(); return { ok: true }; },
     // a new sheet: every bubble back, 0 popped
-    'POST /api/bubble/new-sheet': () => {
-        fs.rmSync(BUBBLE_FILE, { force: true });
-        broadcast('bubble', { kind: 'newsheet' });
-        setStatus({ bubble: { ...(status.bubble || {}), popped: 0 } });
-        log('Bubble Wrap: a new sheet, 1,000,000 bubbles to go.');
-        return { ok: true };
-    },
+    'POST /api/bubble/new-sheet': () => { bubbleNewSheet(); return { ok: true }; },
     'POST /api/games/new': b => {
         if (b.connector === 'bubblewrap') { const bg = makeBubbleGame(String(b.name || 'Bubble Wrap').slice(0, 60)); games[bg.id] = bg; saveGame(bg); setActive(bg.id); return { ok: true, id: bg.id }; }
         const g = normalizeGame({ id: newId(), name: b.name || 'New game', connector: b.connector || 'none', cover: /minecraft/i.test(b.name || '') && b.connector === 'minecraft' ? MINECRAFT_COVER : '', rules: [] });
@@ -1897,9 +1905,14 @@ const server = http.createServer(async (req, res) => {
         if (fs.existsSync(f)) { res.writeHead(200, { 'Content-Type': 'font/ttf', 'Cache-Control': 'max-age=86400', 'Access-Control-Allow-Origin': '*' }); return res.end(fs.readFileSync(f)); }
     }
     // three.js, for Bubble Wrap (kept here so the game works without the internet)
-    if (req.method === 'GET' && /^\/vendor\/[\w.-]+\.js$/.test(url.pathname)) {
+    if (req.method === 'GET' && /^\/vendor\/([\w-]+\/)*[\w.-]+\.js$/.test(url.pathname) && !url.pathname.includes('..')) {
         const f = path.join(ROOT, 'public', url.pathname);
         if (fs.existsSync(f)) { res.writeHead(200, { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'max-age=86400' }); return res.end(fs.readFileSync(f)); }
+    }
+    // Bubble Wrap's 3D models (made in Blender: tools/blender/build_bubblewrap.py)
+    if (req.method === 'GET' && /^\/models\/[\w-]+\.glb$/.test(url.pathname)) {
+        const f = path.join(ROOT, 'public', url.pathname);
+        if (fs.existsSync(f)) { res.writeHead(200, { 'Content-Type': 'model/gltf-binary', 'Cache-Control': 'max-age=3600' }); return res.end(fs.readFileSync(f)); }
     }
     if (req.method === 'GET' && /^\/img\/[\w-]+\.(svg|jpg|png|webp)$/.test(url.pathname)) {
         const f = path.join(ROOT, 'public', url.pathname), ext = path.extname(url.pathname).slice(1);
