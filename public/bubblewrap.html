@@ -1,0 +1,895 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bubble Wrap · Unbound</title>
+<link rel="icon" href="/img/logo.svg" type="image/svg+xml">
+<style>
+/* Bubble Wrap: pop 1,000,000 bubbles, in 3D, first person. A sheet of bubble wrap 1000 x 1000 bubbles
+   (500 m across) on a field; walk on it (or drive the steamroller) and pop it all. Gifts come in from
+   Unbound: add / pop bubble wrap, a tool, a random tool, jail. The sheet is saved in Unbound. */
+:root {
+  --ink: #fff; --panel: rgba(10, 14, 30, .70); --line: rgba(255, 255, 255, .14); --muted: #c3cbea;
+  --gold: #ffd84a; --pink: #ff4f8b; --cyan: #5ee6ff; --green: #5cf08a; --red: #ff5a5a;
+  --font: 'Segoe UI', system-ui, -apple-system, sans-serif; --big: 'Segoe UI Black', 'Arial Black', 'Segoe UI', system-ui, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: #9fd0f5; color: var(--ink); font: 15px/1.3 var(--font); user-select: none; }
+canvas#game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+.hud { position: fixed; pointer-events: none; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; backdrop-filter: blur(6px); box-shadow: 0 10px 30px rgba(0,0,0,.30); }
+
+#counter { top: 14px; left: 50%; transform: translateX(-50%); padding: 10px 22px 12px; text-align: center; min-width: 360px; }
+#counter .num { font: 900 46px/1 var(--big); letter-spacing: -1px; text-shadow: 0 3px 0 rgba(0,0,0,.35); font-variant-numeric: tabular-nums; }
+#counter .of { color: var(--muted); font-weight: 700; font-size: 15px; margin-top: 2px; }
+#counter .bar { height: 10px; border-radius: 99px; background: rgba(255,255,255,.14); margin-top: 8px; overflow: hidden; }
+#counter .bar i { display: block; height: 100%; width: 0; border-radius: 99px; background: linear-gradient(90deg, var(--cyan), #9b7bff, var(--pink)); transition: width .25s; }
+#counter .pct { position: absolute; right: 14px; top: 10px; color: var(--muted); font-weight: 800; font-size: 13px; }
+#counter.bump .num { animation: bump .25s; }
+@keyframes bump { 40% { transform: scale(1.06); } }
+
+#tool { top: 14px; left: 14px; display: flex; align-items: center; gap: 12px; padding: 10px 14px 10px 10px; min-width: 250px; }
+#tool .ic { width: 58px; height: 58px; border-radius: 12px; background: rgba(255,255,255,.08); display: grid; place-items: center; flex: none; }
+#tool .ic svg { width: 46px; height: 46px; }
+#tool b { display: block; font: 900 20px/1.1 var(--big); }
+#tool span { color: var(--muted); font-size: 13px; font-weight: 600; }
+#tool .tbar { height: 6px; border-radius: 99px; background: rgba(255,255,255,.12); margin-top: 6px; overflow: hidden; }
+#tool .tbar i { display: block; height: 100%; background: var(--gold); width: 100%; }
+.stars { color: var(--gold); letter-spacing: 1px; font-size: 12px; }
+
+#feed { top: 14px; right: 14px; width: 300px; display: flex; flex-direction: column; gap: 8px; }
+#feed .ev { padding: 8px 12px; display: flex; gap: 10px; align-items: center; animation: slidein .3s ease; font-weight: 700; font-size: 14px; }
+#feed .ev img { width: 30px; height: 30px; object-fit: contain; flex: none; }
+.who { color: var(--gold); }
+#feed .ev.out { opacity: 0; transition: opacity .6s; }
+@keyframes slidein { from { transform: translateX(30px); opacity: 0; } }
+
+#mini { right: 14px; bottom: 14px; padding: 8px; }
+#mini canvas { display: block; width: 170px; height: 170px; border-radius: 8px; image-rendering: pixelated; }
+#help { left: 14px; bottom: 14px; padding: 8px 12px; color: var(--muted); font-size: 13px; font-weight: 600; }
+#help kbd { background: rgba(255,255,255,.14); border-radius: 5px; padding: 1px 6px; color: #fff; font: 700 12px var(--font); }
+#conn { left: 50%; bottom: 14px; transform: translateX(-50%); padding: 8px 14px; color: #ffcf8a; font-weight: 700; font-size: 13px; }
+#cross { left: 50%; top: 50%; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 2px rgba(0,0,0,.45); }
+#lock { left: 50%; top: 58%; transform: translateX(-50%); padding: 8px 16px; font-weight: 800; font-size: 14px; }
+
+#toast { top: 30%; left: 50%; transform: translate(-50%, -50%); text-align: center; }
+#toast .t { animation: toastin .5s cubic-bezier(.2,1.6,.4,1); }
+#toast .big { font: 900 64px/1 var(--big); letter-spacing: -1px; text-shadow: 0 5px 0 rgba(0,0,0,.4), 0 0 30px rgba(0,0,0,.4); -webkit-text-stroke: 2px rgba(0,0,0,.35); }
+#toast .sub { font: 800 22px var(--font); margin-top: 8px; text-shadow: 0 2px 6px rgba(0,0,0,.8); }
+#toast img { width: 64px; height: 64px; object-fit: contain; display: block; margin: 0 auto 6px; filter: drop-shadow(0 4px 10px rgba(0,0,0,.5)); }
+@keyframes toastin { from { transform: scale(.3); opacity: 0; } }
+
+#roulette { top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 18px 20px 16px; text-align: center; }
+#roulette h3 { margin: 0 0 12px; font: 900 22px var(--big); letter-spacing: .5px; }
+#roulette .row { display: flex; gap: 10px; }
+#roulette .c { width: 110px; padding: 10px 6px 8px; border-radius: 12px; background: rgba(255,255,255,.07); border: 2px solid transparent; transition: transform .08s; }
+#roulette .c svg { width: 64px; height: 64px; display: block; margin: 0 auto 4px; }
+#roulette .c b { font-size: 13px; font-weight: 800; display: block; }
+#roulette .c small { color: var(--muted); font-size: 12px; font-weight: 700; }
+#roulette .c.on { border-color: var(--gold); background: rgba(255, 216, 74, .18); transform: scale(1.08); }
+#roulette .c.win { animation: win .6s ease infinite alternate; }
+@keyframes win { to { box-shadow: 0 0 0 6px rgba(255,216,74,.35), 0 0 40px rgba(255,216,74,.6); } }
+
+#jail { top: 64%; left: 50%; transform: translateX(-50%); padding: 10px 20px; text-align: center; border-color: rgba(255,90,90,.5); }
+#jail b { font: 900 30px var(--big); color: var(--red); letter-spacing: 1px; }
+#jail span { display: block; font-weight: 800; color: #ffd0d0; }
+
+#reset { top: 150px; left: 50%; transform: translateX(-50%); padding: 12px 22px 14px; text-align: center; min-width: 380px; border: 2px solid rgba(255,90,90,.75); background: rgba(40,6,12,.78); }
+#reset .lbl { font: 900 16px var(--big); letter-spacing: 2px; color: #ffb0b0; }
+#reset .secs { font: 900 64px/1 var(--big); color: #ff5a5a; text-shadow: 0 4px 0 rgba(0,0,0,.5); font-variant-numeric: tabular-nums; }
+#reset .save { display: flex; align-items: center; justify-content: center; gap: 10px; font-weight: 800; font-size: 17px; margin-top: 4px; }
+#reset .save img { width: 44px; height: 44px; object-fit: contain; animation: bob 1.2s ease-in-out infinite alternate; }
+#reset .rbar { height: 8px; border-radius: 99px; background: rgba(255,255,255,.12); margin-top: 8px; overflow: hidden; }
+#reset .rbar i { display: block; height: 100%; background: linear-gradient(90deg, #ff5a5a, #ffb84a); transition: width 1s linear; }
+#reset.urgent { animation: urgent .5s ease-in-out infinite alternate; }
+@keyframes urgent { to { box-shadow: 0 0 0 6px rgba(255,60,60,.35), 0 0 50px rgba(255,40,40,.6); } }
+@keyframes bob { to { transform: translateY(-6px) rotate(6deg); } }
+#vignette { inset: 0; box-shadow: inset 0 0 0 rgba(255,0,0,0); transition: box-shadow .4s; }
+#vignette.on { box-shadow: inset 0 0 160px rgba(255,30,30,.55); }
+#shield { top: 150px; right: 14px; padding: 6px 12px; font-weight: 800; color: #9ee8ff; }
+#win { inset: 0; display: grid; place-items: center; background: radial-gradient(circle, rgba(20,10,50,.5), rgba(0,0,0,.75)); pointer-events: auto; }
+#win .box { text-align: center; }
+#win .big { font: 900 90px/1 var(--big); background: linear-gradient(90deg, var(--cyan), #fff, var(--pink)); -webkit-background-clip: text; color: transparent; }
+#win p { font: 800 24px var(--font); }
+#nogl { inset: 0; display: grid; place-items: center; background: #101425; pointer-events: auto; text-align: center; padding: 20px; }
+[hidden] { display: none !important; }
+</style>
+<script type="importmap">{ "imports": { "three": "/vendor/three.module.min.js" } }</script>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div class="hud" id="cross"></div>
+<div class="hud panel" id="lock">Click to look around with the mouse</div>
+<div class="hud panel" id="counter"><span class="pct" id="pct">0%</span><div class="num" id="num">0</div><div class="of">of 1,000,000 bubbles popped</div><div class="bar"><i id="bar"></i></div></div>
+<div class="hud panel" id="tool"><div class="ic" id="toolIc"></div><div style="flex:1;min-width:0"><b id="toolName">Hand</b><span id="toolInfo">pops 1 at a time</span><div class="tbar" id="toolBar" hidden><i id="toolLeft"></i></div></div></div>
+<div class="hud" id="feed"></div>
+<div class="hud panel" id="mini"><canvas id="miniCv" width="200" height="200"></canvas></div>
+<div class="hud panel" id="help"><span id="helpMove"><kbd>W A S D</kbd> move</span> &nbsp; <kbd>Mouse</kbd> look &nbsp; <span id="helpPop"><kbd>Click</kbd> pop</span> &nbsp; <kbd>M</kbd> sound</div>
+<div class="hud panel" id="conn" hidden>Not connected to Unbound: open Unbound to get gifts</div>
+<div class="hud" id="toast"></div>
+<div class="hud panel" id="roulette" hidden><h3>RANDOM TOOL…</h3><div class="row" id="rRow"></div></div>
+<div class="hud panel" id="jail" hidden><b>JAILED</b><span id="jailLeft"></span></div>
+<div class="hud" id="vignette"></div>
+<div class="hud panel" id="reset" hidden><div class="lbl">RESET IN</div><div class="secs" id="resetSecs">60</div><div class="save" id="resetSave"></div><div class="rbar"><i id="resetBar"></i></div></div>
+<div class="hud" id="win" hidden><div class="box"><div class="big">1,000,000</div><p>EVERY BUBBLE IS POPPED!</p></div></div>
+<div class="hud" id="nogl" hidden><div><h2>3D doesn't work on this PC</h2><p>Bubble Wrap needs WebGL. Update your graphics driver, or turn on hardware acceleration in Microsoft Edge's settings.</p></div></div>
+
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from '/vendor/jsm/loaders/GLTFLoader.js';
+
+// ---------- the sheet: 1000 x 1000 bubbles, half a metre apart ----------
+const N = 1000, TOTAL = N * N, SP = 0.5, SIZE = N * SP;
+const bits = new Uint8Array(TOTAL / 8);   // 1 = popped
+let popped = 0;
+const isPopped = (i, j) => (bits[(j * N + i) >> 3] >> ((j * N + i) & 7)) & 1;
+const setBit = (i, j, v) => { const k = j * N + i; if (v) bits[k >> 3] |= 1 << (k & 7); else bits[k >> 3] &= ~(1 << (k & 7)); };
+const cellOf = v => Math.floor(v / SP);
+
+// ---------- the five tools, worst to best ----------
+const TOOLS = {
+  hand:   { name: 'Hand',        info: 'pops 1 at a time',    stars: 1, width: 0,  speed: 4.2, eye: 1.6, turn: 99, reach: 0 },
+  boots:  { name: 'Boots',       info: 'pops where you step', stars: 2, width: 1,  speed: 4.8, eye: 1.6, turn: 99, reach: 0 },
+  pin:    { name: 'Rolling Pin', info: 'pops 3 wide',         stars: 3, width: 3,  speed: 4.6, eye: 1.6, turn: 6,  reach: 0.9 },
+  roller: { name: 'Lawn Roller', info: 'pops 5 wide',         stars: 4, width: 5,  speed: 4.8, eye: 1.6, turn: 3,  reach: 1.7 },
+  steam:  { name: 'Steamroller', info: 'pops 11 wide',        stars: 5, width: 11, speed: 5.6, eye: 3.25, turn: 1.1, reach: 3.6 },
+};
+const ORDER = ['hand', 'boots', 'pin', 'roller', 'steam'];
+const ICONS = {
+  hand: `<svg viewBox="0 0 64 64"><path d="M22 34V16a4 4 0 0 1 8 0v14V12a4 4 0 0 1 8 0v18-14a4 4 0 0 1 8 0v18-10a4 4 0 0 1 8 0v18c0 12-8 20-19 20-8 0-12-4-17-10l-8-10a4 4 0 0 1 6-5z" fill="#ffd2b0" stroke="#7a4a2e" stroke-width="2.5" stroke-linejoin="round"/></svg>`,
+  boots: `<svg viewBox="0 0 64 64"><path d="M10 14h18v22l12 6c6 3 12 4 14 10v4H10z" fill="#ff4f8b" stroke="#4a1530" stroke-width="2.5" stroke-linejoin="round"/><path d="M10 50h44v6H10z" fill="#fff" stroke="#4a1530" stroke-width="2.5"/><path d="M28 30h6M28 36h8" stroke="#fff" stroke-width="3" stroke-linecap="round"/></svg>`,
+  pin: `<svg viewBox="0 0 64 64"><rect x="4" y="28" width="10" height="8" rx="3" fill="#a0612e" stroke="#4d2a10" stroke-width="2"/><rect x="50" y="28" width="10" height="8" rx="3" fill="#a0612e" stroke="#4d2a10" stroke-width="2"/><rect x="13" y="22" width="38" height="20" rx="9" fill="#e5b178" stroke="#4d2a10" stroke-width="2.5"/><path d="M20 27h24" stroke="#fff6" stroke-width="3" stroke-linecap="round"/></svg>`,
+  roller: `<svg viewBox="0 0 64 64"><path d="M32 8v20" stroke="#555" stroke-width="4" stroke-linecap="round"/><path d="M24 8h16" stroke="#333" stroke-width="5" stroke-linecap="round"/><rect x="6" y="28" width="52" height="24" rx="10" fill="#3cc46a" stroke="#14532a" stroke-width="2.5"/><path d="M12 34h40" stroke="#fff6" stroke-width="3" stroke-linecap="round"/></svg>`,
+  steam: `<svg viewBox="0 0 64 64"><rect x="18" y="14" width="30" height="26" rx="4" fill="#ffc21a" stroke="#5a4200" stroke-width="2.5"/><rect x="24" y="18" width="16" height="10" rx="2" fill="#9be7ff" stroke="#5a4200" stroke-width="2"/><rect x="40" y="6" width="5" height="10" fill="#555"/><rect x="4" y="40" width="40" height="18" rx="8" fill="#9aa3ad" stroke="#333" stroke-width="2.5"/><circle cx="52" cy="48" r="9" fill="#222" stroke="#000" stroke-width="2"/></svg>`,
+};
+
+// ---------- 3D ----------
+const canvas = document.getElementById('game');
+let renderer;
+try { renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' }); }
+catch { document.getElementById('nogl').hidden = false; throw new Error('no WebGL'); }
+renderer.setPixelRatio(Math.min(1.5, devicePixelRatio || 1));
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+const scene = new THREE.Scene();
+const SKY = new THREE.Color('#cfe8fb');          // the horizon (the fog fades to it)
+scene.background = SKY;
+const FOG_NEAR = 60, FOG_FAR = 1100;
+scene.fog = new THREE.Fog(SKY, FOG_NEAR, FOG_FAR);
+const camera = new THREE.PerspectiveCamera(72, 1, 0.1, 2600);
+scene.add(camera);
+function resize() { renderer.setSize(innerWidth, innerHeight, false); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); }
+addEventListener('resize', resize); resize();
+
+// light, and a soft studio "sky" for the bubbles' shine
+scene.add(new THREE.HemisphereLight('#e8f4ff', '#6a8a5a', 1.25));
+const sun = new THREE.DirectionalLight('#fff4e0', 2.4); sun.position.set(60, 120, 40); scene.add(sun); scene.add(sun.target);
+// shadows round you (the sun's shadow box follows you)
+sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.02;
+Object.assign(sun.shadow.camera, { left: -22, right: 22, top: 22, bottom: -22, near: 1, far: 200 });
+const SUN_DIR = new THREE.Vector3(0.45, 0.8, 0.35).normalize();
+// the sky: blue overhead to pale at the horizon, a glow round the sun, and a few clouds
+{
+  const skyMat = new THREE.ShaderMaterial({ side: THREE.BackSide, depthWrite: false, fog: false,
+    uniforms: { top: { value: new THREE.Color('#3f8fe6') }, mid: { value: new THREE.Color('#8cc4f2') }, bottom: { value: SKY }, sunDir: { value: SUN_DIR } },
+    vertexShader: `varying vec3 vD; void main() { vD = normalize(position); vec4 p = projectionMatrix * modelViewMatrix * vec4(position, 1.0); gl_Position = p.xyww; }`,
+    fragmentShader: `uniform vec3 top; uniform vec3 mid; uniform vec3 bottom; uniform vec3 sunDir; varying vec3 vD;
+      void main() { float h = max(vD.y, 0.0); vec3 c = mix(bottom, mid, smoothstep(0.0, 0.18, h)); c = mix(c, top, smoothstep(0.18, 0.8, h));
+        float s = max(dot(normalize(vD), sunDir), 0.0); c += vec3(1.0, 0.92, 0.75) * (pow(s, 600.0) * 3.0 + pow(s, 12.0) * 0.18);
+        gl_FragColor = vec4(c, 1.0);
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
+      }` });
+  const skyBox = new THREE.Mesh(new THREE.SphereGeometry(2400, 32, 16), skyMat); skyBox.renderOrder = -1; skyBox.frustumCulled = false; scene.add(skyBox); window.__sky = skyBox;
+  const cc = document.createElement('canvas'); cc.width = 256; cc.height = 128; const g = cc.getContext('2d');
+  for (let k = 0; k < 14; k++) { const x = 40 + Math.random() * 176, y = 50 + Math.random() * 40, rr = 22 + Math.random() * 26; const gr = g.createRadialGradient(x, y, 2, x, y, rr); gr.addColorStop(0, 'rgba(255,255,255,.95)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.beginPath(); g.arc(x, y, rr, 0, 7); g.fill(); }
+  const cloudTex = new THREE.CanvasTexture(cc); cloudTex.colorSpace = THREE.SRGBColorSpace;
+  for (let k = 0; k < 18; k++) {
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: cloudTex, transparent: true, opacity: .85, fog: false, depthWrite: false }));
+    const a = Math.random() * Math.PI * 2, d = 700 + Math.random() * 900;
+    sp.position.set(250 + Math.cos(a) * d, 180 + Math.random() * 160, 250 + Math.sin(a) * d); sp.scale.set(420 + Math.random() * 300, 180 + Math.random() * 90, 1);
+    scene.add(sp);
+  }
+}
+{
+  const env = new THREE.Scene(), pm = new THREE.PMREMGenerator(renderer);
+  env.add(new THREE.Mesh(new THREE.BoxGeometry(20, 20, 20), new THREE.MeshBasicMaterial({ color: '#8fb6d8', side: THREE.BackSide })));
+  for (const [x, y, z, w, d] of [[0, 9.5, 0, 10, 10], [9.5, 3, 0, 6, 4], [-9.5, 4, 3, 4, 4]]) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, .1, d), new THREE.MeshBasicMaterial({ color: '#ffffff' })); m.position.set(x, y, z); if (x) m.rotation.z = Math.PI / 2; env.add(m); }
+  scene.environment = pm.fromScene(env, 0.04).texture;
+}
+
+// the field round the sheet
+const grassTex = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d');
+  g.fillStyle = '#5f9e46'; g.fillRect(0, 0, 256, 256);
+  for (let k = 0; k < 4000; k++) { g.fillStyle = `hsl(${95 + Math.random() * 20},${40 + Math.random() * 20}%,${30 + Math.random() * 18}%)`; g.fillRect(Math.random() * 256, Math.random() * 256, 1.5, 3); }
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(600, 600); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t;
+})();
+// four strips round the sheet (none under it, so far away the two never flicker through each other)
+const grass = new THREE.Group(), grassMat = new THREE.MeshStandardMaterial({ map: grassTex, roughness: 1 });
+grassTex.repeat.set(1, 1);
+for (const [x0, z0, x1, z1] of [[-1300, -1300, 1800, 0], [-1300, SIZE, 1800, 1800], [-1300, 0, 0, SIZE], [SIZE, 0, 1800, SIZE]]) {
+  const w = x1 - x0, h = z1 - z0, geo = new THREE.PlaneGeometry(w, h, Math.ceil(w / 60), Math.ceil(h / 60)), uv = geo.attributes.uv;
+  for (let k = 0; k < uv.count; k++) uv.setXY(k, uv.getX(k) * w * .2, uv.getY(k) * h * .2);
+  const m = new THREE.Mesh(geo, grassMat); m.rotation.x = -Math.PI / 2; m.position.set((x0 + x1) / 2, -0.02, (z0 + z1) / 2); m.receiveShadow = true; grass.add(m);
+}
+scene.add(grass);
+
+// The far sheet: one big plane, drawn as bubbles (or flat ones, where they're popped) from a small map of
+// what's popped. Close to you the real 3D bubbles are on top, so the plane is plain plastic there.
+function tileTex(poppedLook) {
+  const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
+  g.fillStyle = '#c9dbe9'; g.fillRect(0, 0, 64, 64);
+  if (!poppedLook) {
+    const gr = g.createRadialGradient(24, 22, 3, 32, 32, 26); gr.addColorStop(0, '#ffffff'); gr.addColorStop(.4, '#d8ecff'); gr.addColorStop(1, '#8cbfe6');
+    g.fillStyle = 'rgba(30,60,100,.25)'; g.beginPath(); g.arc(34, 35, 26, 0, 7); g.fill();
+    g.fillStyle = gr; g.beginPath(); g.arc(32, 32, 26, 0, 7); g.fill();
+  } else {
+    g.fillStyle = '#a8b7c4'; g.beginPath(); for (let k = 0; k <= 9; k++) { const a = k / 9 * 7, r = 18 + Math.sin(k * 3.7) * 4; g[k ? 'lineTo' : 'moveTo'](32 + Math.cos(a) * r, 32 + Math.sin(a) * r); } g.fill();
+  }
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t;
+}
+const PM = 500;                                         // the popped map: 500 x 500, each texel 2 x 2 bubbles
+const progData = new Uint8Array(PM * PM * 4), progCount = new Uint8Array(PM * PM);
+const progTex = new THREE.DataTexture(progData, PM, PM, THREE.RGBAFormat); progTex.magFilter = THREE.LinearFilter; progTex.needsUpdate = true;
+const R = 30;                                           // 3D bubbles this many rows round you
+const farMat = new THREE.ShaderMaterial({
+  uniforms: { tFull: { value: tileTex(false) }, tFlat: { value: tileTex(true) }, tProg: { value: progTex }, fogColor: { value: SKY }, fogNear: { value: FOG_NEAR }, fogFar: { value: FOG_FAR }, near: { value: new THREE.Vector2() }, nearR: { value: (R - 1) * SP } },
+  vertexShader: `varying vec2 vUv; varying vec3 vW; void main() { vUv = uv; vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }`,
+  fragmentShader: `uniform sampler2D tFull; uniform sampler2D tFlat; uniform sampler2D tProg; uniform vec3 fogColor; uniform float fogNear; uniform float fogFar; uniform vec2 near; uniform float nearR;
+    varying vec2 vUv; varying vec3 vW;
+    void main() {
+      vec2 t = vec2(vUv.x, 1.0 - vUv.y) * ${N}.0;
+      float p = texture2D(tProg, vec2(vUv.x, 1.0 - vUv.y)).r;
+      vec3 c = mix(texture2D(tFull, t).rgb, texture2D(tFlat, t).rgb, p);
+      float sq = max(abs(vW.x - near.x), abs(vW.z - near.y));
+      c = mix(vec3(0.80, 0.86, 0.91), c, smoothstep(nearR - 0.6, nearR + 0.2, sq));
+      c *= 0.92;
+      float f = smoothstep(fogNear, fogFar, length(vW - cameraPosition));
+      gl_FragColor = vec4(mix(c, fogColor, f), 1.0);
+      #include <tonemapping_fragment>
+      #include <colorspace_fragment>
+    }`,
+});
+// (in small pieces: one huge flat piece doesn't draw well on some PCs when it reaches behind you)
+const far = new THREE.Mesh(new THREE.PlaneGeometry(SIZE, SIZE, 100, 100), farMat);
+far.rotation.x = -Math.PI / 2; far.position.set(SIZE / 2, 0, SIZE / 2); scene.add(far);
+function progPx(m) { const v = Math.round(progCount[m] / 4 * 255); progData[m * 4] = v; progData[m * 4 + 3] = 255; }
+let progDirty = true;
+
+// The 3D bubbles round you: one set of full bubbles and one of flat popped ones, a slot per spot in the
+// square round you (slots are reused as you move: a slot shows whatever bubble is at its spot now)
+const WN = R * 2 + 1, SLOTS = WN * WN;
+const bubbleGeo = new THREE.SphereGeometry(0.205, 10, 4, 0, Math.PI * 2, 0, Math.PI / 2); bubbleGeo.scale(1, 0.62, 1);
+const bubbleMat = new THREE.MeshPhysicalMaterial({ color: '#a8d4f7', roughness: 0.05, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.03, envMapIntensity: 2.2, transparent: true, opacity: 0.88 });
+const flatGeo = (() => {
+  const g = new THREE.CircleGeometry(0.19, 10); const p = g.attributes.position;
+  for (let k = 1; k < p.count; k++) { const s = 0.8 + ((k * 7919) % 13) / 30; p.setX(k, p.getX(k) * s); p.setY(k, p.getY(k) * s); p.setZ(k, ((k * 31) % 5) * 0.004); }
+  g.rotateX(-Math.PI / 2); g.computeVertexNormals(); return g;
+})();
+const flatMat = new THREE.MeshStandardMaterial({ color: '#c2ccd5', roughness: 0.85 });
+const bubbles = new THREE.InstancedMesh(bubbleGeo, bubbleMat, SLOTS), flats = new THREE.InstancedMesh(flatGeo, flatMat, SLOTS);
+for (const m of [bubbles, flats]) { m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); m.frustumCulled = false; m.receiveShadow = true; scene.add(m); }
+const slotCell = new Int32Array(SLOTS).fill(-1), M4 = new THREE.Matrix4(), ZERO = new THREE.Matrix4().makeScale(0, 0, 0), Q = new THREE.Quaternion(), V = new THREE.Vector3(), SC = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0);
+const grow = new Map();     // new wrap: bubbles growing in (slot -> start time)
+const slotOf = (i, j) => (((i % WN) + WN) % WN) + (((j % WN) + WN) % WN) * WN;
+function writeSlot(i, j, now = performance.now()) {
+  const s = slotOf(i, j);
+  if (i < 0 || j < 0 || i >= N || j >= N) { slotCell[s] = -2 - s; bubbles.setMatrixAt(s, ZERO); flats.setMatrixAt(s, ZERO); bubbles.instanceMatrix.needsUpdate = flats.instanceMatrix.needsUpdate = true; return; }
+  slotCell[s] = j * N + i;
+  const x = (i + .5) * SP, z = (j + .5) * SP, rot = ((i * 928371 + j * 12345) % 628) / 100;
+  if (isPopped(i, j)) { bubbles.setMatrixAt(s, ZERO); flats.setMatrixAt(s, M4.compose(V.set(x, 0.006, z), Q.setFromAxisAngle(UP, rot), SC.set(1, 1, 1))); }
+  else {
+    let k = 1; const g0 = grow.get(s); if (g0) { k = Math.min(1, (now - g0) / 350); if (k >= 1) grow.delete(s); k = 1 - Math.pow(1 - k, 3); }
+    bubbles.setMatrixAt(s, M4.compose(V.set(x, 0.004, z), Q.setFromAxisAngle(UP, rot), SC.set(k, k, k)));
+    flats.setMatrixAt(s, ZERO);
+  }
+  bubbles.instanceMatrix.needsUpdate = flats.instanceMatrix.needsUpdate = true;
+}
+let winI = -9999, winJ = -9999;
+function updateWindow(force = false) {
+  const ci = cellOf(P.x), cj = cellOf(P.z);
+  if (!force && ci === winI && cj === winJ) return;
+  winI = ci; winJ = cj;
+  for (let j = cj - R; j <= cj + R; j++) for (let i = ci - R; i <= ci + R; i++) {
+    const key = (i < 0 || j < 0 || i >= N || j >= N) ? -2 - slotOf(i, j) : j * N + i;
+    if (force || slotCell[slotOf(i, j)] !== key) writeSlot(i, j);
+  }
+  farMat.uniforms.near.value.set((ci + .5) * SP, (cj + .5) * SP);
+}
+const inWindow = (i, j) => Math.abs(i - winI) <= R && Math.abs(j - winJ) <= R;
+
+// ---------- the player ----------
+const P = { x: SIZE / 2, z: SIZE / 2, yaw: 0, wantYaw: 0, pitch: -0.55, vx: 0, vz: 0, eye: 1.6, tool: 'hand', toolUntil: 0, toolTotal: 0, jailUntil: 0, step: 0, moving: false, poke: 0 };
+const jailed = () => performance.now() < P.jailUntil;
+const fwd = () => [-Math.sin(P.yaw), -Math.cos(P.yaw)];
+
+// ---------- what you hold / drive ----------
+const mat = (color, o = {}) => new THREE.MeshStandardMaterial({ color, roughness: .6, ...o });
+const rig = new THREE.Group(); scene.add(rig);               // on the ground at your feet, turning with you
+const held = new THREE.Group(); camera.add(held);           // in front of your eyes
+const models = {};
+held.traverse(o => { o.castShadow = true; });
+// hand
+{
+  const g = new THREE.Group(), skin = mat('#f2c4a0', { roughness: .7 }), sleeve = mat('#7c5cff');
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(.09, .03, .1), skin));
+  [-.032, -.011, .011, .032].forEach((x, k) => { const f = new THREE.Mesh(new THREE.CapsuleGeometry(.011, k === 1 ? .07 : .055, 4, 8), skin); f.rotation.x = Math.PI / 2; f.position.set(x, 0, -.09 - (k === 1 ? .01 : 0)); g.add(f); });
+  const th = new THREE.Mesh(new THREE.CapsuleGeometry(.012, .04, 4, 8), skin); th.rotation.set(Math.PI / 2, 0, .9); th.position.set(-.06, 0, -.02); g.add(th);
+  const arm = new THREE.Mesh(new THREE.CylinderGeometry(.04, .05, .35, 12), sleeve); arm.rotation.x = Math.PI / 2; arm.position.set(0, 0, .2); g.add(arm);
+  g.position.set(.22, -.25, -.45); g.rotation.set(-.5, .2, 0);
+  models.hand = g; held.add(g);
+}
+// boots: you see them when you look down
+{
+  const g = new THREE.Group(), pink = mat('#ff4f8b'), white = mat('#ffffff');
+  for (const side of [-1, 1]) {
+    const b = new THREE.Group();
+    const top = new THREE.Mesh(new THREE.BoxGeometry(.12, .22, .13), pink); top.position.y = .14; b.add(top);
+    const foot = new THREE.Mesh(new THREE.BoxGeometry(.13, .08, .3), pink); foot.position.set(0, .05, -.08); b.add(foot);
+    const sole = new THREE.Mesh(new THREE.BoxGeometry(.14, .03, .32), white); sole.position.set(0, .015, -.08); b.add(sole);
+    b.position.x = side * .13; b.userData.side = side; g.add(b);
+  }
+  models.boots = g; rig.add(g);
+}
+// a drum lying across in front of you (rolling pin, lawn roller, steamroller), with stripes so you see it roll
+function drum(r, len, color, stripe) {
+  const d = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 32), mat(color, { roughness: .4, metalness: stripe ? .4 : 0 })); body.rotation.z = Math.PI / 2; d.add(body);
+  for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2, s = new THREE.Mesh(new THREE.BoxGeometry(len + .02, r * .07, r * .14), mat(stripe || '#c58a50')); s.position.set(0, Math.sin(a) * r, Math.cos(a) * r); s.rotation.x = -a; d.add(s); }
+  return d;
+}
+// rolling pin, rolling on the bubbles in front of you
+{
+  const g = new THREE.Group(), d = drum(.1, 1.4, '#e2ad72');
+  for (const s of [-1, 1]) { const h = new THREE.Mesh(new THREE.CylinderGeometry(.035, .035, .28, 10), mat('#9a5a2a')); h.rotation.z = Math.PI / 2; h.position.x = s * .84; g.add(h); }
+  g.add(d); g.position.set(0, .1, -TOOLS.pin.reach); g.userData.spin = d;
+  models.pin = g; rig.add(g);
+}
+// lawn roller
+{
+  const g = new THREE.Group(), d = drum(.32, 2.5, '#3cc46a', '#258a48'), metal = mat('#555b63', { metalness: .6, roughness: .3 });
+  g.add(d);
+  // the handle comes up to your hands, at your waist
+  const hy = .68, hz = 1.3, handle = new THREE.Mesh(new THREE.CylinderGeometry(.025, .025, Math.hypot(hy, hz), 8), metal); handle.position.set(0, hy / 2, hz / 2); handle.rotation.x = Math.atan2(hz, hy); g.add(handle);
+  const bar = new THREE.Mesh(new THREE.CylinderGeometry(.03, .03, .6, 8), mat('#222')); bar.rotation.z = Math.PI / 2; bar.position.set(0, hy, hz); g.add(bar);
+  g.position.set(0, .32, -TOOLS.roller.reach); g.userData.spin = d;
+  models.roller = g; rig.add(g);
+}
+// the steamroller: you sit in its cab
+{
+  const g = new THREE.Group(), yellow = mat('#ffc21a', { roughness: .35 }), dark = mat('#2a2f38');
+  const hood = new THREE.Mesh(new THREE.BoxGeometry(2.2, .8, 2.0), yellow); hood.position.set(0, 1.4, -1.25); g.add(hood);
+  const grille = new THREE.Mesh(new THREE.BoxGeometry(1.8, .4, .05), dark); grille.position.set(0, 1.4, -2.27); g.add(grille);
+  for (const s of [-1, 1]) { const arm = new THREE.Mesh(new THREE.BoxGeometry(.25, .3, 2.1), yellow); arm.position.set(s * 2.9, 1.0, -2.6); g.add(arm); }
+  const d = drum(.95, 5.6, '#9aa3ad', '#6f7882'); d.position.set(0, .95, -TOOLS.steam.reach); g.add(d);
+  const cabFloor = new THREE.Mesh(new THREE.BoxGeometry(2.6, .2, 2.4), dark); cabFloor.position.set(0, 1.9, .6); g.add(cabFloor);
+  for (const [x, z] of [[-1.2, -.4], [1.2, -.4], [-1.2, 1.7], [1.2, 1.7]]) { const post = new THREE.Mesh(new THREE.BoxGeometry(.1, 1.7, .1), dark); post.position.set(x, 2.85, z); g.add(post); }
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(2.7, .12, 2.5), yellow); roof.position.set(0, 3.75, .65); g.add(roof);
+  const wheel = new THREE.Mesh(new THREE.TorusGeometry(.32, .04, 8, 24), dark); wheel.position.set(0, 2.45, -.25); wheel.rotation.x = -1.0; g.add(wheel);
+  const stack = new THREE.Mesh(new THREE.CylinderGeometry(.07, .07, .8, 10), dark); stack.position.set(-1.0, 2.1, -1.9); g.add(stack);
+  // behind you: the engine and the back wheels
+  const engineBox = new THREE.Mesh(new THREE.BoxGeometry(2.5, 1.5, 2.0), yellow); engineBox.position.set(0, 1.25, 2.7); g.add(engineBox);
+  const vent = new THREE.Mesh(new THREE.BoxGeometry(1.8, .05, 1.2), dark); vent.position.set(0, 2.02, 2.7); g.add(vent);
+  for (const sx of [-1, 1]) { const w = new THREE.Mesh(new THREE.CylinderGeometry(.75, .75, .55, 24), dark); w.rotation.z = Math.PI / 2; w.position.set(sx * 1.35, .75, 2.6); g.add(w);
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(.3, .3, .57, 16), yellow); hub.rotation.z = Math.PI / 2; hub.position.copy(w.position); g.add(hub); }
+  const frame = new THREE.Mesh(new THREE.BoxGeometry(1.6, .5, 4.6), dark); frame.position.set(0, .9, .4); g.add(frame);
+  const seat = new THREE.Mesh(new THREE.BoxGeometry(.7, .5, .6), mat('#333')); seat.position.set(0, 2.25, .9); g.add(seat);
+  g.userData.spin = d;
+  models.steam = g; rig.add(g);
+}
+// jail: a cage round you
+const cage = new THREE.Group(); scene.add(cage); cage.visible = false;
+function buildCage(r, h) {
+  cage.clear();
+  const bar = mat('#33363d', { metalness: .7, roughness: .3 });
+  for (let side = 0; side < 4; side++) for (let n = 0; n < 8; n++) {
+    const b = new THREE.Mesh(new THREE.CylinderGeometry(.03, .03, h, 8), bar), u = -r + n * r / 4;
+    const [x, z] = [[u, -r], [r, u], [-u, r], [-r, -u]][side];
+    b.position.set(x, h / 2, z); cage.add(b);
+  }
+  for (const y of [h, .04]) for (const [x, z, w, d] of [[0, -r, r * 2, .08], [0, r, r * 2, .08], [-r, 0, .08, r * 2], [r, 0, .08, r * 2]]) { const b = new THREE.Mesh(new THREE.BoxGeometry(w, .08, d), bar); b.position.set(x, y, z); cage.add(b); }
+}
+
+// ---------- bits of plastic flying off ----------
+const PCOUNT = 900, pPos = new Float32Array(PCOUNT * 3), pVel = new Float32Array(PCOUNT * 3), pLife = new Float32Array(PCOUNT);
+const pGeo = new THREE.BufferGeometry(); pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+const shards = new THREE.Points(pGeo, new THREE.PointsMaterial({ color: '#ffffff', size: .05, transparent: true, opacity: .9 })); shards.frustumCulled = false; scene.add(shards);
+let pNext = 0;
+for (let k = 0; k < PCOUNT; k++) pPos[k * 3 + 1] = -10;
+function burst(x, z, n = 4) {
+  for (let q = 0; q < n; q++) {
+    const k = pNext = (pNext + 1) % PCOUNT, a = Math.random() * 7, v = .6 + Math.random() * 1.4;
+    pPos[k * 3] = x; pPos[k * 3 + 1] = .08; pPos[k * 3 + 2] = z;
+    pVel[k * 3] = Math.cos(a) * v; pVel[k * 3 + 1] = 1 + Math.random() * 1.6; pVel[k * 3 + 2] = Math.sin(a) * v; pLife[k] = .6;
+  }
+}
+
+// ---------- minimap: 200 x 200, each pixel 5 x 5 bubbles ----------
+const mini = document.getElementById('miniCv'), mg = mini.getContext('2d'), mimg = mg.createImageData(200, 200), mcount = new Uint8Array(200 * 200);
+function miniPx(m) { const f = mcount[m] / 25, o = m * 4; mimg.data[o] = 120 - f * 90; mimg.data[o + 1] = 220 - f * 175; mimg.data[o + 2] = 255 - f * 190; mimg.data[o + 3] = 255; }
+function rebuildMaps() {
+  mcount.fill(0); progCount.fill(0);
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) if (isPopped(i, j)) { mcount[((j / 5) | 0) * 200 + ((i / 5) | 0)]++; progCount[(j >> 1) * PM + (i >> 1)]++; }
+  for (let m = 0; m < 40000; m++) miniPx(m);
+  for (let m = 0; m < PM * PM; m++) progPx(m);
+  progDirty = true;
+}
+
+// ---------- popping ----------
+let dirty = false, popsThisFrame = 0;
+function mark(i, j, d) {
+  const m = ((j / 5) | 0) * 200 + ((i / 5) | 0); mcount[m] += d; miniPx(m);
+  const q = (j >> 1) * PM + (i >> 1); progCount[q] += d; progPx(q); progDirty = true;
+}
+function pop(i, j, fx = true) {
+  if (i < 0 || j < 0 || i >= N || j >= N || isPopped(i, j)) return false;
+  setBit(i, j, 1); popped++; dirty = true; popsThisFrame++;
+  if (inWindow(i, j)) writeSlot(i, j);
+  mark(i, j, 1);
+  if (fx) burst((i + .5) * SP, (j + .5) * SP, 3);
+  return true;
+}
+function unpop(i, j) {
+  if (i < 0 || j < 0 || i >= N || j >= N || !isPopped(i, j)) return false;
+  setBit(i, j, 0); popped--; dirty = true;
+  if (inWindow(i, j)) { grow.set(slotOf(i, j), performance.now()); writeSlot(i, j); }
+  mark(i, j, -1);
+  return true;
+}
+const popAt = (x, z, fx) => pop(cellOf(x), cellOf(z), fx);
+
+// bubbles round a spot, nearest first (in rings), popped or not
+function* around(cx, cz, want) {
+  const ci = Math.max(0, Math.min(N - 1, cellOf(cx))), cj = Math.max(0, Math.min(N - 1, cellOf(cz)));
+  for (let r = 0; r < N * 1.5; r++) {
+    let any = false;
+    for (let d = -r; d <= r; d++) {
+      for (const [i, j] of r === 0 ? [[ci, cj]] : [[ci + d, cj - r], [ci + d, cj + r], ...(Math.abs(d) < r ? [[ci - r, cj + d], [ci + r, cj + d]] : [])]) {
+        if (i < 0 || j < 0 || i >= N || j >= N) continue;
+        any = true;
+        if (isPopped(i, j) === want) yield [i, j];
+      }
+    }
+    if (!any && r > 2) return;
+  }
+}
+const waves = [];
+const ringMesh = new THREE.Mesh(new THREE.RingGeometry(.9, 1, 64), new THREE.MeshBasicMaterial({ color: '#7dffb0', transparent: true, opacity: .7, side: THREE.DoubleSide, depthWrite: false }));
+ringMesh.rotation.x = -Math.PI / 2; ringMesh.visible = false; scene.add(ringMesh);
+function popWave(n) {
+  const list = []; for (const c of around(P.x, P.z, 0)) { list.push(c); if (list.length >= n) break; }
+  if (list.length) waves.push({ list, k: 0, per: Math.max(1, Math.ceil(list.length / 80)), x: P.x, z: P.z, t: 0 });
+  return list.length;
+}
+function addWrap(n) {
+  let done = 0;
+  for (const [i, j] of around(P.x, P.z, 1)) { unpop(i, j); if (++done >= n) break; }
+  return done;
+}
+
+// ---------- sound (made here, no files) ----------
+let ac = null, master = null, noise = null, engine = null, muted = false;
+function audio() {
+  if (!ac) {
+    ac = new (window.AudioContext || window.webkitAudioContext)();
+    master = ac.createGain(); master.gain.value = .7; master.connect(ac.destination);
+    noise = ac.createBuffer(1, ac.sampleRate * .2, ac.sampleRate); const d = noise.getChannelData(0); for (let k = 0; k < d.length; k++) d[k] = Math.random() * 2 - 1;
+  }
+  if (ac.state === 'suspended') ac.resume();
+  return ac;
+}
+function popSound(vol = 1) {
+  if (muted || !audio()) return;
+  const t = ac.currentTime + Math.random() * .015;
+  const src = ac.createBufferSource(); src.buffer = noise;
+  const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1600 + Math.random() * 2600; bp.Q.value = 1.1;
+  const g = ac.createGain(); g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.55 * vol, t + .002); g.gain.exponentialRampToValueAtTime(.0001, t + .055);
+  src.connect(bp).connect(g).connect(master); src.start(t); src.stop(t + .07);
+  const o = ac.createOscillator(); o.type = 'triangle'; o.frequency.setValueAtTime(700 + Math.random() * 700, t); o.frequency.exponentialRampToValueAtTime(160, t + .03);
+  const og = ac.createGain(); og.gain.setValueAtTime(.22 * vol, t); og.gain.exponentialRampToValueAtTime(.0001, t + .035);
+  o.connect(og).connect(master); o.start(t); o.stop(t + .04);
+}
+function tone(freqs, len = .12, type = 'square', vol = .12) {
+  if (muted || !audio()) return;
+  freqs.forEach((f, k) => { const t = ac.currentTime + k * len * .8, o = ac.createOscillator(), g = ac.createGain(); o.type = type; o.frequency.value = f; g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.0001, t + len); o.connect(g).connect(master); o.start(t); o.stop(t + len + .02); });
+}
+function whoosh(up = true) {
+  if (muted || !audio()) return;
+  const t = ac.currentTime, src = ac.createBufferSource(); src.buffer = noise; src.loop = true;
+  const f = ac.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 2; f.frequency.setValueAtTime(up ? 300 : 3000, t); f.frequency.exponentialRampToValueAtTime(up ? 3000 : 300, t + .6);
+  const g = ac.createGain(); g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.35, t + .1); g.gain.exponentialRampToValueAtTime(.0001, t + .65);
+  src.connect(f).connect(g).connect(master); src.start(t); src.stop(t + .7);
+}
+const clank = () => tone([180, 120], .25, 'sawtooth', .18);
+function engineHum(on, rate) {
+  if (!ac) return;
+  if (!engine) {
+    const o = ac.createOscillator(); o.type = 'sawtooth'; o.frequency.value = 45;
+    const f = ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 260;
+    const g = ac.createGain(); g.gain.value = 0; o.connect(f).connect(g).connect(master); o.start();
+    engine = { o, g };
+  }
+  engine.g.gain.setTargetAtTime(on && !muted ? .07 + rate * .07 : 0, ac.currentTime, .1);
+  engine.o.frequency.setTargetAtTime(40 + rate * 30, ac.currentTime, .1);
+}
+
+// ---------- input: mouse to look, keys to move ----------
+const keys = new Set();
+addEventListener('keydown', e => {
+  audio();
+  const k = e.key.toLowerCase();
+  if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(k)) e.preventDefault();
+  if (k === 'm' && !e.repeat) { muted = !muted; toast(muted ? 'SOUND OFF' : 'SOUND ON', ''); return; }
+  if (k === ' ' && !e.repeat) handPop();
+  if (!document.getElementById('win').hidden && !e.repeat) document.getElementById('win').hidden = true;
+  keys.add(k);
+});
+addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
+addEventListener('blur', () => keys.clear());
+canvas.addEventListener('mousedown', () => {
+  audio();
+  if (document.pointerLockElement !== canvas) { canvas.requestPointerLock?.(); return; }
+  handPop();
+});
+document.addEventListener('pointerlockchange', () => { document.getElementById('lock').hidden = document.pointerLockElement === canvas; });
+document.addEventListener('mousemove', e => {
+  if (document.pointerLockElement !== canvas) return;
+  P.wantYaw -= e.movementX * .0023;
+  P.pitch = Math.max(-1.45, Math.min(1.2, P.pitch - e.movementY * .0023));
+});
+// the hand: the bubble you're looking at, if it's close enough
+const RAY = new THREE.Raycaster(), PLANE = new THREE.Plane(new THREE.Vector3(0, 1, 0), -0.06), HIT = new THREE.Vector3();
+function handPop() {
+  if (P.tool !== 'hand' || jailed()) return;
+  P.poke = 1;
+  RAY.setFromCamera({ x: 0, y: 0 }, camera);
+  if (!RAY.ray.intersectPlane(PLANE, HIT)) return;
+  if (Math.hypot(HIT.x - P.x, HIT.z - P.z) > 3.2) return floatMsg('Too far: look down at a bubble');
+  if (popAt(HIT.x, HIT.z, true)) popSound(1);
+}
+
+// ---------- tools and jail ----------
+function giveTool(id, seconds) {
+  const now = performance.now();
+  if (id === 'hand') { P.tool = 'hand'; P.toolUntil = 0; }
+  else if (P.tool === id && P.toolUntil > now) { P.toolUntil += seconds * 1000; P.toolTotal += seconds * 1000; }
+  else { P.tool = id; P.toolUntil = now + seconds * 1000; P.toolTotal = seconds * 1000; }
+  for (const [k, m] of Object.entries(models)) m.visible = k === P.tool;
+  P.wantYaw = P.yaw;
+  renderTool();
+}
+function renderTool() {
+  const t = TOOLS[P.tool];
+  document.getElementById('toolIc').innerHTML = ICONS[P.tool];
+  document.getElementById('toolName').innerHTML = `${t.name} <span class="stars">${'★'.repeat(t.stars)}${'☆'.repeat(5 - t.stars)}</span>`;
+  document.getElementById('toolInfo').textContent = t.info;
+  document.getElementById('toolBar').hidden = P.tool === 'hand';
+  document.getElementById('helpPop').hidden = P.tool !== 'hand';
+  document.getElementById('cross').hidden = P.tool !== 'hand';
+  document.getElementById('helpMove').innerHTML = P.tool === 'steam' || P.tool === 'roller' ? '<kbd>W S</kbd> drive &nbsp;<kbd>A D</kbd> steer' : '<kbd>W A S D</kbd> move';
+}
+function jail(seconds) {
+  const now = performance.now();
+  P.jailUntil = Math.max(P.jailUntil, now) + seconds * 1000;
+  P.vx = P.vz = 0;
+  const r = P.tool === 'steam' ? 4.6 : P.tool === 'roller' ? 2.2 : P.tool === 'pin' ? 1.4 : .9;
+  buildCage(r, P.tool === 'steam' ? 4.4 : 2.4);
+  cage.position.set(P.x, 0, P.z); cage.rotation.y = P.yaw;
+  clank();
+}
+
+// ---------- on-screen words ----------
+let toastTimer = null;
+function toast(big, sub, color = '#fff', image = null) {
+  const el = document.getElementById('toast');
+  el.innerHTML = `<div class="t">${image ? `<img src="${image}" alt="">` : ''}<div class="big" style="color:${color}">${big}</div>${sub ? `<div class="sub">${sub}</div>` : ''}</div>`;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => el.innerHTML = '', 2600);
+}
+let msgAt = 0;
+function floatMsg(text) { if (performance.now() - msgAt < 1200) return; msgAt = performance.now(); toast('', `<span style="font-size:18px">${text}</span>`); }
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const giftImg = u => u ? (/^https?:/.test(u) ? '/gift-img?u=' + encodeURIComponent(u) : u) : null;
+function feed(html, image) {
+  const box = document.getElementById('feed'), el = document.createElement('div');
+  el.className = 'ev panel'; el.innerHTML = `${image ? `<img src="${image}" alt="">` : ''}<div>${html}</div>`;
+  box.prepend(el);
+  while (box.children.length > 6) box.lastChild.remove();
+  setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 700); }, 14000);
+}
+const fmt = n => Math.round(n).toLocaleString('en-US');
+
+// ---------- the random tool: a spin through the five, landing on the one picked ----------
+let spinning = null;
+const spinQueue = [];
+function spinTool(result, seconds, chances, from, image) {
+  const box = document.getElementById('roulette'), row = document.getElementById('rRow');
+  const total = ORDER.reduce((s, id) => s + (chances?.[id] || 0), 0) || 1;
+  row.innerHTML = ORDER.map(id => `<div class="c">${ICONS[id]}<b>${TOOLS[id].name}</b><small>${Math.round((chances?.[id] || 0) / total * 100)}%</small></div>`).join('');
+  box.hidden = false;
+  const cards = [...row.children], target = ORDER.indexOf(result);
+  let steps = 15 + 5 * ((Math.random() * 2) | 0); steps += (target - steps % 5 + 5) % 5;
+  let k = 0;
+  const tick = () => {
+    cards.forEach((c, n) => c.classList.toggle('on', n === k % 5));
+    tone([500 + (k % 5) * 90], .05, 'square', .06);
+    if (k >= steps) {
+      cards[target].classList.add('win');
+      tone([523, 659, 784, 1047], .12, 'square', .1);
+      setTimeout(() => {
+        box.hidden = true;
+        giveTool(result, seconds);
+        toast(TOOLS[result].name.toUpperCase() + '!', `<span class="who">${esc(from)}</span> spun the random tool · ${seconds}s`, result === 'hand' ? '#ffcf8a' : '#ffd84a', image);
+        feed(`<span class="who">${esc(from)}</span> spun the random tool: <b>${TOOLS[result].name}</b>`, image);
+        spinning = null; nextSpin();
+      }, 900);
+      return;
+    }
+    k++;
+    spinning = setTimeout(tick, 60 + Math.pow(k / steps, 3) * 260);
+  };
+  spinning = setTimeout(tick, 60);
+}
+function nextSpin() { if (!spinning && spinQueue.length) spinTool(...spinQueue.shift()); }
+
+// ---------- gifts from Unbound ----------
+function onGift(m) {
+  const from = m.from || 'Someone', img = giftImg(m.image), who = `<span class="who">${esc(from)}</span>`;
+  if (m.kind === 'add') {
+    const n = addWrap(Math.max(1, +m.amount || 1)); whoosh(true);
+    toast(`+${fmt(n)} BUBBLE WRAP`, `${who} added more wrap`, '#5ee6ff', img);
+    feed(`${who} added ${fmt(n)} bubble wrap`, img);
+  } else if (m.kind === 'remove') {
+    const n = popWave(Math.max(1, +m.amount || 1)); whoosh(false);
+    toast(`POP ${fmt(n)}!`, `${who} popped bubbles for you`, '#5cf08a', img);
+    feed(`${who} popped ${fmt(n)} for you`, img);
+  } else if (m.kind === 'tool' && TOOLS[m.tool]) {
+    const secs = Math.max(1, +m.seconds || 30);
+    if (m.spin) { spinQueue.push([m.tool, secs, m.chances, from, img]); nextSpin(); return; }
+    giveTool(m.tool, secs); tone([523, 659, 784], .1, 'square', .1);
+    toast(TOOLS[m.tool].name.toUpperCase() + '!', `from ${who} · ${secs}s`, '#ffd84a', img);
+    feed(`${who} gave you the <b>${TOOLS[m.tool].name}</b> (${secs}s)`, img);
+  } else if (m.kind === 'jail') {
+    const secs = Math.max(1, +m.seconds || 10); jail(secs);
+    toast('JAILED!', `${who} locked you up · ${secs}s`, '#ff5a5a', img);
+    feed(`${who} jailed you for ${secs}s`, img);
+  } else if (m.kind === 'newsheet') {
+    bits.fill(0); popped = 0; rebuildMaps(); updateWindow(true); dirty = true;
+    if (!m.why) { P.x = P.z = SIZE / 2; toast('NEW SHEET!', '1,000,000 bubbles to go', '#5ee6ff'); }
+  }
+}
+window.onGift = onGift;   // (for testing)
+window.__bw = { P, keys, TOOLS, get popped() { return popped; }, far, grass, scene, renderer, camera, bubbles, popAt, models, cam: null };
+
+// ---------- saving (into Unbound) ----------
+async function gz(u8) { return new Uint8Array(await new Response(new Blob([u8]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer()); }
+async function gunz(u8) { return new Uint8Array(await new Response(new Blob([u8]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer()); }
+const toB64 = u8 => { let s = ''; for (let k = 0; k < u8.length; k += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(k, k + 0x8000)); return btoa(s); };
+const fromB64 = b => Uint8Array.from(atob(b), c => c.charCodeAt(0));
+const post = (p, b, keepalive = false) => fetch(p, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b), keepalive });
+let saving = false;
+async function save(keepalive = false) {
+  if (!dirty || saving) return;
+  saving = true; dirty = false;
+  try { await post('/api/bubble/save', { data: toB64(await gz(bits)), x: Math.round(P.x / SP), y: Math.round(P.z / SP), popped }, keepalive); }
+  catch { dirty = true; }
+  saving = false;
+}
+async function load() {
+  try {
+    const r = await (await fetch('/api/bubble/state')).json();
+    if (r.data) {
+      const u = await gunz(fromB64(r.data));
+      if (u.length === bits.length) bits.set(u);
+      // where you were (saved in bubbles)
+      if (Number.isFinite(r.x) && Number.isFinite(r.y) && r.x >= 0 && r.x <= N && r.y >= 0 && r.y <= N) { P.x = r.x * SP; P.z = r.y * SP; }
+    }
+  } catch { }
+  popped = 0; for (let k = 0; k < bits.length; k++) { let v = bits[k]; while (v) { v &= v - 1; popped++; } }
+  rebuildMaps();
+}
+setInterval(() => save(), 4000);
+addEventListener('beforeunload', () => { dirty = true; save(true); });
+setInterval(() => post('/api/bubble/hello', { popped, tool: P.tool }).catch(() => {}), 3000);
+
+// ---------- the reset: a countdown; at 0 the whole sheet comes back, unless someone sends the save gift ----------
+let resetShownSecs = -1;
+function onReset(r) {
+  const box = document.getElementById('reset'), who = r.by ? `<span class="who">${esc(r.by)}</span>` : 'Someone';
+  if (r.active) {
+    box.hidden = false;
+    document.getElementById('resetSecs').textContent = r.secondsLeft;
+    document.getElementById('resetBar').style.width = (r.secondsLeft / (r.total || 60) * 100) + '%';
+    const sg = r.saveGift;
+    document.getElementById('resetSave').innerHTML = sg ? `${sg.image ? `<img src="${giftImg(sg.image)}" alt="">` : ''}<span>Send <b style="color:#ffd84a">${esc(sg.name)}</b> to SAVE the sheet!</span>` : '<span>Every bubble comes back at 0!</span>';
+    const urgent = r.secondsLeft <= 10;
+    box.classList.toggle('urgent', urgent); document.getElementById('vignette').classList.toggle('on', urgent);
+    if (urgent && r.secondsLeft !== resetShownSecs) tone([r.secondsLeft <= 3 ? 1100 : 880], .06, 'square', .08);
+    if (resetShownSecs < 0) { toast('RESET!', `${who} started a reset · ${r.total}s to save it`, '#ff5a5a'); clank(); }
+    resetShownSecs = r.secondsLeft;
+    return;
+  }
+  box.hidden = true; box.classList.remove('urgent'); document.getElementById('vignette').classList.remove('on');
+  resetShownSecs = -1;
+  if (r.event === 'saved') { toast('SAVED!', `${who} saved the sheet`, '#5cf08a'); tone([523, 659, 784, 1047], .12, 'square', .1); feed(`${who} saved the sheet from the reset`); }
+  else if (r.event === 'shield') { toast('SHIELD!', `${who} blocks the next reset`, '#5ee6ff'); feed(`${who} gave you a shield`); }
+  else if (r.event === 'blocked') { toast('BLOCKED!', `the shield stopped ${who}'s reset`, '#5ee6ff'); feed(`The shield blocked ${who}'s reset`); }
+  else if (r.event === 'done') { toast('RESET!', 'every bubble is back', '#ff5a5a'); feed(`${who}'s reset: the sheet is back to 0`); }
+}
+
+function listen() {
+  const es = new EventSource('/api/events');
+  es.addEventListener('bubble', e => { try { onGift(JSON.parse(e.data)); } catch { } });
+  es.addEventListener('reset', e => { try { onReset(JSON.parse(e.data)); } catch { } });
+  // a reset already running when the game opens
+  fetch('/api/overlay-state').then(r => r.json()).then(s => { if (s.reset?.active) onReset(s.reset); }).catch(() => {});
+  es.onopen = () => document.getElementById('conn').hidden = true;
+  es.onerror = () => { document.getElementById('conn').hidden = false; };
+}
+
+// ---------- each frame ----------
+let last = performance.now(), shownPopped = -1, soundBudget = 0, wonShown = false, miniAt = 0, progAt = 0;
+function frame(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now;
+  const t = TOOLS[P.tool];
+  if (P.toolUntil && now > P.toolUntil) { giveTool('hand', 0); toast('BACK TO YOUR HAND', 'pops 1 at a time', '#ffcf8a'); }
+  const vehicle = P.tool === 'roller' || P.tool === 'steam';
+  const k = n => keys.has(n);
+  let fw = (k('w') || k('arrowup') ? 1 : 0) - (k('s') || k('arrowdown') ? 1 : 0);
+  let st = (k('d') ? 1 : 0) - (k('a') ? 1 : 0);
+  // arrow keys turn too (for anyone without a mouse)
+  if (k('arrowleft')) P.wantYaw += 2.2 * dt;
+  if (k('arrowright')) P.wantYaw -= 2.2 * dt;
+  if (jailed()) fw = st = 0;
+  // vehicles steer with A / D and turn slowly; on foot you turn as fast as the mouse
+  if (vehicle) { P.wantYaw -= st * t.turn * dt; st = 0; }
+  const dy = P.wantYaw - P.yaw, maxTurn = t.turn * dt, slow = vehicle || P.tool === 'pin';
+  P.yaw += slow ? Math.max(-maxTurn, Math.min(maxTurn, dy)) : dy;
+  if (slow) P.wantYaw = P.yaw + Math.max(-.6, Math.min(.6, P.wantYaw - P.yaw));
+  const [fx, fz] = fwd(), rx = -fz, rz = fx;
+  let tx = fx * fw + rx * st, tz = fz * fw + rz * st; const tl = Math.hypot(tx, tz) || 1, go = fw || st ? 1 : 0;
+  tx = tx / tl * t.speed * go; tz = tz / tl * t.speed * go;
+  if (fw < 0) { tx *= .6; tz *= .6; }
+  const acc = Math.min(1, dt * (vehicle ? 2.5 : 10));
+  P.vx += (tx - P.vx) * acc; P.vz += (tz - P.vz) * acc;
+  P.x = Math.max(-20, Math.min(SIZE + 20, P.x + P.vx * dt));
+  P.z = Math.max(-20, Math.min(SIZE + 20, P.z + P.vz * dt));
+  const speed = Math.hypot(P.vx, P.vz);
+  P.moving = speed > .4;
+  P.step += speed * dt * 1.9;
+
+  // popping as you go
+  if (P.moving && !jailed()) {
+    if (P.tool === 'boots') {
+      const side = Math.sin(P.step * Math.PI) > 0 ? 1 : -1;
+      popAt(P.x + rx * .13 * side, P.z + rz * .13 * side, true); popAt(P.x, P.z, true);
+    } else if (t.width > 1) {
+      const half = t.width * SP / 2;
+      for (const off of [-.12, .12]) {
+        const cx = P.x + fx * (t.reach + off), cz = P.z + fz * (t.reach + off);
+        for (let s = -half + .06; s <= half - .06; s += SP / 2) popAt(cx + rx * s, cz + rz * s, popsThisFrame < 50);
+      }
+    }
+  }
+  engineHum(P.tool === 'steam' && !jailed(), Math.min(1, speed / t.speed));
+
+  // "pop for you" waves
+  for (const w of waves) { w.t += dt; for (let n = 0; n < w.per && w.k < w.list.length; n++, w.k++) pop(w.list[w.k][0], w.list[w.k][1], popsThisFrame < 80); }
+  for (let q = waves.length - 1; q >= 0; q--) if (waves[q].k >= waves[q].list.length && waves[q].t > 1) waves.splice(q, 1);
+  const w0 = waves[0];
+  ringMesh.visible = !!w0;
+  if (w0) { const rr = 1 + w0.t * 16; ringMesh.position.set(w0.x, .08, w0.z); ringMesh.scale.set(rr, rr, 1); ringMesh.material.opacity = Math.max(0, .7 - w0.t * .5); }
+
+  // pop sounds: many at once crackle, without hundreds of sounds
+  soundBudget = Math.min(4, soundBudget + dt * 45);
+  if (popsThisFrame) { const n = Math.min(popsThisFrame, Math.floor(soundBudget), 3); for (let q = 0; q < n; q++) popSound(popsThisFrame > 3 ? .7 : 1); soundBudget -= n; }
+  popsThisFrame = 0;
+
+  // the 3D bubbles round you, and new wrap growing in
+  updateWindow();
+  for (const s of [...grow.keys()]) { const c = slotCell[s]; if (c >= 0) writeSlot(c % N, (c / N) | 0, now); else grow.delete(s); }
+
+  // shards
+  for (let q = 0; q < PCOUNT; q++) {
+    if (pLife[q] <= 0) continue;
+    pLife[q] -= dt; pVel[q * 3 + 1] -= 9 * dt;
+    pPos[q * 3] += pVel[q * 3] * dt; pPos[q * 3 + 1] = Math.max(.01, pPos[q * 3 + 1] + pVel[q * 3 + 1] * dt); pPos[q * 3 + 2] += pVel[q * 3 + 2] * dt;
+    if (pLife[q] <= 0) pPos[q * 3 + 1] = -10;
+  }
+  pGeo.attributes.position.needsUpdate = true;
+
+  // what you hold or drive
+  rig.position.set(P.x, 0, P.z); rig.rotation.y = P.yaw;
+  const sp = models[P.tool]?.userData.spin; if (sp) sp.rotation.x -= speed * dt / (P.tool === 'steam' ? .95 : P.tool === 'roller' ? .32 : .1);
+  for (const w of models[P.tool]?.userData.wheels || []) w.rotation.x -= speed * dt / .76;
+  if (P.tool === 'boots') models.boots.children.forEach(b => { const ph = Math.sin(P.step * Math.PI) * b.userData.side; b.position.z = P.moving ? ph * .18 : 0; b.position.y = P.moving ? Math.max(0, ph) * .06 : 0; });
+  P.poke = Math.max(0, P.poke - dt * 5);
+  models.hand.position.set(.22, -.25 - P.poke * .12, -.45 - P.poke * .18);
+  cage.visible = jailed();
+
+  // camera: your eyes (higher in the steamroller), a little bob as you walk
+  P.eye += (t.eye - P.eye) * Math.min(1, dt * 3);
+  const bob = !vehicle && P.moving ? Math.sin(P.step * Math.PI * 2) * .035 : 0;
+  const shake = P.tool === 'steam' && P.moving ? (Math.random() - .5) * .02 : 0;
+  const back = P.tool === 'steam' ? -.55 : 0;
+  camera.position.set(P.x - fx * back, P.eye + bob + shake, P.z - fz * back);
+  camera.rotation.set(P.pitch, P.yaw, 0, 'YXZ');
+  // (a fixed camera, for pictures of the game)
+  if (window.__bw.cam) { const c = window.__bw.cam; camera.position.set(...c.pos); camera.lookAt(...c.at); models.hand.visible = false; }
+
+  sun.position.set(P.x + SUN_DIR.x * 80, SUN_DIR.y * 80, P.z + SUN_DIR.z * 80); sun.target.position.set(P.x, 0, P.z);
+  if (window.__sky) window.__sky.position.copy(camera.position);
+  if (progDirty && now - progAt > 300) { progAt = now; progDirty = false; progTex.needsUpdate = true; }
+  renderer.render(scene, camera);
+  hud(now);
+  requestAnimationFrame(frame);
+}
+
+function hud(now) {
+  if (popped !== shownPopped) {
+    const el = document.getElementById('counter');
+    document.getElementById('num').textContent = fmt(popped);
+    document.getElementById('bar').style.width = (popped / TOTAL * 100) + '%';
+    document.getElementById('pct').textContent = (popped / TOTAL * 100).toFixed(popped && popped < TOTAL / 100 ? 2 : 1) + '%';
+    if (popped > shownPopped && shownPopped >= 0) { el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
+    shownPopped = popped;
+    if (popped >= TOTAL && !wonShown) { wonShown = true; document.getElementById('win').hidden = false; tone([523, 659, 784, 1047, 1319], .2, 'square', .14); }
+    if (popped < TOTAL) wonShown = false;
+  }
+  if (P.tool !== 'hand') {
+    const left = Math.max(0, P.toolUntil - now);
+    document.getElementById('toolLeft').style.width = (left / P.toolTotal * 100) + '%';
+    document.getElementById('toolInfo').textContent = `${TOOLS[P.tool].info} · ${Math.ceil(left / 1000)}s left`;
+  }
+  const j = document.getElementById('jail');
+  if (jailed()) { j.hidden = false; document.getElementById('jailLeft').textContent = `${Math.ceil((P.jailUntil - now) / 1000)}s left`; } else j.hidden = true;
+  if (now - miniAt > 250) {
+    miniAt = now;
+    mg.putImageData(mimg, 0, 0);
+    const kk = 200 / SIZE, [fx, fz] = fwd();
+    mg.fillStyle = '#ffd84a'; mg.strokeStyle = '#000'; mg.lineWidth = 1;
+    mg.beginPath(); mg.moveTo(P.x * kk + fx * 7, P.z * kk + fz * 7); mg.lineTo(P.x * kk - fz * 4 - fx * 3, P.z * kk + fx * 4 - fz * 3); mg.lineTo(P.x * kk + fz * 4 - fx * 3, P.z * kk - fx * 4 - fz * 3); mg.closePath(); mg.fill(); mg.stroke();
+  }
+}
+
+// ---------- the models made in Blender (tools/blender/build_bubblewrap.py) ----------
+// They replace the simple shapes above; if one can't load, the simple one stays.
+const loader = new GLTFLoader();
+const glb = name => new Promise(res => loader.load(`/models/${name}.glb`, g => res(g.scene), undefined, () => res(null)));
+const meshGeo = (scn, name) => { const o = scn?.getObjectByName(name); if (!o?.geometry) return null; o.updateWorldMatrix(true, false); return o.geometry.clone().applyMatrix4(o.matrixWorld); };
+async function loadModels() {
+  const [bub, hand, boots, pin, roller, steam, map] = await Promise.all(['bubbles', 'hand', 'boots', 'pin', 'roller', 'steamroller', 'map'].map(glb));
+  const bg = meshGeo(bub, 'Bubble'), pg = meshGeo(bub, 'Popped');
+  if (bg) bubbles.geometry = bg;
+  if (pg) flats.geometry = pg;
+  const swap = (k, scn, parent, wrap) => {
+    if (!scn) return;
+    scn.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    let node = scn;
+    if (wrap) { node = new THREE.Group(); node.position.copy(models[k].position); node.rotation.copy(models[k].rotation); node.add(scn); }
+    node.visible = models[k].visible;
+    parent.remove(models[k]); parent.add(node);
+    node.userData.spin = scn.getObjectByName('Drum') || null;
+    node.userData.wheels = ['WheelL', 'WheelR'].map(n => scn.getObjectByName(n)).filter(Boolean);
+    models[k] = node;
+  };
+  swap('hand', hand, held, true);
+  swap('boots', boots, rig);
+  if (models.boots) for (const b of models.boots.children) b.userData.side = /L$/.test(b.name) ? -1 : 1;
+  swap('pin', pin, rig); swap('roller', roller, rig); swap('steam', steam, rig);
+  if (map) {
+    map.position.set(SIZE / 2, 0, SIZE / 2);
+    map.traverse(o => { if (o.isMesh) { o.receiveShadow = false; o.castShadow = false; o.matrixAutoUpdate = false; o.updateMatrix(); } });
+    scene.add(map); map.updateMatrixWorld(true);
+  }
+}
+
+for (const [k, m] of Object.entries(models)) m.visible = k === 'hand';
+renderTool();
+Promise.all([load(), loadModels()]).then(() => { for (const [k, m] of Object.entries(models)) m.visible = k === P.tool; updateWindow(true); listen(); requestAnimationFrame(frame); });
+</script>
+</body>
+</html>

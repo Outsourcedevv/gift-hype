@@ -5,7 +5,7 @@
 // Images are files in ./assets.
 
 export const DOWNLOAD_URL = 'https://github.com/Outsourcedevv/gift-hype/archive/refs/heads/main.zip';
-export const VERSION = '2.26.3';
+export const VERSION = '2.27.0';
 
 export const C = {
     purple: 0x8b6cff, blue: 0x5d8bff, cyan: 0x22d3ee, pink: 0xff3d7f, orange: 0xff7a3d,
@@ -88,7 +88,7 @@ export const GAMES = [
         topic: 'Parkour Paradise: gifts that help you or wreck your run.',
         posts: [{ embeds: [game({
             color: C.green, title: '🧗 Parkour Paradise', image: 'cover-parkour.jpg',
-            description: 'Play any parkour map you like, and **chat decides how it goes**. Some gifts help (speed, super jumps), most of them don\'t: arrows raining on you, freezing in place mid-jump, the drunk walk, getting launched into the sky, or straight back to the start.',
+            description: 'Played on **Parkour Paradise 3**, Hielke\'s free 100-level parkour map, and **chat decides how it goes**. Some gifts help (speed, super jumps), most of them don\'t: arrows raining on you, freezing in place mid-jump, the drunk walk, getting launched into the sky, or straight back to the start.\n\nPress **Play Minecraft** and Unbound gets the map for you the first time: press Download on Hielke\'s page and it does the rest.',
             gifts: [['Finger Heart', 'arrow rain'], ['Rosa', 'frozen for 5s'], ['Hat and Mustache', 'drunk for 15s'], ['Paper Crane', 'speed boost'],
                 ['Corgi', 'super jump'], ['Boxing Gloves', 'launched into the air'], ['Galaxy', 'back to the start']],
         })] }],
@@ -358,7 +358,7 @@ export const LAYOUT = [
     },
     {
         category: '✦ HELP', channels: [
-            { key: 'help', name: '🆘・help', type: 'forum', topic: helpGuide, tags: [['Setup', '⚙️'], ['TikTok', '🎵'], ['Minecraft', '⛏️'], ['Overlay', '📺'], ['Gifts & sounds', '🎁'], ['Solved', '✅', true]] },
+            { key: 'help', name: '🆘・help', type: 'forum', topic: helpGuide, tags: [['Setup', '⚙️'], ['TikTok', '🎵'], ['Minecraft', '⛏️'], ['Overlay', '📺'], ['Gifts & sounds', '🎁'], ['Solved', '✅']] },
             {
                 key: 'bugs', name: '🐛・bug-reports', type: 'forum',
                 topic: '**Found a bug?** One post per bug:\n• What you did\n• What you expected\n• What happened instead\n• Your Unbound version (Look & settings > Updates) and a screenshot',

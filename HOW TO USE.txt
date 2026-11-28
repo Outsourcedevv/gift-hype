@@ -47,6 +47,44 @@ MINECRAFT'S TYPES
   Chat Teleport or Parkour Paradise, each with its own cover and its own gifts. The one marked LIVE is
   where gifts go. On a type's page, "Change cover" changes that type's picture.
 
+BUBBLE WRAP (its own game, next to Minecraft)
+  Pop 1,000,000 bubbles, in 3D, first person: a sheet of bubble wrap 1,000 by 1,000 bubbles on a field,
+  next to the Bubble Wrap Co. factory (giant rolls, box stacks, floodlights, a billboard, trees and hills;
+  the models and the map are made in Blender: tools/blender/build_bubblewrap.py makes them again).
+  Press Play Bubble Wrap and it opens in a window of its own: add that window to TikTok LIVE Studio or OBS
+  (Window capture, "Bubble Wrap · Unbound"). Click in it to look round with the mouse (Esc lets go).
+  W A S D walk; M turns its sounds off and on. The counter at the top, the minimap and the tool you have
+  are on its screen; gifts pop up there too, with who sent them.
+  The five tools, worst to best: your HAND (1 bubble at a time: click the one you look at, or Space),
+  BOOTS (pop where you step), a ROLLING PIN (3 wide), a LAWN ROLLER (5 wide) and the STEAMROLLER (11 wide:
+  you sit in the cab, W S drive, A D steer). Gifts give you one for some seconds, then you're back to
+  your hand (the same tool again adds time).
+  The gift actions: Add bubble wrap (that many popped bubbles come back round you: the counter goes down),
+  Pop bubbles for you (a wave goes out from you), Give a tool (which one, how many seconds), Random tool
+  (a wheel spins through the five and lands on one: set each tool's chance, e.g. 10 / 30 / 30 / 20 / 10;
+  0 = never), Jail (a cage drops round you for the seconds you set; more jail adds more time), the Reset
+  countdown (a timer on the game screen and the stream overlay, with the save gift's picture: at 0 every
+  bubble comes back and the counter goes to 0) and Save from the reset (stops it; with no countdown
+  running you get a shield that blocks the next reset).
+  Starting gifts: Rose = pops 50 for you, Finger Heart = +500 bubble wrap, Rosa = jail 10s, Doughnut =
+  boots 30s, Paper Crane = rolling pin 30s, Hand Hearts = random tool, Corgi = lawn roller 30s, Boxing
+  Gloves = +10,000 bubble wrap, Money Gun = steamroller 30s, Galaxy = reset in 60s, Glowing Jellyfish =
+  saves the sheet, Whale Diving = +50,000 bubble wrap, Interstellar = pops 100,000 for you. Change any
+  of them like other gifts.
+  The sheet is saved as you go (in Unbound's data folder), so next stream you carry on. "New sheet" on its
+  page starts again from 0. Deleted it by mistake? "+ Add a game" > Bubble Wrap makes it again.
+
+PARKOUR PARADISE (Minecraft -> Parkour Paradise)
+  Played on Parkour Paradise 3, Hielke's free 100-level parkour map. Unbound doesn't include the map:
+  it comes from Hielke's own page (minecraftmaps.com), which only lets people download it. So the first
+  time you press Play Minecraft, that page opens in your browser: press Download there, and Unbound picks
+  the zip up from your Downloads folder by itself, puts it into your Minecraft worlds as "Parkour Paradise
+  3" and carries on opening it ("Open the page again" and "Stop waiting" are under the Play button while
+  it waits, up to 20 minutes). Already have it (in your worlds, or its zip in Downloads)? It's found and
+  used straight away. Gifts: Finger Heart = arrow rain, Rosa = frozen for 5s, Hat and Mustache = drunk
+  for 15s, Paper Crane = speed boost, Corgi = super jump, Boxing Gloves = launched into the air, Galaxy
+  = back to the start.
+
 CHAT TELEPORT (Minecraft -> Chat Teleport)
   Viewers type anything in Minecraft in your LIVE chat, and every 30 seconds you're teleported to the
   nearest one:
