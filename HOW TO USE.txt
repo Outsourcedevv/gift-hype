@@ -289,6 +289,36 @@ THE DROPPER (Minecraft -> Dropper)
     Lots of punches wait their turn (up to 2000) and keep coming until they're all done, even
     after a wipeout or a death.
 
+SNOW DAY (a Christmas game of its own, no Minecraft needed)
+  Click the Snow Day cover, then Play Snow Day. It opens as its own app (its own window, not a
+  browser; the first time it downloads about 100 MB). Click in it to start. F11 = full screen.
+  You push the snow off a Christmas town square with a big red snow pusher: one open field with
+  nothing in the way. Outside the fence: the big tree, lampposts, houses, cars and snowmen.
+  One big town (240 x 170 m) with 1,500,000 snow in a thin layer. SNOW LEFT counts down (green
+  while it drops, red when snow is added) with milestones every 100,000 cleared. The snow comes
+  away in chunks off the 2.2 m blade. Get it to 0 and HOLD ZERO for 15 seconds to win: any snow
+  that lands stops the clock until you clear it. Once there's little left, light beams show where.
+  Then the leaderboards (biggest adders, resetters and removers) and a fresh round.
+  Your viewers pile snow back on, or melt it to help you: the number and their name pop up.
+  Gift snow only lands where you can see it (or back on ground you've already cleared), and
+  melts only take snow you can see, so nothing changes behind your back.
+  A reset gift starts a 60 second SAVE? countdown: send the save gift in time or all the snow
+  comes back. A save with no reset running gives a shield that blocks the next reset.
+  Keys (the start screen lists them): W A S D move, Shift run, mouse or Q / E to look, Space turn
+  round, hold right click to pull the shovel in (lifted over the snow) and let go to shove it out
+  scooping everything in its way, R restart the level, M music on/off, N sunny day / Christmas night, F11 full screen, Esc pause.
+  Each gift's action is "Send to my game" with one of these names (the amount is how much):
+    snow       that much snow rises up in front of you  blizzard   that many seconds of heavy snow
+    santa      Santa flies over dropping that much     freeze     the shovel freezes for that many seconds
+    melt       melts that much snow (helps you)        avalanche  everything in front of you fills up
+    reset      SAVE? countdown of that many seconds    save       stops a reset (or gives a shield)
+  It starts with: Follow / Rose +100, Finger Heart +1,000, Doughnut +5,000, Rosa frozen shovel,
+  Perfume blizzard, Hat and Mustache Santa +20,000, Corgi avalanche, GG melts 500, Money Gun melts 50,000,
+  Galaxy reset (60s), Glowing Jellyfish saves it.
+  Your level and the snow are kept when you close it. Stream the Snow Day window like any game.
+  The 3D models are made in Blender: snowday/blender/make_models.py builds them all again
+  (blender -b --python snowday/blender/make_models.py -- public/snowday/models).
+
 GIFTS
   + Add gift / Browse all gifts   - every TikTok gift with its picture and price (new ones, like a
                                     new campaign's, are added by themselves when Unbound opens)

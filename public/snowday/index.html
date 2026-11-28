@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Snow Day</title>
+<link rel="icon" href="/icon.png">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script type="importmap">
+{ "imports": { "three": "/vendor/three/build/three.module.js", "three/addons/": "/vendor/three/examples/jsm/" } }
+</script>
+<style>
+  :root { --red: #ff3b47; --green: #4dff6a; --ink: #0d1430; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0b1030; color: #fff;
+    font-family: 'Segoe UI', system-ui, sans-serif; user-select: none; }
+  canvas { display: block; }
+  .chunky { font-family: 'Arial Black', 'Segoe UI Black', Impact, sans-serif; font-weight: 900; letter-spacing: .02em;
+    paint-order: stroke fill; -webkit-text-stroke: 7px var(--ink); }
+
+  /* the scoreboard: level, SNOW LEFT and the gifts that land */
+  #top { position: fixed; top: 14px; left: 0; right: 0; display: grid; justify-items: center; pointer-events: none; }
+  #levelRow { display: flex; gap: 28px; align-items: baseline; }
+  #level { font-size: 30px; color: #fff; }
+  #label { font-size: 30px; color: #fff; }
+  /* the number: cream when still, green while it goes down, red when snow's added */
+  #count { font-size: 92px; line-height: .95; color: #fff1c7; transition: transform .12s, color .2s; }
+  #count.down { color: var(--green); }
+  #count.up { color: #ff6b74; transform: scale(1.06); }
+  #barRow { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+  #pct { font-size: 18px; color: #fff; -webkit-text-stroke-width: 5px; min-width: 120px; }
+
+  /* HOLD ZERO: hold the snow at 0 to win */
+  #hold { margin-top: 10px; display: flex; align-items: center; gap: 10px; padding: 6px 22px 8px; border-radius: 99px; border: 4px solid #fff;
+    background: linear-gradient(180deg, #2bd45a, #129a3b); font-size: 30px; opacity: 0; transform: scale(.6); transition: opacity .25s, transform .25s; }
+  #hold.show { opacity: 1; transform: scale(1); animation: throb 1s ease-in-out infinite; }
+  #hold.broken { opacity: 1; transform: scale(1); background: linear-gradient(180deg, #ff5a63, #c4161f); animation: shakeX .4s 2; }
+  #hold.broken::after { content: ' — SNOW LANDED!'; font-size: 22px; }
+  @keyframes shakeX { 25% { translate: -8px 0; } 75% { translate: 8px 0; } }
+
+  /* SAVE? : a reset counting down */
+  #save { position: fixed; left: 50%; top: 50%; translate: -50% -50%; width: 360px; display: grid; justify-items: center; gap: 4px; padding: 12px 14px 14px;
+    background: linear-gradient(180deg, rgba(120,10,70,.92), rgba(60,6,40,.92)); border: 4px solid #ff5fc0; border-radius: 22px;
+    box-shadow: 0 0 30px rgba(255,80,190,.6); pointer-events: none; opacity: 0; transform: translateY(-20px) scale(.9); transition: opacity .3s, transform .3s; }
+  #save.show { opacity: 1; transform: none; }
+  #save .q { font-size: 72px; color: #ff8fd6; line-height: 1; animation: throb 1s ease-in-out infinite; }
+  #saveTime { font-size: 60px; color: #fff; line-height: 1; }
+  #saveTrack { width: 100%; height: 10px; border-radius: 99px; background: rgba(0,0,0,.45); overflow: hidden; }
+  #saveFill { height: 100%; width: 100%; background: linear-gradient(90deg, #ff3fa4, #ffb3e2); }
+  #saveGift { font-weight: 800; font-size: 17px; text-align: center; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: center; }
+  #saveGift img { width: 38px; height: 38px; }
+  #saveGift b { color: #ffd75e; }
+  #saveBy { font-size: 15px; color: #ffc2e8; -webkit-text-stroke-width: 4px; }
+
+  /* milestones: 100,000 CLEARED! */
+  #mile { position: fixed; left: 0; right: 0; top: 30%; display: grid; justify-items: center; pointer-events: none; opacity: 0; }
+  #mile.show { animation: mile 2.6s ease-out forwards; }
+  #mileBig { font-size: 78px; color: #ffd75e; -webkit-text-stroke-width: 9px; }
+  #mileSmall { font-size: 26px; color: #fff; -webkit-text-stroke-width: 5px; }
+  @keyframes mile { 0% { opacity: 0; transform: scale(.3) rotate(-6deg); } 10% { opacity: 1; transform: scale(1.15) rotate(2deg); }
+    18% { transform: scale(1) rotate(0); } 80% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: translateY(-40px) scale(.95); } }
+
+  /* the streak: how much you've pushed in one go */
+  #streak { position: fixed; left: 0; right: 0; bottom: 64px; text-align: center; pointer-events: none; opacity: 0; transition: opacity .3s; }
+  #streak.show { opacity: 1; }
+  #streakN { font-size: 40px; color: #7dffb0; -webkit-text-stroke-width: 6px; }
+  #streak small { display: block; font-size: 15px; color: #fff; -webkit-text-stroke-width: 4px; }
+
+  #confetti { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+  #confetti i { position: absolute; top: -20px; border-radius: 2px; animation: fall linear forwards; }
+  @keyframes fall { to { transform: translate(var(--dx), 110vh) rotate(var(--r)); } }
+  #bar { width: min(520px, 60vw); height: 14px; border-radius: 99px; background: rgba(13,20,48,.75); border: 3px solid var(--ink);
+    overflow: hidden; margin-top: 6px; }
+  #barFill { height: 100%; width: 0%; background: linear-gradient(90deg, #22e06a, #4dff6a 60%, #d8ff4d); transition: width .3s;
+    box-shadow: 0 0 12px #4dff6a; }
+  #pops { position: relative; height: 0; width: 100%; }
+  .pop { position: absolute; left: 50%; top: 10px; transform: translateX(-50%); display: grid; justify-items: center;
+    animation: pop 2.2s ease-out forwards; white-space: nowrap; }
+  .pop .amt { font-size: 40px; }
+  .pop .who { font-size: 24px; -webkit-text-stroke-width: 5px; display: flex; align-items: center; gap: 8px; }
+  .pop img { width: 34px; height: 34px; }
+  .pop.bad .amt { color: var(--red); }
+  .pop.good .amt { color: var(--green); }
+  .pop.event .amt { color: #8fd8ff; }
+  @keyframes pop { 0% { opacity: 0; transform: translate(-50%, -10px) scale(.6); } 12% { opacity: 1; transform: translate(-50%, 0) scale(1.1); }
+    20% { transform: translate(-50%, 0) scale(1); } 75% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, 70px) scale(.95); } }
+
+  /* effects running now (blizzard, frozen shovel...) */
+  #effects { position: fixed; left: 18px; top: 18px; display: grid; gap: 8px; pointer-events: none; }
+  .fx { background: rgba(13,20,48,.78); border: 3px solid #8fd8ff; border-radius: 14px; padding: 6px 14px; font-weight: 800; font-size: 20px; }
+  .fx.hot { border-color: #ffb347; }
+  .fx.good { border-color: #4dff6a; }
+
+  /* connection to Unbound */
+  #link { position: fixed; right: 16px; bottom: 40px; display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700;
+    background: rgba(13,20,48,.7); padding: 6px 12px; border-radius: 99px; pointer-events: none; }
+  #link i { width: 10px; height: 10px; border-radius: 50%; background: #ffb347; box-shadow: 0 0 8px #ffb347; }
+  #link.on i { background: #4dff6a; box-shadow: 0 0 8px #4dff6a; }
+
+  #banner { position: fixed; inset: 0; display: grid; place-content: center; text-align: center; pointer-events: none; opacity: 0; transition: opacity .4s; }
+  #banner.show { opacity: 1; }
+  #banner .big { font-size: 96px; color: #ffd75e; }
+  #banner .small { font-size: 34px; color: #fff; -webkit-text-stroke-width: 6px; }
+
+  /* the end of a level: who added the most snow and who melted the most */
+  #board { position: fixed; left: 50%; bottom: 8%; transform: translateX(-50%); display: flex; gap: 18px; pointer-events: none;
+    opacity: 0; transition: opacity .5s; flex-wrap: wrap; justify-content: center; width: min(1000px, 96vw); }
+  #board.show { opacity: 1; }
+  #board .col { flex: 1 1 220px; background: rgba(13,20,48,.82); border-radius: 18px; padding: 14px 18px; border: 4px solid #ff6b74; }
+  #board .col.add { border-color: #5ab0ff; }
+  #board .col.reset { border-color: #ff3b47; }
+  #board .col.melt { border-color: #c77dff; }
+  #board h3 { margin: 0 0 8px; font-size: 20px; color: #5ab0ff; }
+  #board .reset h3 { color: #ff6b74; }
+  #board .melt h3 { color: #d6a3ff; }
+  #board ol { margin: 0; padding: 0; list-style: none; display: grid; gap: 5px; }
+  #board li { display: flex; justify-content: space-between; gap: 12px; font-size: 19px; font-weight: 800; }
+  #board li b { opacity: .6; margin-right: 8px; }
+  #board .none { opacity: .6; font-size: 17px; }
+  /* portrait (a TikTok stream): smaller banner so the boards fit under it */
+  @media (max-aspect-ratio: 4/5) {
+    #banner { place-content: start center; padding-top: 30vh; }
+    #banner .big { font-size: 58px; }
+    #banner .small { font-size: 24px; }
+    #board { bottom: 5%; }
+    #mileBig { font-size: 52px; }
+  }
+
+  #frost { position: fixed; inset: 0; pointer-events: none; opacity: 0; transition: opacity .6s;
+    background: radial-gradient(ellipse at center, transparent 45%, rgba(170,225,255,.55) 80%, rgba(230,250,255,.9) 100%); }
+  #frost.on { opacity: 1; }
+  #flash { position: fixed; inset: 0; pointer-events: none; background: #fff; opacity: 0; transition: opacity .5s; }
+
+  #start { position: fixed; inset: 0; display: grid; place-content: center; text-align: center; gap: 14px; cursor: pointer;
+    background: radial-gradient(ellipse at center, rgba(11,16,48,.55), rgba(11,16,48,.9)); }
+  #start h1 { margin: 0; font-size: 110px; color: #fff; -webkit-text-stroke: 9px #c4161f; line-height: .9; }
+  #start h1 span { color: #4dff6a; -webkit-text-stroke-color: #0d5a24; }
+  #start p { margin: 0; font-size: 20px; max-width: 640px; line-height: 1.45; opacity: .92; }
+  #start .keys { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 6px; }
+  #start kbd { background: #fff; color: #0d1430; border-radius: 8px; padding: 4px 10px; font-weight: 800; font-family: inherit; box-shadow: 0 3px 0 #9fb2d9; }
+  #start .go { margin: 12px auto 0; font-size: 28px; background: #c4161f; padding: 14px 34px; border-radius: 16px; border: 4px solid #fff; font-weight: 900;
+    box-shadow: 0 6px 0 #7d0d13; animation: throb 1.4s ease-in-out infinite; }
+  @keyframes throb { 50% { transform: scale(1.05); } }
+  #start.hidden { display: none; }
+</style>
+</head>
+<body>
+<div id="top">
+  <div id="levelRow" class="chunky"><div id="level">CHRISTMAS TOWN</div><div id="label">SNOW LEFT</div></div>
+  <div id="count" class="chunky">0</div>
+  <div id="barRow"><div id="bar"><div id="barFill"></div></div><div id="pct" class="chunky">0% CLEARED</div></div>
+  <div id="hold" class="chunky">HOLD ZERO <span id="holdN">15s</span></div>
+  <div id="pops"></div>
+</div>
+<div id="effects"></div>
+<div id="link"><i></i><span id="linkText">Connecting to Unbound…</span></div>
+<div id="frost"></div>
+<div id="flash"></div>
+<div id="banner"><div class="big chunky" id="bannerBig"></div><div class="small chunky" id="bannerSmall"></div></div>
+<div id="board"></div>
+<div id="save"><div class="q chunky">SAVE?</div><div id="saveTime" class="chunky">01:00</div><div id="saveTrack"><div id="saveFill"></div></div>
+  <div id="saveGift"></div><div id="saveBy" class="chunky"></div></div>
+<div id="mile"><div id="mileBig" class="chunky"></div><div id="mileSmall" class="chunky"></div></div>
+<div id="streak"><span id="streakN" class="chunky"></span><small class="chunky">PUSHED</small></div>
+<div id="confetti"></div>
+<div id="start">
+  <h1 class="chunky">SNOW <span>DAY</span></h1>
+  <p>Push all 1,500,000 snow off the big Christmas town, then hold it at 0 for 15 seconds to win.
+     Your viewers pile it back on (follows and gifts drop snow; big gifts bring blizzards, avalanches, Santa's sleigh and a RESET you have to be saved from) or melt it to help you.</p>
+  <div class="keys"><kbd>W A S D</kbd><kbd>Shift</kbd> run <kbd>Mouse</kbd> look <kbd>Space</kbd> turn round <kbd>Right click</kbd> hold to pull the shovel in, let go to shove <kbd>R</kbd> restart level <kbd>M</kbd> music <kbd>N</kbd> day/night</div>
+  <div class="go chunky" style="-webkit-text-stroke-width:5px">CLICK TO PLAY</div>
+</div>
+<script type="module" src="game.js"></script>
+</body>
+</html>

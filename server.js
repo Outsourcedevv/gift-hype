@@ -255,6 +255,29 @@ const DROPPER_RULES = [
     { gift: 'Glowing Jellyfish', sound: 'builtin/cha-ching.mp3', label: 'Saves the reset', perCount: false, actions: [{ type: 'saveReset' }] },
     { gift: 'Hand Hearts', sound: 'builtin/here-comes-the-money.mp3', label: 'Level slots', perCount: false, actions: [{ type: 'levelWheel', amounts: '-10, -5, -3, -1, 1, 3, 5, 10' }] },
 ];
+// Snow Day (public/snowday): a 3D Christmas game of its own. You shovel the snow off the village
+// square; gifts pile it back on. Each gift's action is sent to the game over the game link.
+const snowAction = (name, amount) => ({ type: 'message', name, amount });
+// a reset gift starts a 60 second SAVE? countdown: the save gift stops it, or all the snow comes back
+const SNOW_DAY_RESET_RULES = [
+    { gift: 'Galaxy', sound: 'builtin/i-need-a-hero.mp3', label: 'Reset in 60s (SAVE?)', perCount: false, actions: [snowAction('reset', 60)] },
+    { gift: 'Glowing Jellyfish', sound: 'builtin/cha-ching.mp3', label: 'Saves the reset', perCount: false, actions: [snowAction('save', 1)] },
+];
+const SNOW_DAY_RULES = [
+    { gift: 'Follow', sound: 'builtin/bonk.mp3', label: '+100 snow', actions: [snowAction('snow', 100)] },
+    { gift: 'Rose', sound: 'builtin/bonk.mp3', label: '+100 snow', actions: [snowAction('snow', 100)] },
+    { gift: 'GG', sound: 'builtin/cha-ching.mp3', label: 'Melts 500 snow', actions: [snowAction('melt', 500)] },
+    { gift: 'Finger Heart', sound: 'builtin/vine-boom.mp3', label: '+1,000 snow', actions: [snowAction('snow', 1000)] },
+    { gift: 'Rosa', sound: 'builtin/wrong-buzzer.mp3', label: 'Frozen shovel 10s', perCount: false, actions: [snowAction('freeze', 10)] },
+    { gift: 'Perfume', sound: 'builtin/whoosh.mp3', label: 'Blizzard 15s', perCount: false, actions: [snowAction('blizzard', 15)] },
+    { gift: 'Doughnut', sound: 'builtin/fahh.mp3', label: 'Big snow pile +5,000', actions: [snowAction('snow', 5000)] },
+    { gift: 'Hat and Mustache', sound: 'builtin/anime-wow.mp3', label: 'Santa drops +20,000', actions: [snowAction('santa', 20000)] },
+    { gift: 'Corgi', sound: 'builtin/nooo.mp3', label: 'AVALANCHE', perCount: false, actions: [snowAction('avalanche', 1)] },
+    { gift: 'Money Gun', sound: 'builtin/here-comes-the-money.mp3', label: 'Melts 50,000 snow', actions: [snowAction('melt', 50000)] },
+    ...SNOW_DAY_RESET_RULES,
+];
+const SNOW_DAY_COVER = path.join(ROOT, 'public', 'img', 'cover-snowday.jpg');
+const isSnowDay = g => g?.connector === 'websocket' && /snow day/i.test(g.name);
 const minecraftModes = (parkourRules = PARKOUR_RULES) => [
     { id: newId(), name: 'Block Delete Survival', rules: BLOCK_DELETE_RULES },
     { id: newId(), name: 'Parkour Paradise', rules: parkourRules },
@@ -435,6 +458,32 @@ if (!settings.chatTeleport) {
         saveGame(g);
     }
     settings.chatTeleport = true; saveSettings();
+}
+if (!settings.snowDay) {
+    // Snow Day is added to the games (once; delete it and it stays gone)
+    if (!Object.values(games).some(isSnowDay)) {
+        const g = normalizeGame({ id: newId(), name: 'Snow Day', connector: 'websocket', rules: SNOW_DAY_RULES });
+        if (fs.existsSync(SNOW_DAY_COVER)) {
+            fs.mkdirSync(COVERS_DIR, { recursive: true });
+            fs.copyFileSync(SNOW_DAY_COVER, path.join(COVERS_DIR, 'snowday.jpg'));
+            g.cover = 'file:snowday.jpg';
+        }
+        games[g.id] = g;
+        saveGame(g);
+    }
+    settings.snowDay = true; saveSettings();
+}
+if (!settings.snowDayReset) {
+    // 2.28: Snow Day's reset and save gifts are added to the Snow Day game you already have
+    for (const g of Object.values(games)) {
+        if (!isSnowDay(g)) continue;
+        const rules = rulesOf(g);
+        if (rules.some(r => r.actions.some(a => a.type === 'message' && (a.name === 'reset' || a.name === 'save')))) continue;
+        const used = new Set(rules.map(r => r.gift.toLowerCase()));
+        rules.push(...normalizeRules(SNOW_DAY_RESET_RULES.filter(r => !used.has(r.gift.toLowerCase()))));
+        saveGame(g);
+    }
+    settings.snowDayReset = true; saveSettings();
 }
 if (!settings.covers) {
     for (const g of Object.values(games)) if (g.connector === 'minecraft' && /minecraft/i.test(g.name) && !g.cover) { g.cover = MINECRAFT_COVER; saveGame(g); }
@@ -1036,7 +1085,8 @@ function startGameSocket() {
     wss.on('connection', (ws, req) => {
         // Only local pages/programs: a website you visit can't connect and listen in.
         const origin = req.headers.origin;
-        if (origin && !/^(https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?|file:\/\/|null)$/i.test(origin)) return ws.close(1008, 'Not allowed');
+        // (snowday://app is the Snow Day desktop app)
+        if (origin && !/^(https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?|file:\/\/|null|snowday:\/\/app)$/i.test(origin)) return ws.close(1008, 'Not allowed');
         setStatus({ gameClients: wss.clients.size });
         log('A game connected.');
         ws.send(JSON.stringify({ type: 'hello', app: 'Gift Hype', game: activeGame()?.name || null }));
@@ -1204,7 +1254,10 @@ async function runAction(game, a, ctx) {
         if (game.connector !== 'minecraft') return;
         for (let i = 0; i < times; i++) await mc(fill(a.command || '', ctx)).catch(e => log(`Command failed: ${e.message}`));
     } else if (a.type === 'message') {
-        const sent = sendToGames({ type: 'gift', action: a.name || 'gift', amount: (+a.amount || 1) * (ctx.perCount ? ctx.count : 1), gift: ctx.gift, from: ctx.from, count: ctx.count, game: game.name });
+        // a reset tells the game which gift saves it (shown on its SAVE? banner)
+        const saver = a.name === 'reset' ? rulesOf(game).find(r => r.actions.some(x => x.type === 'message' && x.name === 'save')) : null;
+        const save = saver ? { name: saver.gift, image: findGift(saver.gift)?.image || saver.image || null } : undefined;
+        const sent = sendToGames({ type: 'gift', action: a.name || 'gift', amount: (+a.amount || 1) * (ctx.perCount ? ctx.count : 1), gift: ctx.gift, from: ctx.from, count: ctx.count, game: game.name, image: ctx.image || null, save });
         if (!sent) log(`No game is connected to receive "${a.name}".`);
     } else if (a.type === 'keys') {
         for (let i = 0; i < times; i++) { pressKeys(a.keys || ''); if (times > 1) await sleep(Math.max(30, +a.gap || 120)); }
@@ -1549,6 +1602,9 @@ function setActive(id) {
 
 const routes = {
     'GET /api/state': () => publicState(),
+    // Snow Day: where it connects for gifts, and its own window
+    'GET /api/snowday': () => ({ wsPort: settings.wsPort }),
+    'POST /api/snowday/open': async () => ({ ok: true, state: await openSnowDay() }),
     // Opens TikTok LIVE Studio if it's on this PC (its scene files aren't documented, so the overlay
     // is added there by hand: the app copies the address and shows the clicks).
     'POST /api/live-studio/open': () => {
@@ -1887,6 +1943,23 @@ const server = http.createServer(async (req, res) => {
 
     if (STATIC[url.pathname]) return send(res, 200, fs.readFileSync(path.join(ROOT, 'public', STATIC[url.pathname])), 'text/html; charset=utf-8');
     if (url.pathname === '/icon.png') return send(res, 200, fs.readFileSync(path.join(ROOT, 'public', 'icon.png')), 'image/png');
+    // Snow Day: its page, code and Blender models, and three.js (the 3D engine) from node_modules
+    if (req.method === 'GET' && url.pathname === '/snowday') { res.writeHead(302, { Location: '/snowday/' + url.search }); return res.end(); }
+    if (req.method === 'GET' && url.pathname === '/snowday/') {
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
+        return res.end(fs.readFileSync(path.join(ROOT, 'public', 'snowday', 'index.html')));
+    }
+    {
+        const m = req.method === 'GET' && (/^\/snowday\/([\w-]+\.js|models\/[\w-]+\.glb)$/.exec(url.pathname) || /^\/vendor\/three\/((?:build|examples\/jsm)\/[\w./-]+\.js)$/.exec(url.pathname));
+        if (m) {
+            const f = url.pathname.startsWith('/vendor/') ? path.join(ROOT, 'node_modules', 'three', m[1]) : path.join(ROOT, 'public', 'snowday', m[1]);
+            if (!f.includes('..') && fs.existsSync(f)) {
+                res.writeHead(200, { 'Content-Type': f.endsWith('.glb') ? 'model/gltf-binary' : 'text/javascript; charset=utf-8', 'Cache-Control': 'no-cache' });
+                return res.end(fs.readFileSync(f));
+            }
+            return send(res, 404, { error: 'Not found' });
+        }
+    }
     // the resource pack the hidden server hands to Minecraft (Chat Teleport's on-screen timer box)
     // a block's 3D picture (Chunk Chat's reveal on the stream overlay)
     if (req.method === 'GET' && /^\/mc\/block\/[a-z0-9_]+\.png$/.test(url.pathname)) {
@@ -2098,6 +2171,29 @@ function openWindow() {
         '--window-size=1400,900',
         '--no-first-run', '--no-default-browser-check',
     ], { stdio: 'ignore' });
+}
+
+// Snow Day is a desktop app of its own (snowday/main.cjs, on Electron). Closing it never closes Unbound.
+const ELECTRON = path.join(ROOT, 'node_modules', 'electron', 'dist', 'electron.exe');
+let snowDayDownload = null;
+async function openSnowDay() {
+    if (!fs.existsSync(ELECTRON)) {
+        // npm doesn't always fetch Electron's program files: the first time, Unbound gets them itself (~100 MB)
+        const installer = path.join(ROOT, 'node_modules', 'electron', 'install.js');
+        if (!fs.existsSync(installer)) throw new Error('Snow Day needs one more download: run Setup.bat again (or restart Unbound after an update)');
+        if (snowDayDownload) throw new Error('Snow Day is still downloading (first time only). It opens by itself when it\'s ready');
+        log('Downloading Snow Day (first time only, about 100 MB)...');
+        snowDayDownload = new Promise(done => spawn(process.execPath, [installer], { cwd: path.dirname(installer), windowsHide: true, stdio: 'ignore' }).on('exit', done).on('error', done));
+        snowDayDownload.then(() => {
+            snowDayDownload = null;
+            if (fs.existsSync(ELECTRON)) openSnowDay().catch(e => log(`Snow Day: ${e.message}`));
+            else log("Snow Day couldn't download. Check the internet connection and press Play Snow Day again.");
+        });
+        return 'downloading';
+    }
+    spawn(ELECTRON, [path.join(ROOT, 'snowday')], { cwd: ROOT, detached: true, stdio: 'ignore' }).unref();
+    log('Snow Day is opening.');
+    return 'opening';
 }
 
 server.on('error', async e => {

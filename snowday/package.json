@@ -1,0 +1,8 @@
+{
+  "name": "snow-day",
+  "productName": "Snow Day",
+  "version": "1.0.0",
+  "description": "Snow Day: a Christmas snow shovelling game for TikTok LIVE, played with Unbound",
+  "main": "main.cjs",
+  "private": true
+}
