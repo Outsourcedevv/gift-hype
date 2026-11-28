@@ -89,6 +89,18 @@ canvas#game { position: fixed; inset: 0; width: 100%; height: 100%; display: blo
 #vignette { inset: 0; box-shadow: inset 0 0 0 rgba(255,0,0,0); transition: box-shadow .4s; }
 #vignette.on { box-shadow: inset 0 0 160px rgba(255,30,30,.55); }
 #shield { top: 150px; right: 14px; padding: 6px 12px; font-weight: 800; color: #9ee8ff; }
+#combo { left: 50%; bottom: 210px; transform: translateX(-50%); text-align: center; transition: opacity .3s; }
+#combo .x { font: 900 54px/1 var(--big); color: #fff; -webkit-text-stroke: 2px rgba(0,0,0,.35); text-shadow: 0 4px 0 rgba(0,0,0,.35), 0 0 24px var(--c, #5ee6ff); }
+#combo .l { font: 900 15px var(--big); letter-spacing: 4px; color: var(--c, #5ee6ff); text-shadow: 0 2px 4px rgba(0,0,0,.6); }
+#combo.bump .x { animation: cbump .16s ease-out; }
+@keyframes cbump { 0% { transform: scale(1.25); } 100% { transform: scale(1); } }
+#combo.done { opacity: 0; }
+#mile { top: 40%; left: 50%; transform: translate(-50%, -50%); text-align: center; }
+#mile .t { animation: milein 1.8s cubic-bezier(.2,1.4,.3,1) forwards; }
+#mile .big { font: 900 96px/1 var(--big); background: linear-gradient(180deg, #fff 20%, #ffd84a 60%, #ff9f2e); -webkit-background-clip: text; color: transparent; filter: drop-shadow(0 6px 0 rgba(0,0,0,.35)) drop-shadow(0 0 30px rgba(255,200,60,.6)); }
+#mile .sub { font: 900 22px var(--big); letter-spacing: 6px; color: #fff; text-shadow: 0 3px 8px rgba(0,0,0,.6); }
+@keyframes milein { 0% { transform: scale(.2) rotate(-8deg); opacity: 0; } 15% { transform: scale(1.15) rotate(2deg); opacity: 1; } 25% { transform: scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: scale(1.05) translateY(-20px); } }
+canvas#confetti { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 #win { inset: 0; display: grid; place-items: center; background: radial-gradient(circle, rgba(20,10,50,.5), rgba(0,0,0,.75)); pointer-events: auto; }
 #win .box { text-align: center; }
 #win .big { font: 900 90px/1 var(--big); background: linear-gradient(90deg, var(--cyan), #fff, var(--pink)); -webkit-background-clip: text; color: transparent; }
@@ -107,12 +119,15 @@ canvas#game { position: fixed; inset: 0; width: 100%; height: 100%; display: blo
 <div class="hud panel" id="tool"><div class="ic" id="toolIc"></div><div style="flex:1;min-width:0"><b id="toolName">Hand</b><span id="toolInfo">pops 1 at a time</span><div class="tbar" id="toolBar" hidden><i id="toolLeft"></i></div></div></div>
 <div class="hud" id="feed"></div>
 <div class="hud panel" id="mini"><canvas id="miniCv" width="200" height="200"></canvas></div>
-<div class="hud panel" id="help"><span id="helpMove"><kbd>W A S D</kbd> move</span> &nbsp; <kbd>Mouse</kbd> look &nbsp; <span id="helpPop"><kbd>Click</kbd> pop</span> &nbsp; <kbd>M</kbd> sound</div>
+<div class="hud panel" id="help"><span id="helpMove"><kbd>W A S D</kbd> move</span> &nbsp; <kbd>Mouse</kbd> look &nbsp; <span id="helpPop"><kbd>Click</kbd> pop</span> &nbsp; <kbd>M</kbd> sound &nbsp; <kbd>Q</kbd> quality</div>
 <div class="hud panel" id="conn" hidden>Not connected to Unbound: open Unbound to get gifts</div>
 <div class="hud" id="toast"></div>
 <div class="hud panel" id="roulette" hidden><h3>RANDOM TOOL…</h3><div class="row" id="rRow"></div></div>
 <div class="hud panel" id="jail" hidden><b>JAILED</b><span id="jailLeft"></span></div>
 <div class="hud" id="vignette"></div>
+<canvas id="confetti"></canvas>
+<div class="hud" id="combo" hidden><div class="x" id="comboX">x0</div><div class="l">COMBO</div></div>
+<div class="hud" id="mile"></div>
 <div class="hud panel" id="reset" hidden><div class="lbl">RESET IN</div><div class="secs" id="resetSecs">60</div><div class="save" id="resetSave"></div><div class="rbar"><i id="resetBar"></i></div></div>
 <div class="hud" id="win" hidden><div class="box"><div class="big">1,000,000</div><p>EVERY BUBBLE IS POPPED!</p></div></div>
 <div class="hud" id="nogl" hidden><div><h2>3D doesn't work on this PC</h2><p>Bubble Wrap needs WebGL. Update your graphics driver, or turn on hardware acceleration in Microsoft Edge's settings.</p></div></div>
@@ -121,6 +136,11 @@ canvas#game { position: fixed; inset: 0; width: 100%; height: 100%; display: blo
 import * as THREE from 'three';
 import { GLTFLoader } from '/vendor/jsm/loaders/GLTFLoader.js';
 import { RoomEnvironment } from '/vendor/jsm/environments/RoomEnvironment.js';
+import { EffectComposer } from '/vendor/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from '/vendor/jsm/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from '/vendor/jsm/postprocessing/UnrealBloomPass.js';
+import { ShaderPass } from '/vendor/jsm/postprocessing/ShaderPass.js';
+import { OutputPass } from '/vendor/jsm/postprocessing/OutputPass.js';
 
 // ---------- the sheet: 1000 x 1000 bubbles, half a metre apart ----------
 const N = 1000, TOTAL = N * N, SP = 0.5, SIZE = N * SP;
@@ -153,33 +173,34 @@ let renderer;
 try { renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' }); }
 catch { document.getElementById('nogl').hidden = false; throw new Error('no WebGL'); }
 renderer.setPixelRatio(Math.min(1.5, devicePixelRatio || 1));
-renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 0.92;
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const scene = new THREE.Scene();
-const SKY = new THREE.Color('#cfe8fb');          // the horizon (the fog fades to it)
+const SKY = new THREE.Color('#f1e4cf');          // the horizon, warm (the fog fades to it)
 scene.background = SKY;
-const FOG_NEAR = 60, FOG_FAR = 1100;
+const FOG_NEAR = 140, FOG_FAR = 1300;
 scene.fog = new THREE.Fog(SKY, FOG_NEAR, FOG_FAR);
 const camera = new THREE.PerspectiveCamera(72, 1, 0.1, 2600);
 scene.add(camera);
-function resize() { renderer.setSize(innerWidth, innerHeight, false); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); }
+function resize() { renderer.setSize(innerWidth, innerHeight, false); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); if (window.__composer) { window.__composer.setSize(innerWidth, innerHeight); } }
 addEventListener('resize', resize); resize();
 
 // light, and a soft studio "sky" for the bubbles' shine
-scene.add(new THREE.HemisphereLight('#e8f4ff', '#6a8a5a', 1.25));
-const sun = new THREE.DirectionalLight('#fff4e0', 2.4); sun.position.set(60, 120, 40); scene.add(sun); scene.add(sun.target);
+scene.add(new THREE.HemisphereLight('#d9ecff', '#7a8a5a', 1.1));
+const sun = new THREE.DirectionalLight('#ffdcae', 2.5);   // golden hour: warm and low sun.position.set(60, 120, 40); scene.add(sun); scene.add(sun.target);
 // shadows round you (the sun's shadow box follows you)
 sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.02;
 Object.assign(sun.shadow.camera, { left: -22, right: 22, top: 22, bottom: -22, near: 1, far: 200 });
-const SUN_DIR = new THREE.Vector3(0.45, 0.8, 0.35).normalize();
-// the sky: blue overhead to pale at the horizon, a glow round the sun, and a few clouds
+const SUN_DIR = new THREE.Vector3(0.55, 0.42, 0.4).normalize();
+// the sky: blue overhead to warm at the horizon, a glow round the sun, and a few clouds that drift
+const clouds = [];
 {
   const skyMat = new THREE.ShaderMaterial({ side: THREE.BackSide, depthWrite: false, fog: false,
-    uniforms: { top: { value: new THREE.Color('#3f8fe6') }, mid: { value: new THREE.Color('#8cc4f2') }, bottom: { value: SKY }, sunDir: { value: SUN_DIR } },
+    uniforms: { top: { value: new THREE.Color('#3d7bd4') }, mid: { value: new THREE.Color('#a4cbef') }, bottom: { value: SKY }, sunDir: { value: SUN_DIR } },
     vertexShader: `varying vec3 vD; void main() { vD = normalize(position); vec4 p = projectionMatrix * modelViewMatrix * vec4(position, 1.0); gl_Position = p.xyww; }`,
     fragmentShader: `uniform vec3 top; uniform vec3 mid; uniform vec3 bottom; uniform vec3 sunDir; varying vec3 vD;
       void main() { float h = max(vD.y, 0.0); vec3 c = mix(bottom, mid, smoothstep(0.0, 0.18, h)); c = mix(c, top, smoothstep(0.18, 0.8, h));
-        float s = max(dot(normalize(vD), sunDir), 0.0); c += vec3(1.0, 0.92, 0.75) * (pow(s, 600.0) * 3.0 + pow(s, 12.0) * 0.18);
+        float s = max(dot(normalize(vD), sunDir), 0.0); c += vec3(1.0, 0.85, 0.6) * (pow(s, 900.0) * 6.0 + pow(s, 40.0) * 0.35 + pow(s, 6.0) * 0.18);
         gl_FragColor = vec4(c, 1.0);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
@@ -192,7 +213,7 @@ const SUN_DIR = new THREE.Vector3(0.45, 0.8, 0.35).normalize();
     const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: cloudTex, transparent: true, opacity: .85, fog: false, depthWrite: false }));
     const a = Math.random() * Math.PI * 2, d = 700 + Math.random() * 900;
     sp.position.set(250 + Math.cos(a) * d, 180 + Math.random() * 160, 250 + Math.sin(a) * d); sp.scale.set(420 + Math.random() * 300, 180 + Math.random() * 90, 1);
-    scene.add(sp);
+    scene.add(sp); clouds.push(sp);
   }
 }
 // reflections: a soft studio, so paint, steel, rubber and the bubbles all catch the light properly
@@ -262,7 +283,9 @@ let progDirty = true;
 // square round you (slots are reused as you move: a slot shows whatever bubble is at its spot now)
 const WN = R * 2 + 1, SLOTS = WN * WN;
 const bubbleGeo = new THREE.SphereGeometry(0.205, 10, 4, 0, Math.PI * 2, 0, Math.PI / 2); bubbleGeo.scale(1, 0.62, 1);
-const bubbleMat = new THREE.MeshPhysicalMaterial({ color: '#6fbfff', roughness: 0.04, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.02, envMapIntensity: 1.3, transparent: true, opacity: 0.93 });
+// bubbles: shiny, with the rainbow sheen real plastic film has
+const bubbleMat = new THREE.MeshPhysicalMaterial({ color: '#6fbfff', roughness: 0.035, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.02, envMapIntensity: 1.25, transparent: true, opacity: 0.93,
+  iridescence: 0.85, iridescenceIOR: 1.35, iridescenceThicknessRange: [180, 520], sheen: 0.4, sheenColor: new THREE.Color('#e6f6ff') });
 const flatGeo = (() => {
   const g = new THREE.CircleGeometry(0.19, 10); const p = g.attributes.position;
   for (let k = 1; k < p.count; k++) { const s = 0.8 + ((k * 7919) % 13) / 30; p.setX(k, p.getX(k) * s); p.setY(k, p.getY(k) * s); p.setZ(k, ((k * 31) % 5) * 0.004); }
@@ -274,13 +297,21 @@ const bubbles = new THREE.InstancedMesh(bubbleGeo, bubbleMat, SLOTS), flats = ne
 for (const m of [bubbles, flats]) { m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); m.frustumCulled = false; m.receiveShadow = true; scene.add(m); }
 const slotCell = new Int32Array(SLOTS).fill(-1), M4 = new THREE.Matrix4(), ZERO = new THREE.Matrix4().makeScale(0, 0, 0), Q = new THREE.Quaternion(), V = new THREE.Vector3(), SC = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0);
 const grow = new Map();     // new wrap: bubbles growing in (slot -> start time)
+const popAnim = new Map();  // bubbles popping right now (slot -> start time)
 const slotOf = (i, j) => (((i % WN) + WN) % WN) + (((j % WN) + WN) % WN) * WN;
 function writeSlot(i, j, now = performance.now()) {
   const s = slotOf(i, j);
   if (i < 0 || j < 0 || i >= N || j >= N) { slotCell[s] = -2 - s; bubbles.setMatrixAt(s, ZERO); flats.setMatrixAt(s, ZERO); bubbles.instanceMatrix.needsUpdate = flats.instanceMatrix.needsUpdate = true; return; }
   slotCell[s] = j * N + i;
   const x = (i + .5) * SP, z = (j + .5) * SP, rot = ((i * 928371 + j * 12345) % 628) / 100;
-  if (isPopped(i, j)) { bubbles.setMatrixAt(s, ZERO); flats.setMatrixAt(s, M4.compose(V.set(x, 0.006, z), Q.setFromAxisAngle(UP, rot), SC.set(1, 1, 1))); }
+  const pa = popAnim.get(s);
+  if (isPopped(i, j) && pa) {
+    // the pop: it swells for a moment, then bursts flat with a little bounce
+    const t = (now - pa) / 1000;
+    if (t < 0.055) { const k = t / 0.055; bubbles.setMatrixAt(s, M4.compose(V.set(x, 0.004, z), Q.setFromAxisAngle(UP, rot), SC.set(1 + k * .2, 1 - k * .35, 1 + k * .2))); flats.setMatrixAt(s, ZERO); }
+    else { const k = Math.min(1, (t - .055) / .22), e = 1 + 2.2 * Math.pow(k - 1, 3) + 1.2 * Math.pow(k - 1, 2); bubbles.setMatrixAt(s, ZERO); flats.setMatrixAt(s, M4.compose(V.set(x, 0.006, z), Q.setFromAxisAngle(UP, rot), SC.set(.55 + .45 * e, 1, .55 + .45 * e))); if (k >= 1) popAnim.delete(s); }
+  }
+  else if (isPopped(i, j)) { bubbles.setMatrixAt(s, ZERO); flats.setMatrixAt(s, M4.compose(V.set(x, 0.006, z), Q.setFromAxisAngle(UP, rot), SC.set(1, 1, 1))); }
   else {
     let k = 1; const g0 = grow.get(s); if (g0) { k = Math.min(1, (now - g0) / 350); if (k >= 1) grow.delete(s); k = 1 - Math.pow(1 - k, 3); }
     bubbles.setMatrixAt(s, M4.compose(V.set(x, 0.004, z), Q.setFromAxisAngle(UP, rot), SC.set(k, k, k)));
@@ -301,7 +332,48 @@ function updateWindow(force = false) {
 }
 const inWindow = (i, j) => Math.abs(i - winI) <= R && Math.abs(j - winJ) <= R;
 
-// ---------- the player ----------
+// ---------- sparkling dust in the sunlight, round you ----------
+const dustGeo = new THREE.BufferGeometry(), dustArr = new Float32Array(260 * 3);
+for (let k = 0; k < 260; k++) { dustArr[k * 3] = (Math.random() - .5) * 26; dustArr[k * 3 + 1] = .2 + Math.random() * 3.8; dustArr[k * 3 + 2] = (Math.random() - .5) * 26; }
+dustGeo.setAttribute('position', new THREE.BufferAttribute(dustArr, 3));
+const dustTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 32; const g = c.getContext('2d'); const gr = g.createRadialGradient(16, 16, 0, 16, 16, 16); gr.addColorStop(0, 'rgba(255,248,220,1)'); gr.addColorStop(1, 'rgba(255,248,220,0)'); g.fillStyle = gr; g.fillRect(0, 0, 32, 32); return new THREE.CanvasTexture(c); })();
+const dustMat = new THREE.PointsMaterial({ size: .06, map: dustTex, transparent: true, opacity: .6, depthWrite: false, blending: THREE.AdditiveBlending });
+const dust = new THREE.Points(dustGeo, dustMat); dust.frustumCulled = false; scene.add(dust);
+
+// ---------- the look: a soft glow on highlights, a vignette and a warm grade; turned down on slow PCs ----------
+const composer = new EffectComposer(renderer); window.__composer = composer;
+composer.addPass(new RenderPass(scene, camera));
+const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.16, 0.35, 1.15);   // only the brightest glints glow
+composer.addPass(bloom);
+composer.addPass(new ShaderPass({
+  uniforms: { tDiffuse: { value: null } },
+  vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: `uniform sampler2D tDiffuse; varying vec2 vUv;
+    void main() { vec4 c = texture2D(tDiffuse, vUv);
+      float l = dot(c.rgb, vec3(.299, .587, .114)); c.rgb = mix(vec3(l), c.rgb, 1.18);          // a touch more colour
+      c.rgb = (c.rgb - .5) * 1.06 + .5;                                                        // and contrast
+      c.rgb *= vec3(1.03, 1.0, .97);                                                            // warm
+      float v = smoothstep(1.05, .35, length(vUv - .5) * 1.25); c.rgb *= mix(.72, 1.0, v);      // vignette
+      gl_FragColor = c; }`,
+}));
+composer.addPass(new OutputPass());
+const quality = {
+  high: true, frames: 0, time: 0, checked: false, auto: true,
+  set(high, say) {
+    this.high = high;
+    renderer.setPixelRatio(high ? Math.min(1.5, devicePixelRatio || 1) : 1);
+    renderer.shadowMap.enabled = high; sun.castShadow = high;
+    scene.traverse(o => { if (o.material) [].concat(o.material).forEach(m => m.needsUpdate = true); });
+    resize();
+    if (say) toast(high ? 'HIGH QUALITY' : 'FAST MODE', high ? 'glow, shadows and full detail' : 'smoother on this PC', '#fff');
+  },
+  // after a few seconds: if this PC can't keep up, the heavy effects go
+  tick(now, dt) {
+    if (this.checked || !this.auto) return;
+    this.frames++; this.time += dt;
+    if (this.time > 4) { this.checked = true; if (this.frames / this.time < 32) this.set(false, true); }
+  },
+};
 const P = { x: SIZE / 2, z: SIZE / 2, yaw: 0, wantYaw: 0, pitch: -0.55, vx: 0, vz: 0, eye: 1.6, tool: 'hand', toolUntil: 0, toolTotal: 0, jailUntil: 0, step: 0, moving: false, poke: 0 };
 const jailed = () => performance.now() < P.jailUntil;
 const fwd = () => [-Math.sin(P.yaw), -Math.cos(P.yaw)];
@@ -396,14 +468,25 @@ function buildCage(r, h) {
 // ---------- bits of plastic flying off ----------
 const PCOUNT = 900, pPos = new Float32Array(PCOUNT * 3), pVel = new Float32Array(PCOUNT * 3), pLife = new Float32Array(PCOUNT);
 const pGeo = new THREE.BufferGeometry(); pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
-const shards = new THREE.Points(pGeo, new THREE.PointsMaterial({ color: '#ffffff', size: .05, transparent: true, opacity: .9 })); shards.frustumCulled = false; scene.add(shards);
+const pCol = new Float32Array(PCOUNT * 3); pGeo.setAttribute('color', new THREE.BufferAttribute(pCol, 3));
+const shardTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 32; const g = c.getContext('2d'); g.translate(16, 16); g.rotate(.5); g.fillStyle = '#fff'; g.beginPath(); g.moveTo(-10, -6); g.lineTo(11, -3); g.lineTo(4, 9); g.closePath(); g.fill(); return new THREE.CanvasTexture(c); })();
+const shards = new THREE.Points(pGeo, new THREE.PointsMaterial({ size: .075, map: shardTex, vertexColors: true, transparent: true, opacity: .95, depthWrite: false, alphaTest: .1 })); shards.frustumCulled = false; scene.add(shards);
+// puffs of air: a soft ring that grows and fades where a bubble bursts
+const puffTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'); const gr = g.createRadialGradient(32, 32, 10, 32, 32, 30); gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(.6, 'rgba(255,255,255,.55)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); })();
+const puffs = Array.from({ length: 48 }, () => { const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: puffTex, transparent: true, depthWrite: false, opacity: 0 })); m.rotation.x = -Math.PI / 2; m.visible = false; m.userData.t = 9; scene.add(m); return m; });
+let puffNext = 0, puffAt = 0;
+function puff(x, z) {
+  const now = performance.now(); if (now - puffAt < 25) return; puffAt = now;
+  const m = puffs[puffNext = (puffNext + 1) % puffs.length]; m.position.set(x, .1, z); m.userData.t = 0; m.visible = true;
+}
 let pNext = 0;
 for (let k = 0; k < PCOUNT; k++) pPos[k * 3 + 1] = -10;
 function burst(x, z, n = 4) {
   for (let q = 0; q < n; q++) {
     const k = pNext = (pNext + 1) % PCOUNT, a = Math.random() * 7, v = .6 + Math.random() * 1.4;
     pPos[k * 3] = x; pPos[k * 3 + 1] = .08; pPos[k * 3 + 2] = z;
-    pVel[k * 3] = Math.cos(a) * v; pVel[k * 3 + 1] = 1 + Math.random() * 1.6; pVel[k * 3 + 2] = Math.sin(a) * v; pLife[k] = .6;
+    pVel[k * 3] = Math.cos(a) * v; pVel[k * 3 + 1] = 1 + Math.random() * 1.6; pVel[k * 3 + 2] = Math.sin(a) * v; pLife[k] = .7;
+    const c = Math.random(); pCol[k * 3] = .75 + c * .25; pCol[k * 3 + 1] = .88 + c * .12; pCol[k * 3 + 2] = 1;
   }
 }
 
@@ -419,6 +502,8 @@ function rebuildMaps() {
 }
 
 // ---------- popping ----------
+const combo = { n: 0, at: 0, shown: 0 };
+const popSpots = [];        // where this frame's pops were (for the sound's left / right)
 let dirty = false, popsThisFrame = 0;
 function mark(i, j, d) {
   const m = ((j / 5) | 0) * 200 + ((i / 5) | 0); mcount[m] += d; miniPx(m);
@@ -427,9 +512,13 @@ function mark(i, j, d) {
 function pop(i, j, fx = true) {
   if (i < 0 || j < 0 || i >= N || j >= N || isPopped(i, j)) return false;
   setBit(i, j, 1); popped++; dirty = true; popsThisFrame++;
-  if (inWindow(i, j)) writeSlot(i, j);
+  if (inWindow(i, j)) { popAnim.set(slotOf(i, j), performance.now()); writeSlot(i, j); }
   mark(i, j, 1);
-  if (fx) burst((i + .5) * SP, (j + .5) * SP, 3);
+  const x = (i + .5) * SP, z = (j + .5) * SP;
+  if (fx) { burst(x, z, 4); puff(x, z); }
+  popSpots.push(x, z);
+  combo.n++; combo.at = performance.now();
+  if (popped % 1000 === 0) milestone(popped);
   return true;
 }
 function unpop(i, j) {
@@ -472,25 +561,51 @@ function addWrap(n) {
 
 // ---------- sound (made here, no files) ----------
 let ac = null, master = null, noise = null, engine = null, muted = false;
+let room = null;
 function audio() {
   if (!ac) {
     ac = new (window.AudioContext || window.webkitAudioContext)();
-    master = ac.createGain(); master.gain.value = .7; master.connect(ac.destination);
+    // everything goes through a gentle compressor (lots of pops at once crackle instead of clipping)
+    const comp = ac.createDynamicsCompressor(); comp.threshold.value = -18; comp.ratio.value = 4; comp.attack.value = .003; comp.release.value = .15;
+    comp.connect(ac.destination);
+    master = ac.createGain(); master.gain.value = .75; master.connect(comp);
     noise = ac.createBuffer(1, ac.sampleRate * .2, ac.sampleRate); const d = noise.getChannelData(0); for (let k = 0; k < d.length; k++) d[k] = Math.random() * 2 - 1;
+    // a little bit of room, so pops sound like they're somewhere
+    const ir = ac.createBuffer(2, ac.sampleRate * .9, ac.sampleRate);
+    for (let ch = 0; ch < 2; ch++) { const b = ir.getChannelData(ch); for (let k = 0; k < b.length; k++) b[k] = (Math.random() * 2 - 1) * Math.pow(1 - k / b.length, 3.5); }
+    const conv = ac.createConvolver(); conv.buffer = ir; room = ac.createGain(); room.gain.value = .14; room.connect(conv).connect(master);
+    // soft wind in the background
+    const w = ac.createBufferSource(); w.buffer = noise; w.loop = true; const wf = ac.createBiquadFilter(); wf.type = 'lowpass'; wf.frequency.value = 420; const wg = ac.createGain(); wg.gain.value = .045;
+    const lfo = ac.createOscillator(); lfo.frequency.value = .08; const lg = ac.createGain(); lg.gain.value = 180; lfo.connect(lg).connect(wf.frequency); lfo.start();
+    w.connect(wf).connect(wg).connect(master); w.start(); window.__wind = wg;
   }
   if (ac.state === 'suspended') ac.resume();
   return ac;
 }
-function popSound(vol = 1) {
+// a pop: a sharp snap, a little thump of air and a crinkle of plastic; pitch rises with your combo; pan = left / right
+function popSound(vol = 1, pitch = 1, pan = 0) {
   if (muted || !audio()) return;
-  const t = ac.currentTime + Math.random() * .015;
-  const src = ac.createBufferSource(); src.buffer = noise;
-  const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1600 + Math.random() * 2600; bp.Q.value = 1.1;
-  const g = ac.createGain(); g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.55 * vol, t + .002); g.gain.exponentialRampToValueAtTime(.0001, t + .055);
-  src.connect(bp).connect(g).connect(master); src.start(t); src.stop(t + .07);
-  const o = ac.createOscillator(); o.type = 'triangle'; o.frequency.setValueAtTime(700 + Math.random() * 700, t); o.frequency.exponentialRampToValueAtTime(160, t + .03);
-  const og = ac.createGain(); og.gain.setValueAtTime(.22 * vol, t); og.gain.exponentialRampToValueAtTime(.0001, t + .035);
-  o.connect(og).connect(master); o.start(t); o.stop(t + .04);
+  const t = ac.currentTime + Math.random() * .012;
+  const out = ac.createStereoPanner(); out.pan.value = Math.max(-.9, Math.min(.9, pan)); out.connect(master); out.connect(room);
+  const snap = ac.createBufferSource(); snap.buffer = noise; snap.playbackRate.value = .9 + Math.random() * .3;
+  const hp = ac.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 2200 * pitch;
+  const sg = ac.createGain(); sg.gain.setValueAtTime(.0001, t); sg.gain.exponentialRampToValueAtTime(.7 * vol, t + .0015); sg.gain.exponentialRampToValueAtTime(.0001, t + .018);
+  snap.connect(hp).connect(sg).connect(out); snap.start(t); snap.stop(t + .03);
+  const body = ac.createOscillator(); body.type = 'sine'; body.frequency.setValueAtTime((240 + Math.random() * 80) * pitch, t); body.frequency.exponentialRampToValueAtTime(70 * pitch, t + .05);
+  const bg = ac.createGain(); bg.gain.setValueAtTime(.42 * vol, t); bg.gain.exponentialRampToValueAtTime(.0001, t + .06);
+  body.connect(bg).connect(out); body.start(t); body.stop(t + .07);
+  const cr = ac.createBufferSource(); cr.buffer = noise; cr.playbackRate.value = .6 + Math.random() * .3;
+  const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = (1400 + Math.random() * 1800) * pitch; bp.Q.value = 2.2;
+  const cg = ac.createGain(); cg.gain.setValueAtTime(.0001, t + .004); cg.gain.exponentialRampToValueAtTime(.22 * vol, t + .01); cg.gain.exponentialRampToValueAtTime(.0001, t + .07);
+  cr.connect(bp).connect(cg).connect(out); cr.start(t); cr.stop(t + .09);
+}
+function chime(level) {
+  if (muted || !audio()) return;
+  const notes = level >= 3 ? [523, 659, 784, 1047, 1319, 1568] : level === 2 ? [659, 784, 1047, 1319] : [784, 1047, 1319];
+  notes.forEach((f, k) => { const t = ac.currentTime + k * .07, o = ac.createOscillator(), o2 = ac.createOscillator(), g = ac.createGain();
+    o.type = 'sine'; o2.type = 'triangle'; o.frequency.value = f; o2.frequency.value = f * 2.01;
+    g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.16, t + .01); g.gain.exponentialRampToValueAtTime(.0001, t + .9);
+    o.connect(g); o2.connect(g); g.connect(master); g.connect(room); o.start(t); o2.start(t); o.stop(t + 1); o2.stop(t + 1); });
 }
 function tone(freqs, len = .12, type = 'square', vol = .12) {
   if (muted || !audio()) return;
@@ -522,7 +637,8 @@ addEventListener('keydown', e => {
   audio();
   const k = e.key.toLowerCase();
   if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(k)) e.preventDefault();
-  if (k === 'm' && !e.repeat) { muted = !muted; toast(muted ? 'SOUND OFF' : 'SOUND ON', ''); return; }
+  if (k === 'm' && !e.repeat) { muted = !muted; toast(muted ? 'SOUND OFF' : 'SOUND ON', ''); if (window.__wind) window.__wind.gain.value = muted ? 0 : .045; return; }
+  if (k === 'q' && !e.repeat) { quality.auto = false; quality.set(!quality.high, true); return; }
   if (k === ' ' && !e.repeat) handPop();
   if (!document.getElementById('win').hidden && !e.repeat) document.getElementById('win').hidden = true;
   keys.add(k);
@@ -551,6 +667,26 @@ function handPop() {
   if (popAt(HIT.x, HIT.z, true)) popSound(1);
 }
 
+// ---------- milestones: every 1,000 popped, bigger at 10,000 and 100,000 ----------
+const conf = document.getElementById('confetti'), cg2 = conf.getContext('2d'), bits2 = [];
+function confetti(n) {
+  conf.width = innerWidth; conf.height = innerHeight;
+  const cols = ['#ff4f8b', '#ffd84a', '#5ee6ff', '#5cf08a', '#9b7bff', '#ffffff'];
+  for (let k = 0; k < n; k++) bits2.push({ x: innerWidth * (.2 + Math.random() * .6), y: innerHeight * .35, vx: (Math.random() - .5) * 900, vy: -300 - Math.random() * 700, r: Math.random() * 6, vr: (Math.random() - .5) * 14, w: 6 + Math.random() * 8, h: 4 + Math.random() * 6, c: cols[k % cols.length], life: 2.6 + Math.random() });
+}
+function milestone(n) {
+  const level = n % 100000 === 0 ? 3 : n % 10000 === 0 ? 2 : 1;
+  chime(level);
+  confetti(level === 3 ? 360 : level === 2 ? 180 : 50);
+  if (level > 1) {
+    const el = document.getElementById('mile');
+    el.innerHTML = `<div class="t"><div class="big">${fmt(n)}</div><div class="sub">BUBBLES POPPED!</div></div>`;
+    clearTimeout(milestone.t); milestone.t = setTimeout(() => el.innerHTML = '', 1900);
+    fovKick = level === 3 ? 10 : 6;
+  } else floatMsg(`🎉 ${fmt(n)} popped!`);
+}
+let fovKick = 0;
+
 // ---------- tools and jail ----------
 function giveTool(id, seconds, keep = false) {
   const now = performance.now();
@@ -560,6 +696,7 @@ function giveTool(id, seconds, keep = false) {
   else { P.tool = id; P.toolUntil = now + seconds * 1000; P.toolTotal = seconds * 1000; P.keep = false; }
   for (const [k, m] of Object.entries(models)) m.visible = k === P.tool;
   P.wantYaw = P.yaw;
+  if (id !== 'hand') { fovKick = 7; whoosh(true); }
   renderTool();
 }
 function renderTool() {
@@ -663,7 +800,7 @@ function onGift(m) {
   }
 }
 window.onGift = onGift;   // (for testing)
-window.__bw = { P, keys, TOOLS, get popped() { return popped; }, far, grass, scene, renderer, camera, bubbles, popAt, models, cam: null };
+window.__bw = { P, keys, TOOLS, get popped() { return popped; }, far, grass, scene, renderer, camera, bubbles, popAt, models, cam: null, quality, milestone, combo };
 
 // ---------- saving (into Unbound) ----------
 async function gz(u8) { return new Uint8Array(await new Response(new Blob([u8]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer()); }
@@ -732,7 +869,7 @@ function listen() {
 }
 
 // ---------- each frame ----------
-let last = performance.now(), shownPopped = -1, soundBudget = 0, wonShown = false, miniAt = 0, progAt = 0;
+let rolled = 0, last = performance.now(), shownPopped = -1, soundBudget = 0, wonShown = false, miniAt = 0, progAt = 0;
 function frame(now) {
   const dt = Math.min(.05, (now - last) / 1000); last = now;
   const t = TOOLS[P.tool];
@@ -785,9 +922,26 @@ function frame(now) {
   if (w0) { const rr = 1 + w0.t * 16; ringMesh.position.set(w0.x, .08, w0.z); ringMesh.scale.set(rr, rr, 1); ringMesh.material.opacity = Math.max(0, .7 - w0.t * .5); }
 
   // pop sounds: many at once crackle, without hundreds of sounds
-  soundBudget = Math.min(4, soundBudget + dt * 45);
-  if (popsThisFrame) { const n = Math.min(popsThisFrame, Math.floor(soundBudget), 3); for (let q = 0; q < n; q++) popSound(popsThisFrame > 3 ? .7 : 1); soundBudget -= n; }
-  popsThisFrame = 0;
+  soundBudget = Math.min(4, soundBudget + dt * 50);
+  if (popsThisFrame) {
+    const n = Math.min(popsThisFrame, Math.floor(soundBudget), 3), pitch = Math.pow(2, Math.min(combo.n, 60) / 60 * .9);
+    for (let q = 0; q < n; q++) {
+      const k = Math.floor(Math.random() * popSpots.length / 2) * 2, dx = popSpots[k] - P.x, dz = popSpots[k + 1] - P.z, d = Math.hypot(dx, dz) || 1;
+      popSound((popsThisFrame > 3 ? .65 : 1) * Math.max(.35, 1 - d / 12), pitch * (.97 + Math.random() * .06), (dx * rx + dz * rz) / d);
+    }
+    soundBudget -= n;
+  }
+  popsThisFrame = 0; popSpots.length = 0;
+  // combo: keep popping and it builds; stop for a moment and it's banked
+  const ce = document.getElementById('combo');
+  if (combo.n && now - combo.at > 1100) { if (combo.n >= 10) { ce.classList.add('done'); setTimeout(() => { if (!combo.n) ce.hidden = true; }, 350); } else ce.hidden = true; combo.n = 0; combo.shown = 0; }
+  if (combo.n >= 10 && combo.n !== combo.shown) {
+    ce.hidden = false; ce.classList.remove('done');
+    if (Math.floor(combo.n / 5) !== Math.floor(combo.shown / 5)) { ce.classList.remove('bump'); void ce.offsetWidth; ce.classList.add('bump'); }
+    combo.shown = combo.n; document.getElementById('comboX').textContent = 'x' + fmt(combo.n);
+    ce.style.setProperty('--c', combo.n >= 500 ? '#ff4f8b' : combo.n >= 150 ? '#ffd84a' : combo.n >= 50 ? '#5cf08a' : '#5ee6ff');
+  }
+  for (const s of [...popAnim.keys()]) { const c = slotCell[s]; if (c >= 0) writeSlot(c % N, (c / N) | 0, now); else popAnim.delete(s); }
 
   // the 3D bubbles round you, and new wrap growing in
   updateWindow();
@@ -800,7 +954,8 @@ function frame(now) {
     pPos[q * 3] += pVel[q * 3] * dt; pPos[q * 3 + 1] = Math.max(.01, pPos[q * 3 + 1] + pVel[q * 3 + 1] * dt); pPos[q * 3 + 2] += pVel[q * 3 + 2] * dt;
     if (pLife[q] <= 0) pPos[q * 3 + 1] = -10;
   }
-  pGeo.attributes.position.needsUpdate = true;
+  pGeo.attributes.position.needsUpdate = true; pGeo.attributes.color.needsUpdate = true;
+  for (const m of puffs) { if (m.userData.t > .35) { m.visible = false; continue; } m.userData.t += dt; const k = m.userData.t / .35; m.scale.setScalar(.15 + k * .55); m.material.opacity = (1 - k) * .8; }
 
   // what you hold or drive
   rig.position.set(P.x, 0, P.z); rig.rotation.y = P.yaw;
@@ -814,7 +969,10 @@ function frame(now) {
   // camera: your eyes (higher in the steamroller), a little bob as you walk
   P.eye += (t.eye - P.eye) * Math.min(1, dt * 3);
   const bob = !vehicle && P.moving ? Math.sin(P.step * Math.PI * 2) * .035 : 0;
-  const shake = P.tool === 'steam' && P.moving ? (Math.random() - .5) * .02 : 0;
+  const shake = P.tool === 'steam' && P.moving ? (Math.random() - .5) * .03 * Math.min(1, speed / 3) : 0;
+  fovKick += (0 - fovKick) * Math.min(1, dt * 4);
+  const fov = 72 + fovKick + (vehicle ? Math.min(1, speed / t.speed) * 4 : 0);
+  if (Math.abs(camera.fov - fov) > .05) { camera.fov = fov; camera.updateProjectionMatrix(); }
   const back = P.tool === 'steam' ? -.55 : 0;
   camera.position.set(P.x - fx * back, P.eye + bob + shake, P.z - fz * back);
   camera.rotation.set(P.pitch, P.yaw, 0, 'YXZ');
@@ -823,16 +981,30 @@ function frame(now) {
 
   sun.position.set(P.x + SUN_DIR.x * 80, SUN_DIR.y * 80, P.z + SUN_DIR.z * 80); sun.target.position.set(P.x, 0, P.z);
   if (window.__sky) window.__sky.position.copy(camera.position);
+  for (const c of clouds) { c.position.x += dt * 3; if (c.position.x > 2000) c.position.x -= 3000; }
+  dust.position.set(camera.position.x, 0, camera.position.z); dustMat.opacity = .55 + Math.sin(now / 900) * .15;
+  { const a = dustGeo.attributes.position.array; for (let k = 0; k < a.length; k += 3) { a[k + 1] += dt * (.05 + (k % 7) * .01); if (a[k + 1] > 4) a[k + 1] = .2; a[k] += Math.sin(now / 1500 + k) * dt * .05; } dustGeo.attributes.position.needsUpdate = true; }
+  // confetti
+  if (bits2.length) {
+    cg2.clearRect(0, 0, conf.width, conf.height);
+    for (let k = bits2.length - 1; k >= 0; k--) { const b = bits2[k]; b.life -= dt; if (b.life <= 0) { bits2.splice(k, 1); continue; } b.vy += 900 * dt; b.vx *= .99; b.x += b.vx * dt; b.y += b.vy * dt; b.r += b.vr * dt;
+      cg2.save(); cg2.translate(b.x, b.y); cg2.rotate(b.r); cg2.globalAlpha = Math.min(1, b.life); cg2.fillStyle = b.c; cg2.fillRect(-b.w / 2, -b.h / 2, b.w, b.h * Math.abs(Math.cos(b.r * 2))); cg2.restore(); }
+    if (!bits2.length) cg2.clearRect(0, 0, conf.width, conf.height);
+  }
   if (progDirty && now - progAt > 300) { progAt = now; progDirty = false; progTex.needsUpdate = true; }
-  renderer.render(scene, camera);
+  if (quality.high) composer.render(); else renderer.render(scene, camera);
+  quality.tick(now, dt);
   hud(now);
   requestAnimationFrame(frame);
 }
 
 function hud(now) {
+  // the number rolls up (or down) to the real count
+  rolled += (popped - rolled) * Math.min(1, .2 + Math.abs(popped - rolled) / 4000);
+  if (Math.abs(popped - rolled) < 1) rolled = popped;
+  document.getElementById('num').textContent = fmt(rolled);
   if (popped !== shownPopped) {
     const el = document.getElementById('counter');
-    document.getElementById('num').textContent = fmt(popped);
     document.getElementById('bar').style.width = (popped / TOTAL * 100) + '%';
     document.getElementById('pct').textContent = (popped / TOTAL * 100).toFixed(popped && popped < TOTAL / 100 ? 2 : 1) + '%';
     if (popped > shownPopped && shownPopped >= 0) { el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
