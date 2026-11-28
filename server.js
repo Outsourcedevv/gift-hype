@@ -320,7 +320,7 @@ const BUBBLE_RULES = [
     { gift: 'Rosa', sound: 'builtin/wrong-buzzer.mp3', label: 'Jail for 10s', actions: [{ type: 'bubbleJail', seconds: 10 }] },
     { gift: 'Doughnut', sound: 'builtin/boing.mp3', label: 'Boots for 30s', actions: [{ type: 'bubbleTool', tool: 'boots', seconds: 30 }] },
     { gift: 'Paper Crane', sound: 'builtin/whoosh.mp3', label: 'Rolling pin for 30s', actions: [{ type: 'bubbleTool', tool: 'pin', seconds: 30 }] },
-    { gift: 'Hand Hearts', sound: 'builtin/anime-wow.mp3', label: 'Random tool', perCount: false, actions: [{ type: 'bubbleRandom', seconds: 30, hand: 10, boots: 30, pin: 30, roller: 20, steam: 10 }] },
+    { gift: 'Hand Hearts', sound: 'builtin/anime-wow.mp3', label: 'Random tool', perCount: false, actions: [{ type: 'bubbleRandom', seconds: 0, hand: 10, boots: 30, pin: 30, roller: 20, steam: 10 }] },
     { gift: 'Corgi', sound: 'builtin/level-up.mp3', label: 'Lawn roller for 30s', actions: [{ type: 'bubbleTool', tool: 'roller', seconds: 30 }] },
     { gift: 'Boxing Gloves', sound: 'builtin/fahh.mp3', label: '+10,000 bubble wrap', actions: [{ type: 'bubbleAdd', amount: 10000 }] },
     { gift: 'Money Gun', sound: 'builtin/here-comes-the-money.mp3', label: 'Steamroller for 30s', actions: [{ type: 'bubbleTool', tool: 'steam', seconds: 30 }] },
@@ -488,6 +488,15 @@ if (!settings.snowDayReset) {
 if (!settings.covers) {
     for (const g of Object.values(games)) if (g.connector === 'minecraft' && /minecraft/i.test(g.name) && !g.cover) { g.cover = MINECRAFT_COVER; saveGame(g); }
     settings.covers = true; saveSettings();
+}
+// 2.30: a random tool lasts until another tool is sent (the old starting 30 seconds becomes that)
+if (!settings.bubbleRandomKeep) {
+    for (const g of Object.values(games)) if (g.connector === 'bubblewrap') {
+        let changed = false;
+        for (const m of g.modes) for (const r of m.rules) for (const a of r.actions) if (a.type === 'bubbleRandom' && +a.seconds === 30) { a.seconds = 0; changed = true; }
+        if (changed) saveGame(g);
+    }
+    settings.bubbleRandomKeep = true; saveSettings();
 }
 // Bubble Wrap is added once (next to Minecraft), for everyone
 if (!settings.bubbleGame) {
@@ -1289,7 +1298,9 @@ function bubbleAction(a, ctx) {
             let roll = Math.random() * (total || 1), tool = 'hand';
             if (total) for (const t of BUBBLE_TOOLS) { if ((roll -= chances[t]) < 0) { tool = t; break; } }
             log(`Random tool for ${ctx.from}: ${tool}`);
-            broadcast('bubble', { ...base, kind: 'tool', tool, seconds: secs(a.seconds), spin: true, chances });
+            // seconds 0 (the usual): you keep it until another tool is sent
+            const keep = !(+a.seconds > 0);
+            broadcast('bubble', { ...base, kind: 'tool', tool, seconds: keep ? 0 : secs(a.seconds), keep, spin: true, chances });
         }
     } else if (a.type === 'bubbleJail') {
         broadcast('bubble', { ...base, kind: 'jail', seconds: Math.min(3600, secs(a.seconds) * n) });

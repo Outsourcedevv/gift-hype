@@ -173,7 +173,49 @@ def origin_at(o, point):
     o.location = Vector(point)
 
 
+def smart_uv(o):
+    if o.type != 'MESH' or not o.data.polygons:
+        return
+    apply_mods(o)
+    bpy.context.view_layer.objects.active = o
+    with bpy.context.temp_override(object=o, active_object=o, selected_objects=[o], selected_editable_objects=[o]):
+        bpy.ops.object.mode_set(mode='EDIT')
+        bpy.ops.mesh.select_all(action='SELECT')
+        bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=0.01, scale_to_bounds=False)
+        bpy.ops.object.mode_set(mode='OBJECT')
+
+
+def meta(name, elems, res=0.006, m=None):
+    """A smooth organic shape from metaballs: elems = [(type, (x,y,z), radius, (sx,sy,sz), (rx,ry,rz))]."""
+    mb = bpy.data.metaballs.new(name)
+    mb.resolution = res
+    mb.render_resolution = res
+    mb.threshold = 0.6
+    for typ, co, rad, size, rot in elems:
+        e = mb.elements.new(type=typ)
+        e.co = co
+        e.radius = rad
+        e.stiffness = 2.0
+        if size:
+            e.size_x, e.size_y, e.size_z = size
+        if rot:
+            from mathutils import Euler
+            e.rotation = Euler(rot).to_quaternion()
+    o = bpy.data.objects.new(name, mb)
+    bpy.context.collection.objects.link(o)
+    bpy.context.view_layer.update()
+    bpy.context.view_layer.objects.active = o
+    o.select_set(True)
+    with bpy.context.temp_override(object=o, active_object=o, selected_objects=[o], selected_editable_objects=[o]):
+        bpy.ops.object.convert(target='MESH')
+    o = bpy.context.active_object
+    o.name = name
+    return finish(o, m, angle=80)
+
+
 def export(fname):
+    for o in list(bpy.context.scene.objects):
+        smart_uv(o)
     for o in bpy.context.scene.objects:
         o.select_set(True)
     bpy.ops.export_scene.gltf(filepath=os.path.join(OUT, fname), export_format='GLB', use_selection=False,
@@ -221,91 +263,111 @@ def build_bubbles():
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     me = bpy.data.meshes.new('Bubble'); bm.to_mesh(me); bm.free()
     o = bpy.data.objects.new('Bubble', me); bpy.context.collection.objects.link(o); finish(o, m, angle=80)
-    # a popped one: flat, crumpled, with creases
+    # a popped one: flattened and torn open, with little flaps of plastic and a dark crease line
     bm = bmesh.new()
-    pts = [bm.verts.new((0, 0, 0.012))]
-    rings2 = []
-    for i, rr in enumerate((0.07, 0.14, 0.2)):
-        ring = []
-        for s in range(14):
-            a = s / 14 * math.tau + i * 0.2
-            r = rr * (0.85 + random.random() * 0.3)
-            ring.append(bm.verts.new((math.cos(a) * r, math.sin(a) * r, 0.003 + random.random() * (0.016 - i * 0.004))))
-        rings2.append(ring)
-    for s in range(14):
-        bm.faces.new((pts[0], rings2[0][s], rings2[0][(s + 1) % 14]))
-    for i in range(2):
-        for s in range(14):
-            bm.faces.new((rings2[i][s], rings2[i + 1][s], rings2[i + 1][(s + 1) % 14], rings2[i][(s + 1) % 14]))
+    seg = 16
+    centre = bm.verts.new((0, 0, 0.004))
+    inner, outer = [], []
+    for k in range(seg):
+        a = k / seg * math.tau
+        ri = 0.06 + random.random() * 0.03
+        inner.append(bm.verts.new((math.cos(a) * ri, math.sin(a) * ri, 0.002)))
+        ro = 0.15 + random.random() * 0.06 + (0.03 if k % 3 == 0 else 0)      # jagged torn edge
+        outer.append(bm.verts.new((math.cos(a) * ro, math.sin(a) * ro, 0.006 + random.random() * 0.02)))
+    for k in range(seg):
+        bm.faces.new((centre, inner[k], inner[(k + 1) % seg]))
+        bm.faces.new((inner[k], outer[k], outer[(k + 1) % seg], inner[(k + 1) % seg]))
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     me = bpy.data.meshes.new('Popped'); bm.to_mesh(me); bm.free()
-    o = bpy.data.objects.new('Popped', me); bpy.context.collection.objects.link(o); finish(o, mat('Popped', '#c2ccd5', 0.85), smooth=False)
+    o = bpy.data.objects.new('Popped', me); bpy.context.collection.objects.link(o); finish(o, mat('Popped', '#8d99a4', 0.9), smooth=False)
     export('bubbles.glb')
+
+
+# ---------------------------------------------------------------- skin: smooth limbs from a stick skeleton
+def skinned(name, points, edges, radii, m, subdiv=2, root=0):
+    """points: [(x,y,z)], edges: [(a,b)], radii: [(rx, rz)] per point. Blender wraps the sticks in skin and smooths it."""
+    me = bpy.data.meshes.new(name)
+    me.from_pydata(points, edges, [])
+    o = bpy.data.objects.new(name, me)
+    bpy.context.collection.objects.link(o)
+    sk = o.modifiers.new('skin', 'SKIN')
+    sk.use_smooth_shade = True
+    sk.branch_smoothing = 0.6
+    for i, r in enumerate(radii):
+        v = me.skin_vertices[0].data[i]
+        v.radius = r
+        v.use_root = (i == root)
+    sub = o.modifiers.new('sub', 'SUBSURF')
+    sub.levels = subdiv
+    sub.render_levels = subdiv
+    apply_mods(o)
+    return finish(o, m, angle=80)
 
 
 # ---------------------------------------------------------------- your hand (first person)
 def build_hand():
+    """A smooth hand: the skin modifier on a skeleton of the palm, four fingers and a thumb, all joined."""
     reset()
-    skin, sleeve, cuff, nail = mat('Skin', '#f0c09c', 0.55), mat('Sleeve', '#7c5cff', 0.7), mat('Cuff', '#5a3fe0', 0.8), mat('Nail', '#f7d9cc', 0.3)
-    parts = []
-    palm = box('Palm', (0.085, 0.095, 0.03), (0, 0, 0), skin, bevel=0.012, segs=3)
-    parts.append(palm)
-    # four fingers, each three bones, curling slightly
-    for k, (x, ln) in enumerate([(-0.031, 0.075), (-0.010, 0.085), (0.011, 0.08), (0.031, 0.062)]):
-        y, z, ang = 0.048, 0, 0
-        for b, seg in enumerate((0.42, 0.33, 0.25)):
-            L = ln * seg
-            ang += 0.18
-            cy = y + math.cos(ang) * L / 2
-            cz = z - math.sin(ang) * L / 2
-            c = cyl(f'F{k}{b}', 0.0105 - b * 0.0012, L, (x, cy, cz), skin, rot=(math.pi / 2 - ang, 0, 0), verts=12)
-            parts.append(c)
-            parts.append(sphere(f'K{k}{b}', 0.0108 - b * 0.0012, (x, y, z), skin, segs=10, rings=6))
-            y += math.cos(ang) * L
-            z -= math.sin(ang) * L
-        parts.append(sphere(f'Tip{k}', 0.0095, (x, y, z), skin, segs=10, rings=6))
-        parts.append(box(f'Nail{k}', (0.012, 0.012, 0.003), (x, y - 0.004, z + 0.008), nail, bevel=0.002))
-    # thumb
-    parts.append(cyl('Thumb1', 0.013, 0.04, (-0.052, 0.005, -0.004), skin, rot=(math.pi / 2, 0, 0.8), verts=12))
-    parts.append(cyl('Thumb2', 0.0115, 0.032, (-0.068, 0.03, -0.006), skin, rot=(math.pi / 2, 0, 0.35), verts=12))
-    parts.append(sphere('ThumbTip', 0.0115, (-0.074, 0.046, -0.006), skin, segs=10, rings=6))
-    hand = join('Hand', parts)
-    # the arm: sleeve and cuff
-    arm = cyl('Sleeve', 0.05, 0.36, (0, -0.24, 0), sleeve, rot=(math.pi / 2, 0, 0), verts=20, r2=0.042)
-    c = cyl('Cuff', 0.047, 0.04, (0, -0.07, 0), cuff, rot=(math.pi / 2, 0, 0), verts=20)
-    wrist = cyl('Wrist', 0.034, 0.05, (0, -0.045, 0), skin, rot=(math.pi / 2, 0, 0), verts=16)
-    for o in (arm, c, wrist):
-        apply_mods(o)
+    skin, sleeve, cuff, nail = mat('Skin', '#efbf9b', 0.5), mat('Sleeve', '#7c5cff', 0.75), mat('Cuff', '#5a3fe0', 0.85), mat('Nail', '#f6d6cb', 0.25)
+    P, E, R = [], [], []
+    def pt(p, r):
+        P.append(p); R.append(r); return len(P) - 1
+    w = pt((0, -0.075, 0), (0.026, 0.02))           # wrist
+    p1 = pt((0, -0.035, 0), (0.036, 0.016))         # palm
+    p2 = pt((0, 0.005, 0), (0.04, 0.015))
+    E += [(w, p1), (p1, p2)]
+    tips = []
+    for x, ln, rr, sp in ((-0.033, 0.072, 0.0092, -0.006), (-0.011, 0.082, 0.0098, -0.002), (0.012, 0.078, 0.0096, 0.002), (0.034, 0.06, 0.0086, 0.007)):
+        k = pt((x * 0.85, 0.04, 0), (rr * 1.05, rr * 0.95))
+        E.append((p2, k))
+        y, z, ang, prev = 0.04, 0.0, 0.0, k
+        for frac in (0.45, 0.32, 0.23):
+            ang += 0.2
+            y += math.cos(ang) * ln * frac
+            z -= math.sin(ang) * ln * frac
+            x += sp
+            j = pt((x, y, z), (rr * (0.96 - 0.04 * len(tips)), rr * 0.9))
+            E.append((prev, j)); prev = j
+        tips.append((x, y, z, ang))
+    t1 = pt((-0.03, -0.03, -0.004), (0.016, 0.013))
+    t2 = pt((-0.052, -0.005, -0.01), (0.013, 0.011))
+    t3 = pt((-0.064, 0.02, -0.014), (0.011, 0.0095))
+    t4 = pt((-0.07, 0.038, -0.016), (0.0095, 0.0085))
+    E += [(p1, t1), (t1, t2), (t2, t3), (t3, t4)]
+    skinned('Hand', P, E, R, skin, subdiv=2)
+    for i, (x, y, z, ang) in enumerate(tips):
+        box(f'Nail{i}', (0.0125, 0.013, 0.003), (x, y - 0.002, z + 0.0075), nail, bevel=0.0015, segs=2, rot=(-ang, 0, 0))
+    box('ThumbNail', (0.012, 0.012, 0.003), (-0.07, 0.036, -0.007), nail, bevel=0.0015, segs=2, rot=(-0.3, 0, 0.3))
+    # a sleeve with a ribbed cuff
+    c = cyl('Cuff', 0.038, 0.035, (0, -0.1, 0), cuff, rot=(math.pi / 2, 0, 0), verts=32, bevel=0.006)
+    arm = cyl('Sleeve', 0.047, 0.36, (0, -0.295, 0), sleeve, rot=(math.pi / 2, 0, 0), verts=32, r2=0.04, bevel=0.01)
     export('hand.glb')
 
 
 # ---------------------------------------------------------------- boots
 def build_boots():
+    """Chunky high-top sneakers: a smooth skinned upper (foot and ankle in one piece), a thick sole with tread,
+    a toe cap, laces across the top and a collar."""
     reset()
-    pink, white, lace, dark = mat('BootPink', '#ff4f8b', 0.55), mat('BootWhite', '#f4f4f6', 0.6), mat('Lace', '#ffffff', 0.7), mat('BootDark', '#3a1222', 0.6)
+    pink, white, lace, dark, pinkD = mat('BootPink', '#ff4f8b', 0.5), mat('BootWhite', '#f4f4f6', 0.55), mat('Lace', '#ffffff', 0.7), mat('BootDark', '#3a1222', 0.7), mat('BootPinkDark', '#c92a62', 0.6)
     for side, nm in ((-1, 'BootL'), (1, 'BootR')):
         x = side * 0.13
-        parts = []
-        sole = box('Sole', (0.13, 0.32, 0.035), (x, 0.06, 0.018), white, bevel=0.016, segs=3)
-        parts.append(sole)
-        tread = box('Tread', (0.12, 0.30, 0.008), (x, 0.06, 0.003), dark, bevel=0.004)
-        parts.append(tread)
-        upper = box('Upper', (0.118, 0.24, 0.085), (x, 0.03, 0.075), pink, bevel=0.035, segs=4)
-        parts.append(upper)
-        toe = sphere('Toe', 0.06, (x, 0.165, 0.055), pink, segs=16, rings=8, scale=(1.0, 0.9, 0.62))
-        parts.append(toe)
-        cap = sphere('ToeCap', 0.061, (x, 0.172, 0.045), white, segs=16, rings=8, scale=(1.0, 0.85, 0.45))
-        parts.append(cap)
-        ankle = cyl('Ankle', 0.058, 0.13, (x, -0.04, 0.17), pink, verts=20, bevel=0.01)
-        parts.append(ankle)
-        collar = torus('Collar', 0.056, 0.012, (x, -0.04, 0.235), white, maj=20, mi=8)
-        parts.append(collar)
-        tongue = box('Tongue', (0.06, 0.03, 0.12), (x, 0.03, 0.17), white, bevel=0.012, rot=(-0.35, 0, 0))
-        parts.append(tongue)
-        for k in range(4):
-            parts.append(box(f'Lace{k}', (0.075, 0.008, 0.006), (x, 0.09 - k * 0.032, 0.122 + k * 0.012), lace, bevel=0.002, rot=(-0.3, 0, 0)))
-        stripe = box('Stripe', (0.122, 0.12, 0.012), (x, 0.0, 0.09), white, bevel=0.005, rot=(0, 0, 0))
-        parts.append(stripe)
+        pts = [(x, 0.17, 0.06), (x, 0.09, 0.07), (x, 0.0, 0.08), (x, -0.06, 0.09), (x, -0.06, 0.16), (x, -0.055, 0.22)]
+        rad = [(0.058, 0.04), (0.062, 0.052), (0.062, 0.062), (0.058, 0.058), (0.056, 0.056), (0.058, 0.058)]
+        up = skinned(nm + 'Upper', pts, [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5)], rad, pink, subdiv=2, root=3)
+        parts = [up]
+        parts.append(box('Sole', (0.135, 0.34, 0.04), (x, 0.055, 0.02), white, bevel=0.018, segs=4))
+        for k in range(9):
+            parts.append(box(f'Tread{k}', (0.12, 0.012, 0.008), (x, -0.09 + k * 0.035, 0.002), dark, bevel=0.002, segs=1))
+        parts.append(sphere('ToeCap', 0.062, (x, 0.18, 0.05), white, segs=24, rings=12, scale=(1.0, 0.75, 0.62)))
+        parts.append(torus('Collar', 0.05, 0.011, (x, -0.055, 0.228), white, maj=28, mi=10))
+        parts.append(box('Tongue', (0.05, 0.03, 0.1), (x, 0.0, 0.2), pinkD, bevel=0.012, segs=3, rot=(-0.25, 0, 0)))
+        for k in range(5):
+            y = 0.11 - k * 0.032
+            zt = 0.114 + (0.11 - y) * 0.2
+            parts.append(cyl(f'Lace{k}', 0.0045, 0.062, (x, y, zt), lace, rot=(0, math.pi / 2, 0), verts=10))
+        parts.append(box('Heel', (0.11, 0.03, 0.08), (x, -0.118, 0.08), white, bevel=0.012, segs=3))
+        parts.append(sphere('Badge', 0.022, (x + side * 0.056, -0.06, 0.17), white, segs=16, rings=8, scale=(0.3, 1, 1)))
         b = join(nm, parts)
         origin_at(b, (x, 0, 0))
     export('boots.glb')

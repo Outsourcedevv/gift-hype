@@ -120,6 +120,7 @@ canvas#game { position: fixed; inset: 0; width: 100%; height: 100%; display: blo
 <script type="module">
 import * as THREE from 'three';
 import { GLTFLoader } from '/vendor/jsm/loaders/GLTFLoader.js';
+import { RoomEnvironment } from '/vendor/jsm/environments/RoomEnvironment.js';
 
 // ---------- the sheet: 1000 x 1000 bubbles, half a metre apart ----------
 const N = 1000, TOTAL = N * N, SP = 0.5, SIZE = N * SP;
@@ -194,12 +195,8 @@ const SUN_DIR = new THREE.Vector3(0.45, 0.8, 0.35).normalize();
     scene.add(sp);
   }
 }
-{
-  const env = new THREE.Scene(), pm = new THREE.PMREMGenerator(renderer);
-  env.add(new THREE.Mesh(new THREE.BoxGeometry(20, 20, 20), new THREE.MeshBasicMaterial({ color: '#8fb6d8', side: THREE.BackSide })));
-  for (const [x, y, z, w, d] of [[0, 9.5, 0, 10, 10], [9.5, 3, 0, 6, 4], [-9.5, 4, 3, 4, 4]]) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, .1, d), new THREE.MeshBasicMaterial({ color: '#ffffff' })); m.position.set(x, y, z); if (x) m.rotation.z = Math.PI / 2; env.add(m); }
-  scene.environment = pm.fromScene(env, 0.04).texture;
-}
+// reflections: a soft studio, so paint, steel, rubber and the bubbles all catch the light properly
+scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(renderer), 0.04).texture;
 
 // the field round the sheet
 const grassTex = (() => {
@@ -224,11 +221,12 @@ function tileTex(poppedLook) {
   const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
   g.fillStyle = '#c9dbe9'; g.fillRect(0, 0, 64, 64);
   if (!poppedLook) {
-    const gr = g.createRadialGradient(24, 22, 3, 32, 32, 26); gr.addColorStop(0, '#ffffff'); gr.addColorStop(.4, '#d8ecff'); gr.addColorStop(1, '#8cbfe6');
+    const gr = g.createRadialGradient(24, 22, 3, 32, 32, 26); gr.addColorStop(0, '#ffffff'); gr.addColorStop(.35, '#a9dcff'); gr.addColorStop(1, '#4fa6ec');
     g.fillStyle = 'rgba(30,60,100,.25)'; g.beginPath(); g.arc(34, 35, 26, 0, 7); g.fill();
     g.fillStyle = gr; g.beginPath(); g.arc(32, 32, 26, 0, 7); g.fill();
   } else {
-    g.fillStyle = '#a8b7c4'; g.beginPath(); for (let k = 0; k <= 9; k++) { const a = k / 9 * 7, r = 18 + Math.sin(k * 3.7) * 4; g[k ? 'lineTo' : 'moveTo'](32 + Math.cos(a) * r, 32 + Math.sin(a) * r); } g.fill();
+    g.fillStyle = '#7d8994'; g.beginPath(); for (let k = 0; k <= 15; k++) { const a = k / 15 * Math.PI * 2, r = 18 + (k % 3 ? 0 : 6) + Math.sin(k * 3.7) * 3; g[k ? 'lineTo' : 'moveTo'](32 + Math.cos(a) * r, 32 + Math.sin(a) * r); } g.closePath(); g.fill();
+    g.strokeStyle = 'rgba(40,50,60,.6)'; g.lineWidth = 2; g.beginPath(); g.moveTo(22, 30); g.lineTo(42, 36); g.moveTo(30, 22); g.lineTo(34, 44); g.stroke();
   }
   const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t;
 }
@@ -264,13 +262,14 @@ let progDirty = true;
 // square round you (slots are reused as you move: a slot shows whatever bubble is at its spot now)
 const WN = R * 2 + 1, SLOTS = WN * WN;
 const bubbleGeo = new THREE.SphereGeometry(0.205, 10, 4, 0, Math.PI * 2, 0, Math.PI / 2); bubbleGeo.scale(1, 0.62, 1);
-const bubbleMat = new THREE.MeshPhysicalMaterial({ color: '#a8d4f7', roughness: 0.05, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.03, envMapIntensity: 2.2, transparent: true, opacity: 0.88 });
+const bubbleMat = new THREE.MeshPhysicalMaterial({ color: '#6fbfff', roughness: 0.04, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.02, envMapIntensity: 1.3, transparent: true, opacity: 0.93 });
 const flatGeo = (() => {
   const g = new THREE.CircleGeometry(0.19, 10); const p = g.attributes.position;
   for (let k = 1; k < p.count; k++) { const s = 0.8 + ((k * 7919) % 13) / 30; p.setX(k, p.getX(k) * s); p.setY(k, p.getY(k) * s); p.setZ(k, ((k * 31) % 5) * 0.004); }
   g.rotateX(-Math.PI / 2); g.computeVertexNormals(); return g;
 })();
-const flatMat = new THREE.MeshStandardMaterial({ color: '#c2ccd5', roughness: 0.85 });
+// popped: flat, torn, dull grey (seen from either side, so they always show)
+const flatMat = new THREE.MeshStandardMaterial({ color: '#76828d', roughness: 0.95, envMapIntensity: 0.3, side: THREE.DoubleSide });
 const bubbles = new THREE.InstancedMesh(bubbleGeo, bubbleMat, SLOTS), flats = new THREE.InstancedMesh(flatGeo, flatMat, SLOTS);
 for (const m of [bubbles, flats]) { m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); m.frustumCulled = false; m.receiveShadow = true; scene.add(m); }
 const slotCell = new Int32Array(SLOTS).fill(-1), M4 = new THREE.Matrix4(), ZERO = new THREE.Matrix4().makeScale(0, 0, 0), Q = new THREE.Quaternion(), V = new THREE.Vector3(), SC = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0);
@@ -553,11 +552,12 @@ function handPop() {
 }
 
 // ---------- tools and jail ----------
-function giveTool(id, seconds) {
+function giveTool(id, seconds, keep = false) {
   const now = performance.now();
-  if (id === 'hand') { P.tool = 'hand'; P.toolUntil = 0; }
-  else if (P.tool === id && P.toolUntil > now) { P.toolUntil += seconds * 1000; P.toolTotal += seconds * 1000; }
-  else { P.tool = id; P.toolUntil = now + seconds * 1000; P.toolTotal = seconds * 1000; }
+  if (id === 'hand' && !keep) { P.tool = 'hand'; P.toolUntil = 0; P.keep = false; }
+  else if (keep) { P.tool = id; P.toolUntil = 0; P.toolTotal = 0; P.keep = true; }          // until another tool is sent
+  else if (P.tool === id && P.toolUntil > now) { P.toolUntil += seconds * 1000; P.toolTotal += seconds * 1000; P.keep = false; }
+  else { P.tool = id; P.toolUntil = now + seconds * 1000; P.toolTotal = seconds * 1000; P.keep = false; }
   for (const [k, m] of Object.entries(models)) m.visible = k === P.tool;
   P.wantYaw = P.yaw;
   renderTool();
@@ -567,7 +567,8 @@ function renderTool() {
   document.getElementById('toolIc').innerHTML = ICONS[P.tool];
   document.getElementById('toolName').innerHTML = `${t.name} <span class="stars">${'★'.repeat(t.stars)}${'☆'.repeat(5 - t.stars)}</span>`;
   document.getElementById('toolInfo').textContent = t.info;
-  document.getElementById('toolBar').hidden = P.tool === 'hand';
+  document.getElementById('toolBar').hidden = P.tool === 'hand' || P.keep;
+  if (P.keep && P.tool !== 'hand') document.getElementById('toolInfo').textContent = `${t.info} · until another tool`;
   document.getElementById('helpPop').hidden = P.tool !== 'hand';
   document.getElementById('cross').hidden = P.tool !== 'hand';
   document.getElementById('helpMove').innerHTML = P.tool === 'steam' || P.tool === 'roller' ? '<kbd>W S</kbd> drive &nbsp;<kbd>A D</kbd> steer' : '<kbd>W A S D</kbd> move';
@@ -605,7 +606,7 @@ const fmt = n => Math.round(n).toLocaleString('en-US');
 // ---------- the random tool: a spin through the five, landing on the one picked ----------
 let spinning = null;
 const spinQueue = [];
-function spinTool(result, seconds, chances, from, image) {
+function spinTool(result, seconds, chances, from, image, keep) {
   const box = document.getElementById('roulette'), row = document.getElementById('rRow');
   const total = ORDER.reduce((s, id) => s + (chances?.[id] || 0), 0) || 1;
   row.innerHTML = ORDER.map(id => `<div class="c">${ICONS[id]}<b>${TOOLS[id].name}</b><small>${Math.round((chances?.[id] || 0) / total * 100)}%</small></div>`).join('');
@@ -621,8 +622,8 @@ function spinTool(result, seconds, chances, from, image) {
       tone([523, 659, 784, 1047], .12, 'square', .1);
       setTimeout(() => {
         box.hidden = true;
-        giveTool(result, seconds);
-        toast(TOOLS[result].name.toUpperCase() + '!', `<span class="who">${esc(from)}</span> spun the random tool · ${seconds}s`, result === 'hand' ? '#ffcf8a' : '#ffd84a', image);
+        giveTool(result, seconds, keep);
+        toast(TOOLS[result].name.toUpperCase() + '!', `<span class="who">${esc(from)}</span> spun the random tool · ${keep ? 'yours until another tool' : seconds + 's'}`, result === 'hand' ? '#ffcf8a' : '#ffd84a', image);
         feed(`<span class="who">${esc(from)}</span> spun the random tool: <b>${TOOLS[result].name}</b>`, image);
         spinning = null; nextSpin();
       }, 900);
@@ -648,7 +649,7 @@ function onGift(m) {
     feed(`${who} popped ${fmt(n)} for you`, img);
   } else if (m.kind === 'tool' && TOOLS[m.tool]) {
     const secs = Math.max(1, +m.seconds || 30);
-    if (m.spin) { spinQueue.push([m.tool, secs, m.chances, from, img]); nextSpin(); return; }
+    if (m.spin) { spinQueue.push([m.tool, secs, m.chances, from, img, !!m.keep]); nextSpin(); return; }
     giveTool(m.tool, secs); tone([523, 659, 784], .1, 'square', .1);
     toast(TOOLS[m.tool].name.toUpperCase() + '!', `from ${who} · ${secs}s`, '#ffd84a', img);
     feed(`${who} gave you the <b>${TOOLS[m.tool].name}</b> (${secs}s)`, img);
@@ -807,7 +808,7 @@ function frame(now) {
   for (const w of models[P.tool]?.userData.wheels || []) w.rotation.x -= speed * dt / .76;
   if (P.tool === 'boots') models.boots.children.forEach(b => { const ph = Math.sin(P.step * Math.PI) * b.userData.side; b.position.z = P.moving ? ph * .18 : 0; b.position.y = P.moving ? Math.max(0, ph) * .06 : 0; });
   P.poke = Math.max(0, P.poke - dt * 5);
-  models.hand.position.set(.22, -.25 - P.poke * .12, -.45 - P.poke * .18);
+  models.hand.position.set(.13, -.16 - P.poke * .1, -.3 - P.poke * .16);
   cage.visible = jailed();
 
   // camera: your eyes (higher in the steamroller), a little bob as you walk
@@ -839,7 +840,7 @@ function hud(now) {
     if (popped >= TOTAL && !wonShown) { wonShown = true; document.getElementById('win').hidden = false; tone([523, 659, 784, 1047, 1319], .2, 'square', .14); }
     if (popped < TOTAL) wonShown = false;
   }
-  if (P.tool !== 'hand') {
+  if (P.tool !== 'hand' && !P.keep) {
     const left = Math.max(0, P.toolUntil - now);
     document.getElementById('toolLeft').style.width = (left / P.toolTotal * 100) + '%';
     document.getElementById('toolInfo').textContent = `${TOOLS[P.tool].info} · ${Math.ceil(left / 1000)}s left`;
@@ -860,6 +861,34 @@ function hud(now) {
 const loader = new GLTFLoader();
 const glb = name => new Promise(res => loader.load(`/models/${name}.glb`, g => res(g.scene), undefined, () => res(null)));
 const meshGeo = (scn, name) => { const o = scn?.getObjectByName(name); if (!o?.geometry) return null; o.updateWorldMatrix(true, false); return o.geometry.clone().applyMatrix4(o.matrixWorld); };
+// detail textures made here (no files): noise, wood grain and brushed metal, laid on the models' materials
+function canvasTex(w, h, draw, repeat = 4, srgb = false) {
+  const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h);
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(repeat, repeat); t.anisotropy = 8; if (srgb) t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+const TEX = {
+  noise: canvasTex(256, 256, (g, w, h) => { const d = g.createImageData(w, h); for (let k = 0; k < w * h; k++) { const v = 150 + Math.random() * 70; d.data.set([v, v, v, 255], k * 4); } g.putImageData(d, 0, 0); g.filter = 'blur(1px)'; g.drawImage(g.canvas, 0, 0); }, 6),
+  grain: canvasTex(512, 128, (g, w, h) => { g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h); for (let k = 0; k < 60; k++) { const y = Math.random() * h; g.strokeStyle = `rgba(120,70,30,${.06 + Math.random() * .14})`; g.lineWidth = 1 + Math.random() * 3; g.beginPath(); g.moveTo(0, y); for (let x = 0; x <= w; x += 16) g.lineTo(x, y + Math.sin(x / 40 + k) * 4); g.stroke(); } }, 2, true),
+  brushed: canvasTex(256, 256, (g, w, h) => { g.fillStyle = '#7a7a7a'; g.fillRect(0, 0, w, h); for (let k = 0; k < 900; k++) { g.fillStyle = `rgba(${Math.random() < .5 ? '255,255,255' : '0,0,0'},${Math.random() * .12})`; g.fillRect(0, Math.random() * h, w, 1); } }, 3),
+  bumps: canvasTex(128, 128, (g, w, h) => { g.fillStyle = '#808080'; g.fillRect(0, 0, w, h); for (let k = 0; k < 500; k++) { g.fillStyle = `rgba(${Math.random() < .5 ? '255,255,255' : '0,0,0'},${.15 + Math.random() * .2})`; g.beginPath(); g.arc(Math.random() * w, Math.random() * h, .6 + Math.random() * 1.6, 0, 7); g.fill(); } }, 10),
+};
+function enhance(root) {
+  root.traverse(o => {
+    if (!o.isMesh) return;
+    for (const m of [].concat(o.material)) {
+      if (!m || m.userData.done) continue;
+      m.userData.done = true;
+      const n = m.name || '';
+      if (/Wood/.test(n)) { m.map = TEX.grain; m.roughnessMap = TEX.noise; m.roughness = .55; }
+      else if (/Rubber|BootDark|Seat|Tread/.test(n)) { m.bumpMap = TEX.bumps; m.bumpScale = 1.2; m.roughness = .95; }
+      else if (/Steel|Chrome|Mast/.test(n)) { m.roughnessMap = TEX.brushed; m.metalness = Math.max(m.metalness, .8); }
+      else if (/Yellow|Green|Pink|Sleeve|Cuff|Stripe|Truck|Sign|Roll/.test(n)) { m.roughnessMap = TEX.noise; m.roughness = Math.max(.3, m.roughness); m.bumpMap = TEX.noise; m.bumpScale = .15; }
+      else if (/Skin/.test(n)) { m.bumpMap = TEX.noise; m.bumpScale = .1; m.roughness = .6; }
+      else if (/Brick|Cardboard|Gravel|Hill/.test(n)) { m.bumpMap = TEX.bumps; m.bumpScale = 1; m.roughnessMap = TEX.noise; }
+      m.needsUpdate = true;
+    }
+  });
+}
 async function loadModels() {
   const [bub, hand, boots, pin, roller, steam, map] = await Promise.all(['bubbles', 'hand', 'boots', 'pin', 'roller', 'steamroller', 'map'].map(glb));
   const bg = meshGeo(bub, 'Bubble'), pg = meshGeo(bub, 'Popped');
@@ -877,13 +906,15 @@ async function loadModels() {
     models[k] = node;
   };
   swap('hand', hand, held, true);
+  if (hand) { models.hand.scale.setScalar(1.25); models.hand.rotation.set(-.22, .42, .18); }
   swap('boots', boots, rig);
   if (models.boots) for (const b of models.boots.children) b.userData.side = /L$/.test(b.name) ? -1 : 1;
   swap('pin', pin, rig); swap('roller', roller, rig); swap('steam', steam, rig);
+  for (const k of ['hand', 'boots', 'pin', 'roller', 'steam']) enhance(models[k]);
   if (map) {
     map.position.set(SIZE / 2, 0, SIZE / 2);
     map.traverse(o => { if (o.isMesh) { o.receiveShadow = false; o.castShadow = false; o.matrixAutoUpdate = false; o.updateMatrix(); } });
-    scene.add(map); map.updateMatrixWorld(true);
+    enhance(map); scene.add(map); map.updateMatrixWorld(true);
   }
 }
 

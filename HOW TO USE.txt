@@ -61,8 +61,8 @@ BUBBLE WRAP (its own game, next to Minecraft)
   your hand (the same tool again adds time).
   The gift actions: Add bubble wrap (that many popped bubbles come back round you: the counter goes down),
   Pop bubbles for you (a wave goes out from you), Give a tool (which one, how many seconds), Random tool
-  (a wheel spins through the five and lands on one: set each tool's chance, e.g. 10 / 30 / 30 / 20 / 10;
-  0 = never), Jail (a cage drops round you for the seconds you set; more jail adds more time), the Reset
+  (a wheel spins through the five and lands on one, and you keep it until another tool is sent; set each
+  tool's chance, e.g. 10 / 30 / 30 / 20 / 10, 0 = never; or give it seconds to run out), Jail (a cage drops round you for the seconds you set; more jail adds more time), the Reset
   countdown (a timer on the game screen and the stream overlay, with the save gift's picture: at 0 every
   bubble comes back and the counter goes to 0) and Save from the reset (stops it; with no countdown
   running you get a shield that blocks the next reset).
